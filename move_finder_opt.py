@@ -1,0 +1,712 @@
+"""
+CROSSPLAY V7 - Optimized Move Finder
+
+Drop-in replacement for GADDAGMoveFinder.find_all_moves() targeting <100ms.
+
+Optimizations vs the fast path in move_finder_gaddag.py:
+1. Skip _validate_placement entirely — GADDAG moves are valid by construction
+2. Inline all board access — direct grid[r][c] with 0-indexed coords throughout
+3. Inline _get_child — unpack directly from bytearray via struct.unpack_from
+4. Inline scoring — direct tile value lookup + bonus table, no function calls
+5. Closure-captured locals — avoid self.attr and module-level lookups in recursion
+6. List-based word building — avoid 56K string concatenations
+
+All coordinates internal to this module are 0-indexed.
+Output moves use 1-indexed coordinates (matching the rest of the codebase).
+"""
+
+import struct
+from collections import Counter
+from typing import List, Dict, Optional, Set, Tuple
+
+from .config import (
+    BOARD_SIZE, CENTER_ROW, CENTER_COL, VALID_TWO_LETTER,
+    TILE_VALUES, BONUS_SQUARES, BINGO_BONUS, RACK_SIZE,
+)
+
+# === Pre-computed lookup tables (module-level, built once) ===
+
+# Char <-> index for compact GADDAG
+_C2I = {chr(65 + i): i for i in range(26)}
+_C2I['+'] = 26
+_I2C = {v: k for k, v in _C2I.items()}
+_DELIM = 26
+
+# Tile values as a list indexed by (ord(c) - 65) for A-Z
+_TV = [0] * 26
+for _c, _v in TILE_VALUES.items():
+    if _c != '?':
+        _TV[ord(_c) - 65] = _v
+
+# Bonus grid: 0-indexed [r][c] -> (letter_mult, word_mult)
+# Pre-build so scoring can do a single lookup
+_BONUS = [[(1, 1)] * 15 for _ in range(15)]
+for (r1, c1), btype in BONUS_SQUARES.items():
+    r0, c0 = r1 - 1, c1 - 1
+    if btype == '2L':
+        _BONUS[r0][c0] = (2, 1)
+    elif btype == '3L':
+        _BONUS[r0][c0] = (3, 1)
+    elif btype == '2W':
+        _BONUS[r0][c0] = (1, 2)
+    elif btype == '3W':
+        _BONUS[r0][c0] = (1, 3)
+
+# Dictionary for word validation
+_dictionary = None
+
+def _get_dict():
+    global _dictionary
+    if _dictionary is None:
+        from .dictionary import get_dictionary
+        _dictionary = get_dictionary()
+    return _dictionary
+
+
+def find_all_moves_opt(board, gaddag, rack_str: str,
+                       board_blanks: List[Tuple[int, int, str]] = None) -> List[Dict]:
+    """
+    Find all valid moves. Drop-in replacement for GADDAGMoveFinder.find_all_moves().
+
+    Args:
+        board: Board object
+        gaddag: CompactGADDAG object
+        rack_str: Rack string (e.g. 'AEINRST' or 'AEIN?ST')
+        board_blanks: List of (row, col, letter) for blanks on board (1-indexed)
+
+    Returns:
+        List of move dicts sorted by score descending, same format as GADDAGMoveFinder
+    """
+    rack_str = rack_str.upper()
+    num_blanks = rack_str.count('?')
+    rack_letters = rack_str.replace('?', '')
+
+    if not rack_letters and num_blanks == 0:
+        return []
+
+    # === Capture everything as locals for the closures ===
+    grid = board._grid                     # 0-indexed [r][c] -> letter|None
+    gdata = gaddag._data                   # bytearray
+    gmv = memoryview(gdata)                # memoryview for zero-copy slicing
+    unpack = struct.unpack_from             # single function ref
+    bonus_grid = _BONUS                    # pre-built bonus table
+    tv = _TV                               # tile value array
+    bingo = BINGO_BONUS
+    rack_sz = RACK_SIZE
+    c2i = _C2I
+    i2c = _I2C
+    delim_idx = _DELIM
+    valid_2 = VALID_TWO_LETTER
+    dictionary = _get_dict()
+    board_blank_set = {(r - 1, c - 1) for r, c, _ in (board_blanks or [])}
+
+    empty_board = all(grid[r][c] is None for r in range(15) for c in range(15))
+
+    # Cross-check cache: (r0, c0, is_horizontal) -> set of valid letters | None | _UNCONSTRAINED
+    _UNCONSTRAINED = None  # Means "any letter is OK"
+    _NOT_COMPUTED = object()  # Sentinel for "not yet computed"
+    cross_cache: Dict = {}
+
+    # Results collection
+    moves: List[Dict] = []
+    seen: set = set()
+
+    # ------------------------------------------------------------------
+    # Inlined helpers (closures capturing locals)
+    # ------------------------------------------------------------------
+
+    def get_child(offset: int, char_idx: int) -> int:
+        """Return child offset or -1. Inline of CompactGADDAG._get_child."""
+        count = gdata[offset] & 0x1F
+        off = offset + 1
+        end = off + count * 5
+        while off < end:
+            ci = gdata[off]
+            if ci == char_idx:
+                return unpack('<I', gdata, off + 1)[0]
+            if ci > char_idx:
+                return -1
+            off += 5
+        return -1
+
+    def is_terminal(offset: int) -> bool:
+        return gdata[offset] > 127  # bit 7 check without &
+
+    def iter_children(offset: int):
+        """Yield (letter, child_offset) pairs."""
+        count = gdata[offset] & 0x1F
+        off = offset + 1
+        end = off + count * 5
+        while off < end:
+            ci = gdata[off]
+            child_off = unpack('<I', gdata, off + 1)[0]
+            yield i2c[ci], child_off
+            off += 5
+
+    def is_valid_word(word: str) -> bool:
+        if len(word) == 2:
+            return word in valid_2
+        return dictionary.is_valid(word)
+
+    def cross_check(r0: int, c0: int, horiz: bool) -> Optional[Set[str]]:
+        """Get valid letters for perpendicular constraint. 0-indexed coords."""
+        key = (r0, c0, horiz)
+        result = cross_cache.get(key, _NOT_COMPUTED)
+        if result is not _NOT_COMPUTED:
+            return result
+
+        # Find perpendicular tiles
+        above = []
+        below = []
+        if horiz:
+            # Perpendicular is vertical — check above/below
+            r = r0 - 1
+            while r >= 0 and grid[r][c0] is not None:
+                above.append(grid[r][c0])
+                r -= 1
+            above.reverse()
+            r = r0 + 1
+            while r < 15 and grid[r][c0] is not None:
+                below.append(grid[r][c0])
+                r += 1
+        else:
+            # Perpendicular is horizontal — check left/right
+            c = c0 - 1
+            while c >= 0 and grid[r0][c] is not None:
+                above.append(grid[r0][c])
+                c -= 1
+            above.reverse()
+            c = c0 + 1
+            while c < 15 and grid[r0][c] is not None:
+                below.append(grid[r0][c])
+                c += 1
+
+        if not above and not below:
+            cross_cache[key] = None
+            return None
+
+        prefix = ''.join(above)
+        suffix = ''.join(below)
+
+        valid = set()
+        for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
+            if is_valid_word(prefix + letter + suffix):
+                valid.add(letter)
+
+        cross_cache[key] = valid
+        return valid
+
+    def score_move(word_chars: list, wlen: int, start_r0: int, start_c0: int,
+                   horiz: bool, blanks_set: set) -> Tuple[int, List[Dict]]:
+        """
+        Inline scoring. All coords 0-indexed.
+        Returns (total_score, crosswords_with_scores).
+        """
+        # Determine new tile positions + score main word in single pass
+        main_score = 0
+        word_mult = 1
+        new_positions = []  # list of (r0, c0, word_index)
+
+        for i in range(wlen):
+            if horiz:
+                r0, c0 = start_r0, start_c0 + i
+            else:
+                r0, c0 = start_r0 + i, start_c0
+
+            is_new = grid[r0][c0] is None
+
+            if i in blanks_set:
+                lv = 0
+            elif not is_new and (r0, c0) in board_blank_set:
+                lv = 0
+            else:
+                lv = tv[ord(word_chars[i]) - 65]
+
+            if is_new:
+                new_positions.append((r0, c0, i))
+                lm, wm = bonus_grid[r0][c0]
+                lv *= lm
+                word_mult *= wm
+
+            main_score += lv
+
+        main_score *= word_mult
+
+        # --- Find and score crosswords in single pass ---
+        cw_total = 0
+        crosswords = []
+
+        for r0, c0, wi in new_positions:
+            placed_letter = word_chars[wi]
+            is_blank = wi in blanks_set
+
+            if horiz:
+                # Perpendicular is vertical — check above/below
+                has_perp = (r0 > 0 and grid[r0-1][c0] is not None) or \
+                           (r0 < 14 and grid[r0+1][c0] is not None)
+            else:
+                has_perp = (c0 > 0 and grid[r0][c0-1] is not None) or \
+                           (c0 < 14 and grid[r0][c0+1] is not None)
+
+            if not has_perp:
+                continue
+
+            # Build and score crossword simultaneously
+            cw_horiz = not horiz
+            cw_score = 0
+            cw_wmult = 1
+            cw_chars = []
+            cw_start_r, cw_start_c = r0, c0
+
+            if cw_horiz:
+                # Look left
+                cc = c0 - 1
+                pre_chars = []
+                while cc >= 0 and grid[r0][cc] is not None:
+                    ch = grid[r0][cc]
+                    pre_chars.append(ch)
+                    clv = 0 if (r0, cc) in board_blank_set else tv[ord(ch) - 65]
+                    cw_score += clv
+                    cw_start_c = cc
+                    cc -= 1
+                pre_chars.reverse()
+                cw_chars.extend(pre_chars)
+
+                # The placed letter
+                cw_chars.append(placed_letter)
+                if is_blank:
+                    plv = 0
+                else:
+                    plv = tv[ord(placed_letter) - 65]
+                lm, wm = bonus_grid[r0][c0]
+                plv *= lm
+                cw_wmult *= wm
+                cw_score += plv
+
+                # Look right
+                cc = c0 + 1
+                while cc < 15 and grid[r0][cc] is not None:
+                    ch = grid[r0][cc]
+                    cw_chars.append(ch)
+                    clv = 0 if (r0, cc) in board_blank_set else tv[ord(ch) - 65]
+                    cw_score += clv
+                    cc += 1
+            else:
+                # Look up
+                rr = r0 - 1
+                pre_chars = []
+                while rr >= 0 and grid[rr][c0] is not None:
+                    ch = grid[rr][c0]
+                    pre_chars.append(ch)
+                    clv = 0 if (rr, c0) in board_blank_set else tv[ord(ch) - 65]
+                    cw_score += clv
+                    cw_start_r = rr
+                    rr -= 1
+                pre_chars.reverse()
+                cw_chars.extend(pre_chars)
+
+                # The placed letter
+                cw_chars.append(placed_letter)
+                if is_blank:
+                    plv = 0
+                else:
+                    plv = tv[ord(placed_letter) - 65]
+                lm, wm = bonus_grid[r0][c0]
+                plv *= lm
+                cw_wmult *= wm
+                cw_score += plv
+
+                # Look down
+                rr = r0 + 1
+                while rr < 15 and grid[rr][c0] is not None:
+                    ch = grid[rr][c0]
+                    cw_chars.append(ch)
+                    clv = 0 if (rr, c0) in board_blank_set else tv[ord(ch) - 65]
+                    cw_score += clv
+                    rr += 1
+
+            cw_score *= cw_wmult
+            cw_total += cw_score
+
+            crosswords.append({
+                'word': ''.join(cw_chars),
+                'row': cw_start_r + 1,
+                'col': cw_start_c + 1,
+                'horizontal': cw_horiz,
+                'score': cw_score
+            })
+
+        total = main_score + cw_total
+
+        # Bingo bonus
+        if len(new_positions) >= rack_sz:
+            total += bingo
+
+        return total, crosswords
+
+    def record_move(word_chars: list, wlen: int, start_r0: int, start_c0: int,
+                    horiz: bool, blanks_used: list):
+        """Record a valid move. 0-indexed input, 1-indexed output."""
+        # Bounds check
+        if start_r0 < 0 or start_c0 < 0:
+            return
+        if horiz:
+            if start_c0 + wlen > 15:
+                return
+        else:
+            if start_r0 + wlen > 15:
+                return
+
+        word = ''.join(word_chars)
+
+        # Validate word
+        if wlen == 2:
+            if word not in valid_2:
+                return
+        elif not dictionary.is_valid(word):
+            return
+
+        # Dedup BEFORE scoring (saves ~64% of scoring work)
+        key = (word, start_r0, start_c0, horiz)
+        if key in seen:
+            return
+        seen.add(key)
+
+        # Lightweight connectivity check
+        connects = False
+        uses_new = False
+        for i in range(wlen):
+            if horiz:
+                r0, c0 = start_r0, start_c0 + i
+            else:
+                r0, c0 = start_r0 + i, start_c0
+            if grid[r0][c0] is not None:
+                connects = True
+                if uses_new:
+                    break  # early exit: both conditions met
+            else:
+                uses_new = True
+                if connects:
+                    break  # early exit: both conditions met
+                # Check adjacency only until we find a connection
+                if ((r0 > 0 and grid[r0-1][c0] is not None) or
+                    (r0 < 14 and grid[r0+1][c0] is not None) or
+                    (c0 > 0 and grid[r0][c0-1] is not None) or
+                    (c0 < 14 and grid[r0][c0+1] is not None)):
+                    connects = True
+                    break  # early exit
+        if not uses_new:
+            return
+        if empty_board:
+            if not any((start_r0 + (0 if horiz else i) == 7 and
+                        start_c0 + (i if horiz else 0) == 7) for i in range(wlen)):
+                return
+        elif not connects:
+            return
+
+        blanks_set = set(blanks_used)
+
+        try:
+            score, crosswords = score_move(word_chars, wlen, start_r0, start_c0, horiz, blanks_set)
+        except Exception:
+            return
+
+        moves.append({
+            'word': word,
+            'row': start_r0 + 1,
+            'col': start_c0 + 1,
+            'direction': 'H' if horiz else 'V',
+            'score': score,
+            'crosswords': crosswords,
+            'blanks_used': blanks_used
+        })
+
+    # ------------------------------------------------------------------
+    # Core GADDAG traversal (closures, 0-indexed throughout)
+    # ------------------------------------------------------------------
+
+    def extend_right(row0, col0, horiz, offset, wchars, wlen, rack, sr0, sc0,
+                     blanks_rem, blanks_used):
+        """Extend word rightward. All coords 0-indexed."""
+        if row0 < 0 or row0 >= 15 or col0 < 0 or col0 >= 15:
+            if is_terminal(offset) and wlen >= 2:
+                record_move(wchars, wlen, sr0, sc0, horiz, blanks_used)
+            return
+
+        existing = grid[row0][col0]
+
+        if existing is not None:
+            idx = c2i.get(existing)
+            if idx is not None:
+                child = get_child(offset, idx)
+                if child >= 0:
+                    wchars.append(existing)
+                    if horiz:
+                        extend_right(row0, col0 + 1, True, child, wchars, wlen + 1,
+                                     rack, sr0, sc0, blanks_rem, blanks_used)
+                    else:
+                        extend_right(row0 + 1, col0, False, child, wchars, wlen + 1,
+                                     rack, sr0, sc0, blanks_rem, blanks_used)
+                    wchars.pop()
+        else:
+            cc = cross_check(row0, col0, horiz)
+
+            if is_terminal(offset) and wlen >= 2:
+                record_move(wchars, wlen, sr0, sc0, horiz, blanks_used)
+
+            for letter in rack:
+                if rack[letter] <= 0:
+                    continue
+                if cc is not None and letter not in cc:
+                    continue
+                idx = c2i.get(letter)
+                if idx is None:
+                    continue
+                child = get_child(offset, idx)
+                if child < 0:
+                    continue
+
+                rack[letter] -= 1
+                wchars.append(letter)
+                if horiz:
+                    extend_right(row0, col0 + 1, True, child, wchars, wlen + 1,
+                                 rack, sr0, sc0, blanks_rem, blanks_used)
+                else:
+                    extend_right(row0 + 1, col0, False, child, wchars, wlen + 1,
+                                 rack, sr0, sc0, blanks_rem, blanks_used)
+                wchars.pop()
+                rack[letter] += 1
+
+            if blanks_rem > 0:
+                for letter, child_off in iter_children(offset):
+                    if letter == '+':
+                        continue
+                    if cc is not None and letter not in cc:
+                        continue
+                    wchars.append(letter)
+                    blanks_used_new = blanks_used + [wlen]
+                    if horiz:
+                        extend_right(row0, col0 + 1, True, child_off, wchars, wlen + 1,
+                                     rack, sr0, sc0, blanks_rem - 1, blanks_used_new)
+                    else:
+                        extend_right(row0 + 1, col0, False, child_off, wchars, wlen + 1,
+                                     rack, sr0, sc0, blanks_rem - 1, blanks_used_new)
+                    wchars.pop()
+
+    def gen_left_part(anchor_r0, anchor_c0, horiz, offset, wchars, wlen, rack,
+                      limit, blanks_rem, blanks_used):
+        """Generate left part of word before anchor. 0-indexed."""
+        # Try crossing delimiter
+        delim_child = get_child(offset, delim_idx)
+        if delim_child >= 0:
+            if horiz:
+                sr0 = anchor_r0
+                sc0 = anchor_c0 - wlen
+            else:
+                sr0 = anchor_r0 - wlen
+                sc0 = anchor_c0
+
+            extend_right(anchor_r0, anchor_c0, horiz, delim_child,
+                         wchars[:], wlen, rack, sr0, sc0, blanks_rem, blanks_used[:])
+
+        # Try extending left
+        if limit > 0:
+            if horiz:
+                pr0 = anchor_r0
+                pc0 = anchor_c0 - wlen - 1
+            else:
+                pr0 = anchor_r0 - wlen - 1
+                pc0 = anchor_c0
+
+            if pr0 < 0 or pc0 < 0:
+                return
+
+            cc = cross_check(pr0, pc0, horiz)
+            pos_idx = -(wlen + 1)
+
+            for letter, idx in rack_letter_indices:
+                if rack[letter] <= 0:
+                    continue
+                if cc is not None and letter not in cc:
+                    continue
+                child = get_child(offset, idx)
+                if child < 0:
+                    continue
+
+                rack[letter] -= 1
+                new_wchars = [letter] + wchars
+                gen_left_part(anchor_r0, anchor_c0, horiz, child, new_wchars,
+                              wlen + 1, rack, limit - 1, blanks_rem, blanks_used)
+                rack[letter] += 1
+
+            if blanks_rem > 0:
+                for letter, child_off in iter_children(offset):
+                    if letter == '+':
+                        continue
+                    if cc is not None and letter not in cc:
+                        continue
+                    new_wchars = [letter] + wchars
+                    gen_left_part(anchor_r0, anchor_c0, horiz, child_off, new_wchars,
+                                  wlen + 1, rack, limit - 1, blanks_rem - 1,
+                                  blanks_used + [pos_idx])
+
+        # At root with limit=0: try placing first letter at anchor
+        if wlen == 0 and limit == 0:
+            cc = cross_check(anchor_r0, anchor_c0, horiz)
+
+            for letter, idx in rack_letter_indices:
+                if rack[letter] <= 0:
+                    continue
+                if cc is not None and letter not in cc:
+                    continue
+                letter_child = get_child(offset, idx)
+                if letter_child < 0:
+                    continue
+                dc = get_child(letter_child, delim_idx)
+                if dc < 0:
+                    continue
+
+                rack[letter] -= 1
+                if horiz:
+                    extend_right(anchor_r0, anchor_c0 + 1, True, dc, [letter], 1,
+                                 rack, anchor_r0, anchor_c0, blanks_rem, blanks_used[:])
+                else:
+                    extend_right(anchor_r0 + 1, anchor_c0, False, dc, [letter], 1,
+                                 rack, anchor_r0, anchor_c0, blanks_rem, blanks_used[:])
+                rack[letter] += 1
+
+            if blanks_rem > 0:
+                for letter, letter_child in iter_children(offset):
+                    if letter == '+':
+                        continue
+                    if cc is not None and letter not in cc:
+                        continue
+                    dc = get_child(letter_child, delim_idx)
+                    if dc < 0:
+                        continue
+                    if horiz:
+                        extend_right(anchor_r0, anchor_c0 + 1, True, dc, [letter], 1,
+                                     rack, anchor_r0, anchor_c0, blanks_rem - 1, [0])
+                    else:
+                        extend_right(anchor_r0 + 1, anchor_c0, False, dc, [letter], 1,
+                                     rack, anchor_r0, anchor_c0, blanks_rem - 1, [0])
+
+    def extend_from_existing(anchor_r0, anchor_c0, horiz, rack_counter, blanks_rem):
+        """Extend from existing tiles on board. 0-indexed."""
+        prefix = []
+        if horiz:
+            c = anchor_c0 - 1
+            while c >= 0 and grid[anchor_r0][c] is not None:
+                prefix.append(grid[anchor_r0][c])
+                c -= 1
+            prefix.reverse()
+            sc0 = c + 1
+            sr0 = anchor_r0
+        else:
+            r = anchor_r0 - 1
+            while r >= 0 and grid[r][anchor_c0] is not None:
+                prefix.append(grid[r][anchor_c0])
+                r -= 1
+            prefix.reverse()
+            sr0 = r + 1
+            sc0 = anchor_c0
+
+        # Navigate GADDAG with reversed prefix
+        reversed_prefix = prefix[::-1]
+        offset = 0  # root
+        for ch in reversed_prefix:
+            idx = c2i.get(ch)
+            if idx is None:
+                return
+            child = get_child(offset, idx)
+            if child < 0:
+                return
+            offset = child
+
+        # Cross delimiter
+        dc = get_child(offset, delim_idx)
+        if dc < 0:
+            return
+
+        extend_right(anchor_r0, anchor_c0, horiz, dc, list(prefix), len(prefix),
+                     rack_counter, sr0, sc0, blanks_rem, [])
+
+    # ------------------------------------------------------------------
+    # Find anchors (0-indexed)
+    # ------------------------------------------------------------------
+
+    if empty_board:
+        anchors_0 = [(CENTER_ROW - 1, CENTER_COL - 1)]
+    else:
+        anchors_0 = []
+        for r in range(15):
+            row = grid[r]
+            for c in range(15):
+                if row[c] is None:
+                    if ((r > 0 and grid[r-1][c] is not None) or
+                        (r < 14 and grid[r+1][c] is not None) or
+                        (c > 0 and row[c-1] is not None) or
+                        (c < 14 and row[c+1] is not None)):
+                        anchors_0.append((r, c))
+
+    # ------------------------------------------------------------------
+    # Left limit calculation (0-indexed)
+    # ------------------------------------------------------------------
+
+    def left_limit(anchor_r0, anchor_c0, horiz):
+        """How far left/up from anchor (0-indexed)."""
+        limit = 0
+        if horiz:
+            r0 = anchor_r0
+            c = anchor_c0 - 1
+            while c >= 0:
+                if grid[r0][c] is not None:
+                    break
+                # Stop at another anchor (has adjacent tile)
+                if ((r0 > 0 and grid[r0-1][c] is not None) or
+                    (r0 < 14 and grid[r0+1][c] is not None) or
+                    (c > 0 and grid[r0][c-1] is not None) or
+                    (c < 14 and grid[r0][c+1] is not None)):
+                    break
+                limit += 1
+                c -= 1
+        else:
+            c0 = anchor_c0
+            r = anchor_r0 - 1
+            while r >= 0:
+                if grid[r][c0] is not None:
+                    break
+                if ((r > 0 and grid[r-1][c0] is not None) or
+                    (r < 14 and grid[r+1][c0] is not None) or
+                    (c0 > 0 and grid[r][c0-1] is not None) or
+                    (c0 < 14 and grid[r][c0+1] is not None)):
+                    break
+                limit += 1
+                r -= 1
+        return limit
+
+    # ------------------------------------------------------------------
+    # Main loop
+    # ------------------------------------------------------------------
+
+    # Pre-compute rack letter -> GADDAG index pairs (avoid dict.get in hot loop)
+    rack_counter = Counter(rack_letters)
+    rack_letter_indices = [(letter, c2i[letter]) for letter in rack_counter]
+
+    for ar0, ac0 in anchors_0:
+        for horiz in (True, False):
+            # Check for existing tile to the left/above
+            if horiz:
+                has_left = ac0 > 0 and grid[ar0][ac0 - 1] is not None
+            else:
+                has_left = ar0 > 0 and grid[ar0 - 1][ac0] is not None
+
+            if has_left:
+                extend_from_existing(ar0, ac0, horiz, rack_counter, num_blanks)
+            else:
+                ll = left_limit(ar0, ac0, horiz)
+                gen_left_part(ar0, ac0, horiz, 0, [], 0, rack_counter,
+                              ll, num_blanks, [])
+
+    moves.sort(key=lambda m: -m['score'])
+    return moves

@@ -1,0 +1,32 @@
+# Generated / cached data (rebuilt automatically on first run)
+gaddag_compact.bin
+.mc_calibration.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.so
+!gaddag_accel.cpython-312-x86_64-linux-gnu.so
+
+# Cython build artifacts
+*.c
+*.html
+build/
+
+# Game saves (local to each machine)
+/crossplay_saves/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
