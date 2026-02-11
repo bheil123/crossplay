@@ -827,13 +827,13 @@ class Game:
         unseen_str = ''.join(unseen_tiles)
         total_unseen = sum(unseen.values())
         
-        # Skip if bag is nearly empty (endgame with <7 tiles) - use endgame solver instead
-        if len(unseen_str) < 7:
+        # Skip MC when bag is empty — exhaustive analysis + 3-ply already give exact results
+        bag_size = total_unseen - 7  # unseen minus opponent rack
+        if bag_size <= 0:
             return
-        
+
         # Adaptive N×K based on calibrated throughput
         blanks_unseen = blank_count
-        bag_size = total_unseen - 7  # unseen minus opponent rack
         
         # Determine MC time budget (shares 30s with risk:3s and optional 3-ply)
         if bag_size <= 5:
