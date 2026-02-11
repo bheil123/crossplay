@@ -32,14 +32,14 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
 
-sys.path.insert(0, '/home/claude')
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from crossplay_v9.board import Board
 from crossplay_v9.move_finder_gaddag import GADDAGMoveFinder
 from crossplay_v9.gaddag import get_gaddag
 from crossplay_v9.scoring import calculate_move_score
 from crossplay_v9.dictionary import Dictionary
-from crossplay_v9.config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES
+from crossplay_v9.config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE
 from crossplay_v9.leave_eval import evaluate_leave
 from crossplay_v9.tile_tracker import TileTracker
 from crossplay_v9.blocked_cache import BlockedSquareCache
@@ -182,6 +182,36 @@ class Game:
         if self.auto_save and self.save_filename:
             self.save(self.save_filename, quiet=True)
     
+    def is_complete(self) -> bool:
+        """Check if this game is complete, using game-over rules.
+
+        A game is over when:
+        - Bag is empty and one player has no tiles, OR
+        - 6 consecutive passes (detected via notes)
+
+        For saved games, remaining = bag + opp_rack. We detect:
+        - your_rack < RACK_SIZE means bag was empty on last draw
+        - remaining = 0 means opponent also has no tiles (they went out)
+        - your_rack empty means you went out
+        - Notes explicitly say COMPLETED
+        """
+        s = self.state
+        remaining = len(self.bag)  # bag + opp_rack (unaccounted tiles)
+        # Explicit completion marker
+        if 'COMPLETED' in s.notes.upper():
+            return True
+        # You went out (empty rack, bag was already empty)
+        if len(s.your_rack) == 0:
+            return True
+        # Opponent went out (no unaccounted tiles remain)
+        if remaining == 0 and len(s.your_rack) > 0:
+            return True
+        # Rack below full size means bag was empty on last draw;
+        # if remaining tiles fit in one rack, game is in final stage
+        if len(s.your_rack) < RACK_SIZE and remaining <= RACK_SIZE:
+            return True
+        return False
+
     def show_board(self):
         """Display the board with bonus squares."""
         print("\n     1  2  3  4  5  6  7  8  9 10 11 12 13 14 15")
@@ -203,11 +233,15 @@ class Game:
         """Show game status."""
         spread = self.state.your_score - self.state.opp_score
         spread_str = f"+{spread}" if spread >= 0 else str(spread)
-        turn = "YOUR TURN" if self.state.is_your_turn else f"{self.state.opponent_name.upper()}'S TURN"
-        
+        if self.is_complete():
+            result = "WIN" if spread > 0 else "LOSS" if spread < 0 else "TIE"
+            status = f"COMPLETED - {result}"
+        else:
+            status = "YOUR TURN" if self.state.is_your_turn else f"{self.state.opponent_name.upper()}'S TURN"
+
         print(f"\n📊 {self.state.name} vs {self.state.opponent_name}")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score} ({spread_str})")
-        print(f"   Bag: {max(0, len(self.bag) - 7)} tiles | {turn}")
+        print(f"   Bag: {max(0, len(self.bag) - 7)} tiles | {status}")
         if self.state.your_rack:
             rack_val = sum(TILE_VALUES.get(t, 0) for t in self.state.your_rack)
             print(f"   Your rack: [{' '.join(self.state.your_rack)}] (value: {rack_val})")
@@ -2329,10 +2363,14 @@ class GameManager:
                 self.games[slot] = game
                 s = game.state
                 spread = s.your_score - s.opp_score
-                turn = "Your turn" if s.is_your_turn else f"{s.opponent_name}'s turn"
+                if game.is_complete():
+                    result = "WIN" if spread > 0 else "LOSS" if spread < 0 else "TIE"
+                    status = f"COMPLETED - {result}"
+                else:
+                    status = "Your turn" if s.is_your_turn else f"{s.opponent_name}'s turn"
                 print(f"  Slot {slot}: {s.name} vs {s.opponent_name} "
                       f"({s.your_score}-{s.opp_score}, {'+' if spread >= 0 else ''}{spread}) "
-                      f"| {turn}")
+                      f"| {status}")
             except Exception as e:
                 print(f"  Slot {slot}: ⚠ Failed to load: {e}")
                 self.games[slot] = None
@@ -2350,9 +2388,13 @@ class GameManager:
             if game:
                 spread = game.state.your_score - game.state.opp_score
                 spread_str = f"+{spread}" if spread >= 0 else str(spread)
-                turn = "Your turn" if game.state.is_your_turn else f"{game.state.opponent_name}'s turn"
+                if game.is_complete():
+                    result = "WIN" if spread > 0 else "LOSS" if spread < 0 else "TIE"
+                    status = f"COMPLETED - {result}"
+                else:
+                    status = "Your turn" if game.state.is_your_turn else f"{game.state.opponent_name}'s turn"
                 print(f"{marker}Slot {slot}: {game.state.name} vs {game.state.opponent_name}")
-                print(f"         Score: {game.state.your_score}-{game.state.opp_score} ({spread_str}) | {turn}")
+                print(f"         Score: {game.state.your_score}-{game.state.opp_score} ({spread_str}) | {status}")
             else:
                 print(f"{marker}Slot {slot}: [Empty]")
     
