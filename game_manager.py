@@ -474,7 +474,7 @@ class Game:
         best_equity = float('-inf')
         skipped_count = 0
         min_to_analyze = max(top_n + 5, 115)  # Analyze enough for both display and MC candidates (up to N=111)
-        risk_time_budget = 3.0  # seconds max for risk analysis phase
+        risk_time_budget = 90.0 if bag_size <= 5 else 3.0  # generous budget for exhaustive endgame
         t_risk_start = time.time()
         risk_budget_exhausted = False
         
@@ -511,10 +511,11 @@ class Game:
                 continue
             
             # Calculate risk with probability weighting
-            # For small bags (≤3), use exhaustive opponent analysis (all possible racks).
+            # For small bags (≤5), use exhaustive opponent analysis (all possible racks).
             # This is exact: enumerate every rack the opp could hold and find their best move.
-            # bag=0: 1ms (1 rack), bag=1: ~5s (≤6 racks), bag=2: ~19s (≤23 racks), bag=3: ~58s (≤70 racks)
-            if bag_size <= 3:
+            # bag=0: ~1ms/move (1 rack), bag=1: ~80ms (6), bag=2: ~300ms (23),
+            # bag=3: ~900ms (70), bag=4: ~2.4s (183), bag=5: ~5.6s (428)
+            if bag_size <= 5:
                 risk_str, expected_risk, max_damage = self._calculate_exhaustive_opp_risk(move, unseen)
             else:
                 risk_str, expected_risk, max_damage = self._calculate_probabilistic_risk(move, unseen)
