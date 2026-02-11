@@ -20,6 +20,9 @@ build/
 # Game saves (local to each machine)
 /crossplay_saves/
 
+# Claude Code local settings
+.claude/
+
 # IDE
 .vscode/
 .idea/

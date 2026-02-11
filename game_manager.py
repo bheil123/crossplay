@@ -2271,7 +2271,7 @@ def run_simulation(strategy1: Strategy, strategy2: Strategy, num_games: int = 10
             'winner': winner
         })
         
-        print(f"  Final: P1={score1}, P2={score2} → {winner}")
+        print(f"  Final: P1={score1}, P2={score2} -> {winner}")
     
     # Summary
     print(f"\n{'='*60}")
