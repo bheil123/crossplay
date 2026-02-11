@@ -76,15 +76,24 @@ First run builds GADDAG (~48s) and runs MC calibration (~3s). Both are cached.
 | `gaddag_compact.bin` | 28MB compact GADDAG, built on first run |
 | `.mc_calibration.json` | MC throughput cache, valid 48h |
 
-## Rebuilding the C extension
+## Cython C extension (gaddag_accel)
+
+The pre-built `.so` is for CPython 3.12 x86_64 Linux (Claude Chat sandbox).
+To rebuild for other platforms:
 
 ```bash
 pip install cython
 python3 setup_accel.py build_ext --inplace
 ```
 
-The pre-built `.so` is for CPython 3.12 x86_64 Linux. Rebuild for other
-platforms.
+**Windows / Claude Code note:** On a native Win11 host, the Cython extension
+is *not* a speedup for Monte Carlo evaluation. The MC hot loop uses
+`GADDAGMoveFinder` (pure Python) which runs at ~2.6M sims/s on 8 workers.
+The C extension adds Python↔C call overhead per simulation that drops MC
+throughput to ~3K sims/s — a ~900x regression. The C extension is only ~1.5x
+faster for single-call move generation (8.4ms vs 12.4ms per rack), which
+does not justify the MC penalty. The `.pyd` has been renamed to
+`.pyd.disabled` and the engine runs pure Python.
 
 ## Coding conventions
 

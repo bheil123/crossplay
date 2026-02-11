@@ -158,12 +158,12 @@ The first run will:
    dense sims/sec on 4 workers. Your i7 should do better.
 
 If the pre-built `.so` doesn't work on your system (it's for CPython 3.12
-x86_64 Linux), rebuild it:
+x86_64 Linux), the engine falls back to pure Python automatically.
 
-```bash
-pip install cython
-python3 setup_accel.py build_ext --inplace
-```
+**Windows / Claude Code note:** Do *not* rebuild the Cython extension on
+native Win11. The compiled `.pyd` actually *degrades* MC performance (~3K
+sims/s vs ~2.6M sims/s pure Python) due to Python↔C call overhead in the
+tight MC simulation loop. The engine runs faster without it on Windows.
 
 ---
 

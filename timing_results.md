@@ -77,6 +77,47 @@ Two-tier: full risk for top candidates within 3s, prelim_equity fallback.
 | 1   | ≤8     | ≤8           | ~6ms         |
 | 2   | ≤9     | ≤36          | ~15ms        |
 
+## Native Win11 / Claude Code performance (2026-02-10)
+
+**Environment:** Win11, 12-core CPU, Python 3.12, 8 MC workers
+
+### Cython C extension: NOT a speedup on Win11
+
+The Cython `.pyd` was compiled successfully but **degrades MC performance**:
+
+| Config | MC sims/s | Move gen (ms/rack) |
+|--------|-----------|-------------------|
+| Pure Python (GADDAGMoveFinder) | **2,640,000** (8 workers) | 12.4ms |
+| Cython `.pyd` enabled | **3,000** (8 workers) | 8.4ms |
+
+The C extension is 1.5x faster for single-call move generation, but the
+per-call Python↔C overhead in the tight MC simulation loop causes a ~900x
+regression. The `.pyd` has been renamed to `.pyd.disabled`.
+
+### MC worker scaling (pure Python)
+
+| Workers | sims/s | Scaling |
+|---------|--------|---------|
+| 4 | 1,310,000 | baseline |
+| 8 | 2,640,000 | 2.0x (linear) |
+| 12 | 4,040,000 | 3.1x (linear) |
+
+Worker cap set to 8 for balance.
+
+### Endgame optimizations
+
+| Bag size | Unique opp racks | Exhaustive risk time | MC skipped? |
+|----------|-----------------|---------------------|-------------|
+| 0 | 1 | ~1ms | Yes |
+| 1 | 6 | ~6ms | Yes |
+| 2 | 23 | ~15ms | Yes |
+| 3 | 70 | ~900ms | Yes |
+| 4 | 183 | ~2.4s | Yes |
+| 5 | 428 | ~5.6s | Yes |
+
+For bag ≤ 5, exhaustive risk + 3-ply replace MC entirely (exact results,
+no sampling needed). Time budget for exhaustive risk: 90s.
+
 ## Performance history
 
 | Version | Feature | Move gen | MC sims/s (4w) | N×K (mid) |

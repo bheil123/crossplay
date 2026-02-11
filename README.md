@@ -94,7 +94,13 @@ python3 setup_accel.py build_ext --inplace
 
 ### Move generation
 GADDAG traversal via compiled C extension → Python scoring wrapper.
-Falls back to pure Python if .so unavailable (~14x slower for MC).
+Falls back to pure Python if .so unavailable.
+
+**Windows / Claude Code note:** On a native Win11 host, the Cython C extension
+is *not* a speedup for MC. The Python `GADDAGMoveFinder` path achieves ~2.6M
+sims/s (8 workers), while the C extension drops MC to ~3K sims/s due to
+Python↔C call overhead in the tight simulation loop. The `.pyd` is disabled;
+the engine runs pure Python on Windows.
 
 ### AI evaluation pipeline (per turn, 30s budget)
 1. **Risk analysis** (3s): Full threat analysis on top candidates, prelim_equity fallback
@@ -133,3 +139,8 @@ python3 setup_accel.py build_ext --inplace
 
 The .pyx source implements the same GADDAG traversal algorithm as
 `move_finder_opt.py` but with Cython-accelerated node lookup.
+
+**Important:** On native Win11 (Claude Code), the compiled `.pyd` *degrades*
+MC performance (~3K vs ~2.6M sims/s) due to per-call Python↔C overhead in
+the tight MC loop. The `.pyd` has been disabled. Only rebuild if you are on
+Linux or have confirmed it helps on your platform.
