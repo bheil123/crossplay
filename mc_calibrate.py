@@ -94,7 +94,7 @@ def _run_benchmark():
     t_dense = time.perf_counter() - t0
     sps_dense = n_dense / t_dense
     
-    n_workers = min(4, multiprocessing.cpu_count())
+    n_workers = min(8, multiprocessing.cpu_count())
     
     return {
         'sps_sparse_1w': round(sps_sparse, 1),
@@ -296,7 +296,7 @@ def get_env_info() -> dict:
     """Gather environment info for reporting."""
     import sys
     total_cores = os.cpu_count() or 1
-    n_workers = min(4, total_cores)
+    n_workers = min(8, total_cores)
     
     # Try to get CPU model name
     cpu_model = platform.processor() or "unknown"

@@ -282,7 +282,7 @@ def evaluate_with_lookahead_parallel(
     # Determine worker count
     if max_workers is None:
         cpu = os.cpu_count() or 1
-        max_workers = min(cpu, 4)  # Cap at 4 — diminishing returns beyond
+        max_workers = min(cpu, 8)  # Cap at 8
 
     # Skip parallel overhead for tiny batches
     if len(candidates) <= 2 or max_workers <= 1:

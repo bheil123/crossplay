@@ -926,7 +926,7 @@ def mc_evaluate_2ply(
     # Decide parallel vs sequential
     if max_workers is None:
         cpu = os.cpu_count() or 1
-        max_workers = min(cpu, 4)
+        max_workers = min(cpu, 8)
 
     # Sequential for small batches or no board_moves
     if board_moves is None or len(candidates) <= 2 or max_workers <= 1:
