@@ -431,6 +431,7 @@ class Game:
         
         bag_size = tracker.get_bag_count()
         bag_empty = bag_size < 7
+        endgame_exact = (bag_size == 0)
         
         # Check for power tiles
         from crossplay_v9.power_tiles import format_power_tile_display, get_power_tiles_in_pool, prob_draw_any_power_tile
@@ -481,7 +482,11 @@ class Game:
             leave_str = ''.join(sorted(leave_tiles)) if leave_tiles else "-"
             
             # Proper leave evaluation (quality score, not just point value)
-            leave_value = evaluate_leave(leave_str, bag_empty=bag_empty)
+            # Crossplay: when bag=0, leftover tiles don't penalize — leave is meaningless
+            if endgame_exact:
+                leave_value = 0.0
+            else:
+                leave_value = evaluate_leave(leave_str, bag_empty=bag_empty)
             
             # Preliminary equity (without risk)
             prelim_equity = pts + leave_value
@@ -865,6 +870,10 @@ class Game:
         # Skip MC when bag ≤ 5 — exhaustive risk + 3-ply give exact results,
         # and MC just resamples the same small rack pool (≤428 unique racks)
         bag_size = total_unseen - 7  # unseen minus opponent rack
+        if bag_size == 0:
+            # Bag empty: opponent rack is known exactly — use deterministic 2-ply
+            self._show_endgame_2ply(rack, unseen_str, total_unseen)
+            return
         if bag_size <= 5:
             return
 
@@ -1307,6 +1316,67 @@ class Game:
             import traceback
             traceback.print_exc()
     
+    def _show_endgame_2ply(self, rack: str, opp_rack: str, total_unseen: int):
+        """Show exact 2-ply endgame analysis when bag=0 (Crossplay rules).
+
+        Opponent rack is known exactly (= all unseen tiles).  Both players
+        get one final turn; leftover tiles don't penalize.
+        """
+        from crossplay_v9.lookahead_3ply import evaluate_endgame_2ply
+
+        print(f"\n{'='*70}")
+        print(f"ENDGAME 2-PLY (exact) [bag: 0, opp rack: {len(opp_rack)} tiles]")
+        print("=" * 70)
+        print(f"Opponent rack known: {opp_rack}")
+        print("Your move -> Opponent's best response -> Net")
+        print()
+
+        try:
+            results = evaluate_endgame_2ply(
+                self.board,
+                your_rack=rack,
+                opp_rack=opp_rack,
+                gaddag=self.gaddag,
+                board_blanks=self.state.blank_positions,
+            )
+
+            if not results:
+                print("No endgame results available (no valid moves).")
+                return
+
+            meta = results[0].get('_meta', {})
+            evald = meta.get('candidates_evaluated', '?')
+            pruned_ct = meta.get('candidates_pruned', 0)
+            elapsed = meta.get('elapsed_s', '?')
+            print(f"  Evaluated {evald} candidates, pruned {pruned_ct}, in {elapsed}s")
+            print()
+
+            print(f"{'#':<3} {'Your Move':<12} {'Pos':<12} {'Pts':>4} "
+                  f"{'Opp Move':<12} {'Opp Pts':>7} {'Net':>6}")
+            print("-" * 62)
+
+            for i, r in enumerate(results[:15], 1):
+                pos = f"R{r['row']}C{r['col']} {r['direction']}"
+                opp_move = r['opp_word'][:10]
+                print(f"{i:<3} {r['word']:<12} {pos:<12} {r['score']:>4} "
+                      f"{opp_move:<12} {r['opp_score']:>7} {r['net_2ply']:>+6}")
+
+            best = results[0]
+            print(f"\n  Best: {best['word']} ({best['score']} pts)")
+            print(f"    -> Opp plays {best['opp_word']} ({best['opp_score']} pts)")
+            print(f"    -> Net: {best['net_2ply']:+d}")
+
+            opp_resps = best.get('opp_responses', [])
+            if len(opp_resps) > 1:
+                print(f"\n  Top opponent responses to {best['word']}:")
+                for resp in opp_resps[:3]:
+                    print(f"    {resp['word']} @ {resp['pos']} = {resp['score']} pts")
+
+        except Exception as e:
+            print(f"Endgame 2-ply error: {e}")
+            import traceback
+            traceback.print_exc()
+
     def _calculate_probabilistic_risk(self, move: dict, unseen: dict) -> tuple:
         """Calculate risk using real word analysis of opened bonus squares."""
         from crossplay_v9.real_risk import calculate_real_risk
@@ -2205,29 +2275,36 @@ def run_simulation(strategy1: Strategy, strategy2: Strategy, num_games: int = 10
         turn = 1
         consecutive_passes = 0
         max_turns = 100
-        
+        final_turns = None  # Crossplay: both get 1 more turn after bag empties
+
         while consecutive_passes < 4 and turn < max_turns:
+            # Crossplay endgame: once final countdown reaches 0, game is over
+            if final_turns is not None and final_turns <= 0:
+                break
+
             current_rack = rack1 if turn % 2 == 1 else rack2
             current_strategy = strategy1 if turn % 2 == 1 else strategy2
             player_name = f"P1({strategy1.value})" if turn % 2 == 1 else f"P2({strategy2.value})"
-            
+
             rack_str = ''.join(current_rack)
             finder = GADDAGMoveFinder(board, gaddag)
             moves = finder.find_all_moves(rack_str)
-            
+
             if not moves:
                 consecutive_passes += 1
+                if final_turns is not None:
+                    final_turns -= 1
                 turn += 1
                 continue
-            
+
             # Select move based on strategy
             move = ai_select_move(moves, current_strategy, rack_str)
-            
+
             if move:
                 word = move['word']
                 row, col = move['row'], move['col']
                 horizontal = move['direction'] == 'H'
-                
+
                 # Calculate tiles used
                 tiles_used = []
                 for i, letter in enumerate(word):
@@ -2235,54 +2312,49 @@ def run_simulation(strategy1: Strategy, strategy2: Strategy, num_games: int = 10
                     c = col + i if horizontal else col
                     if not board.get_tile(r, c):
                         tiles_used.append(letter)
-                
+
                 # Place word
                 board.place_word(word, row, col, horizontal)
                 points = move['score']
-                
+
                 # Bingo bonus (Crossplay uses 40)
                 if len(tiles_used) == 7:
                     points += 40
-                
+
                 # Update score
                 if turn % 2 == 1:
                     score1 += points
                 else:
                     score2 += points
-                
+
                 # Update rack
                 for t in tiles_used:
                     if t in current_rack:
                         current_rack.remove(t)
-                
+
                 # Draw new tiles
                 for _ in range(min(len(tiles_used), len(bag))):
                     current_rack.append(bag.pop())
-                
+
+                # Crossplay: start final-turn countdown when bag empties
+                if len(bag) == 0 and final_turns is None:
+                    final_turns = 2  # Both players get one more turn
+                if final_turns is not None:
+                    final_turns -= 1
+
                 consecutive_passes = 0
-                
+
                 if turn <= 10 or turn % 10 == 0:
                     print(f"  Turn {turn}: {player_name} plays {word} for {points} pts")
             else:
                 consecutive_passes += 1
-            
+                if final_turns is not None:
+                    final_turns -= 1
+
             turn += 1
-            
-            # Check if someone is out
-            if len(rack1) == 0 or len(rack2) == 0:
-                break
-        
-        # Final scoring - subtract remaining tiles
-        rack1_penalty = sum(TILE_VALUES.get(t, 0) for t in rack1)
-        rack2_penalty = sum(TILE_VALUES.get(t, 0) for t in rack2)
-        
-        if len(rack1) == 0:
-            score1 += rack2_penalty
-        elif len(rack2) == 0:
-            score2 += rack1_penalty
-        else:
-            score1 -= rack1_penalty
-            score2 -= rack2_penalty
+
+        # Crossplay final scoring: no tile penalties, no transfer bonus.
+        # Final scores are simply accumulated move scores.
         
         # Record results
         results['player1_total_score'] += score1

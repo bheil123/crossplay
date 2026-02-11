@@ -114,9 +114,10 @@ def calculate_real_risk(
     opened_squares = playable_squares
     
     total_unseen = sum(unseen.values())
-    if total_unseen < 7:
+    if total_unseen == 0:
         return "-", 0.0, 0, []
-    
+    hand_size = min(7, total_unseen)
+
     # Group opened squares by column and row
     by_col = {}
     by_row = {}
@@ -158,10 +159,10 @@ def calculate_real_risk(
         threats = _find_vertical_threats(
             get_tile, col_num, opened_rows, constraints, bonuses,
             unseen, total_unseen, dictionary, bonus_squares, tile_values,
-            blocked_cache
+            blocked_cache, hand_size=hand_size
         )
         all_threats.extend(threats)
-    
+
     # Find horizontal threats
     for row_num, opened_cols in by_row.items():
         # Skip row if all bonus squares in it are blocked/occupied
@@ -193,10 +194,10 @@ def calculate_real_risk(
         threats = _find_horizontal_threats(
             get_tile, row_num, opened_cols, constraints, bonuses,
             unseen, total_unseen, dictionary, bonus_squares, tile_values,
-            blocked_cache
+            blocked_cache, hand_size=hand_size
         )
         all_threats.extend(threats)
-    
+
     # Deduplicate
     seen = set()
     unique_threats = []
@@ -205,10 +206,10 @@ def calculate_real_risk(
         if key not in seen:
             seen.add(key)
             unique_threats.append(t)
-    
+
     if not unique_threats:
         return "-", 0.0, 0, []
-    
+
     # Sort by EV
     unique_threats.sort(key=lambda x: -x['ev'])
     expected_damage = unique_threats[0]['ev']
@@ -251,7 +252,7 @@ def calculate_real_risk(
 def _find_vertical_threats(
     get_tile, col, opened_rows, constraints, bonuses,
     unseen, total_unseen, dictionary, bonus_squares, tile_values,
-    blocked_cache=None
+    blocked_cache=None, hand_size=7
 ) -> List[dict]:
     """Find vertical words that use opened squares."""
     threats = []
@@ -347,18 +348,19 @@ def _find_vertical_threats(
                 
                 threat = _evaluate_threat(
                     word, start_r, col, positions_needed, constraints, False,
-                    unseen, total_unseen, bonus_squares, tile_values
+                    unseen, total_unseen, bonus_squares, tile_values,
+                    hand_size=hand_size
                 )
                 if threat:
                     threats.append(threat)
-    
+
     return threats
 
 
 def _find_horizontal_threats(
     get_tile, row, opened_cols, constraints, bonuses,
     unseen, total_unseen, dictionary, bonus_squares, tile_values,
-    blocked_cache=None
+    blocked_cache=None, hand_size=7
 ) -> List[dict]:
     """Find horizontal words that use opened squares."""
     threats = []
@@ -449,11 +451,12 @@ def _find_horizontal_threats(
                 
                 threat = _evaluate_threat(
                     word, row, start_c, positions_needed, constraints, True,
-                    unseen, total_unseen, bonus_squares, tile_values
+                    unseen, total_unseen, bonus_squares, tile_values,
+                    hand_size=hand_size
                 )
                 if threat:
                     threats.append(threat)
-    
+
     return threats
 
 
@@ -553,7 +556,7 @@ def _check_crosswords(word, start, positions_needed, constraints, dictionary, ve
 
 def _evaluate_threat(
     word, row_or_start, col_or_pos, positions_needed, constraints, horizontal,
-    unseen, total_unseen, bonus_squares, tile_values
+    unseen, total_unseen, bonus_squares, tile_values, hand_size=7
 ) -> dict:
     """Evaluate a potential threat, accounting for blank-only plays."""
     
@@ -657,8 +660,8 @@ def _evaluate_threat(
     
     total_score = main_score + cross_score
     
-    prob = _calc_prob(needed_str, unseen, total_unseen)
-    
+    prob = _calc_prob(needed_str, unseen, total_unseen, hand_size=hand_size)
+
     if total_score < 6 or prob < 0.001:
         return None
     
@@ -870,19 +873,20 @@ def analyze_existing_threats(
         return "-", 0.0, 0, []
     
     total_unseen = sum(unseen.values())
-    if total_unseen < 7:
+    if total_unseen == 0:
         return "-", 0.0, 0, []
-    
+    hand_size = min(7, total_unseen)
+
     # Group by column and row
     by_col = {}
     by_row = {}
-    
+
     for (r, c) in playable:
         by_col.setdefault(c, []).append(r)
         by_row.setdefault(r, []).append(c)
-    
+
     all_threats = []
-    
+
     # Find vertical threats
     for col_num, rows in by_col.items():
         constraints = {}
@@ -895,21 +899,21 @@ def analyze_existing_threats(
                 right = get_tile(r, col_num + 1)
                 if right:
                     constraints[r] = ('right', right)
-        
+
         if not constraints:
             continue
-        
-        bonuses = [(r, bonus_squares.get((r, col_num))) 
-                   for r in range(1, 16) 
+
+        bonuses = [(r, bonus_squares.get((r, col_num)))
+                   for r in range(1, 16)
                    if bonus_squares.get((r, col_num)) in ('3W', '2W', '3L', '2L')]
-        
+
         threats = _find_vertical_threats(
             get_tile, col_num, rows, constraints, bonuses,
             unseen, total_unseen, dictionary, bonus_squares, tile_values,
-            blocked_cache
+            blocked_cache, hand_size=hand_size
         )
         all_threats.extend(threats)
-    
+
     # Find horizontal threats
     for row_num, cols in by_row.items():
         constraints = {}
@@ -922,18 +926,18 @@ def analyze_existing_threats(
                 below = get_tile(row_num + 1, c)
                 if below:
                     constraints[c] = ('below', below)
-        
+
         if not constraints:
             continue
-        
+
         bonuses = [(c, bonus_squares.get((row_num, c)))
                    for c in range(1, 16)
                    if bonus_squares.get((row_num, c)) in ('3W', '2W', '3L', '2L')]
-        
+
         threats = _find_horizontal_threats(
             get_tile, row_num, cols, constraints, bonuses,
             unseen, total_unseen, dictionary, bonus_squares, tile_values,
-            blocked_cache
+            blocked_cache, hand_size=hand_size
         )
         all_threats.extend(threats)
     

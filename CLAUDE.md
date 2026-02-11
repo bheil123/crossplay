@@ -8,7 +8,46 @@ also run AI-vs-AI simulations.
 
 **Key differences from Scrabble:** 3 blanks (not 2), 40-point bingo bonus
 (not 50), different tile values, different bonus square layout, no center
-star bonus.
+star bonus, very different endgame rules.
+
+## Endgame rules (NYT Crossplay)
+
+When the tile bag is empty and all tiles are played, or no more moves can
+be made, the game ends. **Both players get one final turn** after the bag
+empties. **Leftover tiles do not count against the player** — there is no
+tile penalty or transfer bonus. This differs significantly from Scrabble
+where going out earns opponent's tile values and remaining tiles are
+subtracted.
+
+### Endgame heuristic for AI evaluation
+
+Because of the "both get one final turn, no tile penalty" rule, the
+endgame equity calculation is:
+
+1. **When bag = 0 and it's your turn (your final turn):**
+   - You will play one more move. Opponent will play one more move.
+   - `equity = your_move_score - opp_best_response_score`
+   - Leave value is irrelevant (leftover tiles don't penalize).
+   - Maximize your move score; opponent maximizes theirs.
+
+2. **When bag = 0 and it's opponent's turn (their final turn):**
+   - Opponent plays one more move. You play one more move after.
+   - `equity = -opp_move_score + your_best_response_score`
+
+3. **Key implications for the engine:**
+   - **Leave evaluation is meaningless** once both players have their
+     final racks — there is no future draw and no tile penalty.
+   - **Risk analysis changes**: the opponent has exactly 1 response
+     move, not an infinite horizon. Threat = their single best move.
+   - **3-ply simplifies to 2-ply**: your move + opponent's response
+     (or opponent's move + your response). No ply 3 needed because
+     the game ends after both final turns.
+   - **MC simulation is unnecessary** when bag = 0 — opponent's rack
+     can be inferred exactly (unseen tiles = their rack), so evaluate
+     deterministically instead of sampling.
+   - **When bag has 1-6 tiles**: the draw that empties the bag triggers
+     final turns. Factor in that after this draw, each player gets
+     exactly one more turn.
 
 ## Architecture overview
 

@@ -52,6 +52,7 @@ class CrossplayGame:
         self.turn = 'human'  # human goes first
         self.consecutive_passes = 0
         self.moves_played = []
+        self.final_turns_remaining = None  # Counts down once bag empties
         
     def _draw_tiles(self, n: int) -> list:
         """Draw n tiles from bag."""
@@ -181,7 +182,10 @@ class CrossplayGame:
         
         self.human_score += score
         self._refill_rack(self.human_rack)
-        
+        self._check_bag_empty()
+        if self.final_turns_remaining is not None:
+            self.final_turns_remaining -= 1
+
         self.moves_played.append(('human', word, row, col, horizontal, score))
         self.consecutive_passes = 0
         
@@ -202,6 +206,8 @@ class CrossplayGame:
         if not moves:
             print("\n🤖 Claude passes (no valid moves).")
             self.consecutive_passes += 1
+            if self.final_turns_remaining is not None:
+                self.final_turns_remaining -= 1
             return
         
         # Claude picks the highest-scoring move (simple strategy)
@@ -233,7 +239,10 @@ class CrossplayGame:
         
         self.claude_score += score
         self._refill_rack(self.claude_rack)
-        
+        self._check_bag_empty()
+        if self.final_turns_remaining is not None:
+            self.final_turns_remaining -= 1
+
         self.moves_played.append(('claude', word, row, col, horizontal, score))
         self.consecutive_passes = 0
         
@@ -269,41 +278,45 @@ class CrossplayGame:
         self.consecutive_passes = 0
         return True
     
+    def _check_bag_empty(self):
+        """Start final turn countdown when bag empties.
+
+        Crossplay rule: when the bag empties, both players get one final
+        turn. We track this with final_turns_remaining (2 = both still
+        need a final turn, 1 = one player has taken theirs, 0 = done).
+        """
+        if len(self.bag) == 0 and self.final_turns_remaining is None:
+            self.final_turns_remaining = 2  # Both players get one more turn
+
     def is_game_over(self) -> bool:
-        """Check if game is over."""
-        # 6 consecutive passes
+        """Check if game is over.
+
+        Crossplay rules:
+        - When bag empties, both players get one final turn, then game ends
+        - 6 consecutive passes ends the game immediately
+        - No more valid moves ends the game
+        """
         if self.consecutive_passes >= 6:
             return True
-        # One player out of tiles and bag empty
-        if len(self.bag) == 0:
-            if len(self.human_rack) == 0 or len(self.claude_rack) == 0:
-                return True
+        if self.final_turns_remaining is not None and self.final_turns_remaining <= 0:
+            return True
         return False
-    
+
     def final_scores(self):
-        """Calculate final scores."""
-        # Subtract remaining tiles
-        human_penalty = sum(TILE_VALUES.get(t, 0) for t in self.human_rack)
-        claude_penalty = sum(TILE_VALUES.get(t, 0) for t in self.claude_rack)
-        
-        # If one player went out, they get opponent's remaining tiles
-        if len(self.human_rack) == 0:
-            self.human_score += claude_penalty
-        elif len(self.claude_rack) == 0:
-            self.claude_score += human_penalty
-        else:
-            self.human_score -= human_penalty
-            self.claude_score -= claude_penalty
-        
+        """Calculate final scores.
+
+        Crossplay rule: leftover tiles do NOT count against the player.
+        Final scores are simply the accumulated scores from played moves.
+        """
         print(f"\n{'='*60}")
         print("GAME OVER!")
         print(f"{'='*60}")
         print(f"Final Score: You {self.human_score} - Claude {self.claude_score}")
-        
+
         if self.human_score > self.claude_score:
-            print("🎉 YOU WIN! 🎉")
+            print("YOU WIN!")
         elif self.claude_score > self.human_score:
-            print("🤖 Claude wins!")
+            print("Claude wins!")
         else:
             print("It's a tie!")
     
@@ -352,11 +365,14 @@ class CrossplayGame:
             
             elif action == 'pass':
                 self.consecutive_passes += 1
+                if self.final_turns_remaining is not None:
+                    self.final_turns_remaining -= 1
                 print("You passed.")
-                # Claude's turn
-                self.claude_play()
-                self.show_board()
-                self.show_scores()
+                if not self.is_game_over():
+                    # Claude's turn
+                    self.claude_play()
+                    self.show_board()
+                    self.show_scores()
             
             elif action == 'exchange' and len(parts) >= 2:
                 if self.human_exchange(parts[1]):

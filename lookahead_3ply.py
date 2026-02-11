@@ -19,6 +19,125 @@ from .gaddag import get_gaddag
 from .leave_eval import evaluate_leave
 
 
+def evaluate_endgame_2ply(
+    board: Board,
+    your_rack: str,
+    opp_rack: str,
+    gaddag=None,
+    top_n: int = 20,
+    board_blanks: List[Tuple[int, int, str]] = None,
+) -> List[Dict]:
+    """
+    Deterministic 2-ply solver for bag=0 endgame (Crossplay rules).
+
+    When the bag is empty, the opponent's rack is known exactly (= all unseen
+    tiles).  Both players get one final turn, leftover tiles don't penalize.
+
+    For each candidate move:
+      1. Place your move on the board
+      2. Find opponent's best response with their exact rack
+      3. net = your_score - opp_best_score
+
+    No leave value (Crossplay: leftover tiles don't matter).
+    No blank correction (exact rack, not sampled).
+    No ply 3 (game ends after both final turns).
+
+    Returns:
+        List of dicts with move info and net equity, sorted best first.
+    """
+    t_start = time.perf_counter()
+
+    if gaddag is None:
+        gaddag = get_gaddag()
+    if board_blanks is None:
+        board_blanks = []
+
+    # --- Generate your candidate moves ---
+    finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks)
+    your_moves = finder.find_all_moves(your_rack)
+
+    if not your_moves:
+        return []
+
+    your_moves.sort(key=lambda m: -m['score'])
+    candidates = your_moves[:top_n]
+
+    # --- Evaluate each candidate ---
+    results = []
+    best_net = float('-inf')
+    pruned = 0
+
+    for move in candidates:
+        # Progressive pruning: if this move's score can't beat best net
+        # even with opponent scoring 0, skip it.
+        if best_net > float('-inf') and move['score'] < best_net:
+            pruned += 1
+            continue
+
+        horizontal = move['direction'] == 'H'
+
+        # === PLY 1: Place your move ===
+        placed = board.place_move(
+            move['word'], move['row'], move['col'], horizontal
+        )
+
+        # === PLY 2: Opponent's best response with exact rack ===
+        opp_finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks)
+        opp_moves = opp_finder.find_all_moves(opp_rack)
+
+        opp_best_responses = []
+        if opp_moves:
+            opp_moves.sort(key=lambda m: -m['score'])
+            opp_best = opp_moves[0]
+            opp_score = opp_best['score']
+            opp_word = opp_best['word']
+
+            for om in opp_moves[:3]:
+                opp_best_responses.append({
+                    'word': om['word'],
+                    'score': om['score'],
+                    'pos': f"R{om['row']}C{om['col']} {om['direction']}"
+                })
+        else:
+            opp_score = 0
+            opp_word = "(pass)"
+
+        board.undo_move(placed)
+
+        net = move['score'] - opp_score
+
+        result = {
+            'word': move['word'],
+            'row': move['row'],
+            'col': move['col'],
+            'direction': move['direction'],
+            'score': move['score'],
+            'opp_word': opp_word,
+            'opp_score': opp_score,
+            'opp_responses': opp_best_responses,
+            'net_2ply': net,
+        }
+        results.append(result)
+
+        if net > best_net:
+            best_net = net
+
+    elapsed = time.perf_counter() - t_start
+    results.sort(key=lambda r: -r['net_2ply'])
+
+    meta = {
+        'elapsed_s': round(elapsed, 2),
+        'candidates_evaluated': len(results),
+        'candidates_pruned': pruned,
+        'opp_rack_size': len(opp_rack),
+        'solver': 'endgame_2ply_exact',
+    }
+    for r in results:
+        r['_meta'] = meta
+
+    return results
+
+
 def evaluate_3ply(
     board: Board,
     your_rack: str,
