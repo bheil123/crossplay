@@ -827,9 +827,10 @@ class Game:
         unseen_str = ''.join(unseen_tiles)
         total_unseen = sum(unseen.values())
         
-        # Skip MC when bag ≤ 2 — exhaustive analysis + 3-ply already give exact results
+        # Skip MC when bag ≤ 5 — exhaustive risk + 3-ply give exact results,
+        # and MC just resamples the same small rack pool (≤428 unique racks)
         bag_size = total_unseen - 7  # unseen minus opponent rack
-        if bag_size <= 2:
+        if bag_size <= 5:
             return
 
         # Adaptive N×K based on calibrated throughput
