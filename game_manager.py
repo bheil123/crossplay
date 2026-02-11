@@ -511,10 +511,10 @@ class Game:
                 continue
             
             # Calculate risk with probability weighting
-            # For very small bags (≤2), use exhaustive opponent analysis (all possible racks).
+            # For small bags (≤3), use exhaustive opponent analysis (all possible racks).
             # This is exact: enumerate every rack the opp could hold and find their best move.
-            # bag=0: 1ms (1 rack), bag=1: ~6ms (≤8 racks), bag=2: ~15ms (≤36 racks)
-            if bag_size <= 2:
+            # bag=0: 1ms (1 rack), bag=1: ~5s (≤6 racks), bag=2: ~19s (≤23 racks), bag=3: ~58s (≤70 racks)
+            if bag_size <= 3:
                 risk_str, expected_risk, max_damage = self._calculate_exhaustive_opp_risk(move, unseen)
             else:
                 risk_str, expected_risk, max_damage = self._calculate_probabilistic_risk(move, unseen)
@@ -827,9 +827,9 @@ class Game:
         unseen_str = ''.join(unseen_tiles)
         total_unseen = sum(unseen.values())
         
-        # Skip MC when bag is empty — exhaustive analysis + 3-ply already give exact results
+        # Skip MC when bag ≤ 2 — exhaustive analysis + 3-ply already give exact results
         bag_size = total_unseen - 7  # unseen minus opponent rack
-        if bag_size <= 0:
+        if bag_size <= 2:
             return
 
         # Adaptive N×K based on calibrated throughput
