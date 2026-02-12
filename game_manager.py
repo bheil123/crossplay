@@ -6,12 +6,12 @@ Highlights:
   - Cython-accelerated GADDAG move generation (gaddag_accel.so)
   - MC 2-ply with fast path: cached bytes + SetDict + inline scoring
   - Tiered N×K scales by game phase (10K-22K sims, 30s budget)
-  - 3-ply exhaustive endgame (bag ≤ 12, adaptive timing)
+  - 3-ply exhaustive endgame (bag <= 12, adaptive timing)
   - Bingo probability DB for composite leave evaluation
   - MC-integrated exchange evaluation
   - Blank correction factor (Crossplay 3-blank support)
   - Parallel 2-ply lookahead (4 workers)
-  - Risk analysis with two-tier approach + exhaustive endgame (bag ≤ 2)
+  - Risk analysis with two-tier approach + exhaustive endgame (bag <= 2)
 
 Modes:
   1. Play against Claude AI
@@ -199,12 +199,12 @@ class Game:
             safe_name = self.state.name.replace(' ', '_').lower()
             opp_name = self.state.opponent_name.replace(' ', '_').lower()
             self.save_filename = f"{safe_name}_{opp_name}.json"
-        print(f"💾 Auto-save enabled: {self.save_filename}")
+        print(f"[SAVE] Auto-save enabled: {self.save_filename}")
     
     def disable_auto_save(self):
         """Disable auto-save."""
         self.auto_save = False
-        print("💾 Auto-save disabled")
+        print("[SAVE] Auto-save disabled")
     
     def _auto_save(self):
         """Save game if auto-save is enabled."""
@@ -268,7 +268,7 @@ class Game:
         else:
             status = "YOUR TURN" if self.state.is_your_turn else f"{self.state.opponent_name.upper()}'S TURN"
 
-        print(f"\n📊 {self.state.name} vs {self.state.opponent_name}")
+        print(f"\n[INFO] {self.state.name} vs {self.state.opponent_name}")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score} ({spread_str})")
         print(f"   Bag: {max(0, len(self.bag) - 7)} tiles | {status}")
         if self.state.your_rack:
@@ -432,7 +432,7 @@ class Game:
                 moves = find_all_moves_c(self.board, self.gaddag, rack,
                                           board_blanks=self.state.blank_positions)
                 t_mg = time.time() - t_mg
-                print(f"  ⚡ {len(moves)} moves found in {t_mg*1000:.0f}ms (C accel)")
+                print(f"  {len(moves)} moves found in {t_mg*1000:.0f}ms (C accel)")
             else:
                 raise ImportError("C not available")
         except ImportError:
@@ -475,7 +475,7 @@ class Game:
         print(f"{'='*70}")
         print(f"\n{'#':<3} {'Word':<12} {'Position':<12} {'Pts':>4} {'Risk (exp/max)':<20} {'Leave':>6} {'DLS':>5} {'DD':>4} {'Trn':>4} {'Equity':>6} {'Worst':>6}")
         print("-" * 90)
-        print("★ = Top Equity    Safe = Best Worst-Case    ⚠ = Negative Worst-Case")
+        print("* = Top Equity    Safe = Best Worst-Case    ! = Negative Worst-Case")
         print("-" * 90)
         
         # OPTIMIZATION: Two-phase analysis
@@ -579,7 +579,7 @@ class Game:
                 continue
             
             # Calculate risk with probability weighting
-            # For small bags (≤5), use exhaustive opponent analysis (all possible racks).
+            # For small bags (<=5), use exhaustive opponent analysis (all possible racks).
             # This is exact: enumerate every rack the opp could hold and find their best move.
             # bag=0: ~1ms/move (1 rack), bag=1: ~80ms (6), bag=2: ~300ms (23),
             # bag=3: ~900ms (70), bag=4: ~2.4s (183), bag=5: ~5.6s (428)
@@ -654,11 +654,11 @@ class Game:
             # Determine indicator
             indicator = ""
             if i == 1:
-                indicator = "★"
+                indicator = "*"
             elif worst_case == best_worst_case and worst_case >= 0:
                 indicator = "Safe"
             elif worst_case < 0:
-                indicator = "⚠"
+                indicator = "!"
             
             print(f"{i:<3} {word:<12} {pos:<12} {pts:>4} {risk_display:<20} {leave_value:>+6.1f} {move['dls_penalty']:>+5.1f} {move['dd_bonus']:>+4.1f} {move['turnover_bonus']:>+3.1f} {equity:>+6.0f} {worst_case:>+6.0f}  {indicator}")
         
@@ -691,18 +691,18 @@ class Game:
                     parts.append(f"DD:{dd_b:+.1f}")
                 if turn_b != 0:
                     parts.append(f"Turn:{turn_b:+.1f}")
-                print(f"   📊 Positional: {' | '.join(parts)}")
+                print(f"   [INFO] Positional: {' | '.join(parts)}")
                 
                 # Show DLS exposure details
                 for d in move.get('dls_details', []):
                     tile_r, tile_c, tile_l = d['tile_pos']
                     dls_r, dls_c = d['dls_pos']
-                    print(f"      ⚠ {tile_l}@R{tile_r}C{tile_c} → DLS@R{dls_r}C{dls_c}: opp {d['worst_tile']} for {d['max_damage']}pts ({d['probability']*100:.0f}%)")
+                    print(f"      ! {tile_l}@R{tile_r}C{tile_c} -> DLS@R{dls_r}C{dls_c}: opp {d['worst_tile']} for {d['max_damage']}pts ({d['probability']*100:.0f}%)")
                 
                 # Show DD description if notable
                 dd_desc = move.get('dd_desc', '')
                 if 'DOUBLE-DOUBLE' in dd_desc:
-                    print(f"      🎯 {dd_desc}")
+                    print(f"      --> {dd_desc}")
             
             # Show power tile draw probability if power tiles exist
             if has_power_tiles:
@@ -712,13 +712,13 @@ class Game:
                 if draw_count > 0 and bag_size > 0:
                     power_prob = prob_draw_any_power_tile(unseen, bag_size, draw_count)
                     if power_prob > 0.05:  # Only show if >5%
-                        print(f"   🎯 Power tile chance: {power_prob*100:.0f}% (drawing {draw_count})")
+                        print(f"   --> Power tile chance: {power_prob*100:.0f}% (drawing {draw_count})")
             
             # Show blocking bonus if any
             if move.get('blocking_bonus', 0) > 0:
                 blocked = move.get('blocked_squares', [])
                 blocked_str = ', '.join(f"{b[2]}@R{b[0]}C{b[1]}" for b in blocked)
-                print(f"   🛡️  Blocks: {blocked_str} (+{move['blocking_bonus']:.1f} defensive)")
+                print(f"   [SAFE] Blocks: {blocked_str} (+{move['blocking_bonus']:.1f} defensive)")
             
             print(f"   EQUITY: {move['equity']:+.1f}")
             
@@ -727,13 +727,13 @@ class Game:
             if opened_3w:
                 for sq in opened_3w:
                     threat = self._analyze_threat(sq, unseen, is_3w=True)
-                    print(f"   ⚠️  3W {sq}: {threat}")
+                    print(f"   WARNING:  3W {sq}: {threat}")
             if opened_2w:
                 for sq in opened_2w:
                     threat = self._analyze_threat(sq, unseen, is_3w=False)
-                    print(f"   ⚠️  2W {sq}: {threat}")
+                    print(f"   WARNING:  2W {sq}: {threat}")
             if not opened_3w and not opened_2w and move.get('blocking_bonus', 0) == 0:
-                print(f"   ✅ No bonus squares opened")
+                print(f"   [OK] No bonus squares opened")
         
         # =================================================================
         # EXCHANGE CANDIDATE GENERATION
@@ -751,7 +751,7 @@ class Game:
                 exchange_candidates = self._generate_exchange_candidates(rack, unseen)
                 if exchange_candidates:
                     n_exch = len(exchange_candidates)
-                    print(f"\n  📦 {n_exch} exchange option{'s' if n_exch > 1 else ''} "
+                    print(f"\n  [EXCH] {n_exch} exchange option{'s' if n_exch > 1 else ''} "
                           f"added to MC evaluation (best play equity: {best_play_equity:.1f})")
         
         # =================================================================
@@ -896,8 +896,8 @@ class Game:
         unseen_str = ''.join(unseen_tiles)
         total_unseen = sum(unseen.values())
         
-        # Skip MC when bag ≤ 5 — exhaustive risk + 3-ply give exact results,
-        # and MC just resamples the same small rack pool (≤428 unique racks)
+        # Skip MC when bag <= 5 — exhaustive risk + 3-ply give exact results,
+        # and MC just resamples the same small rack pool (<=428 unique racks)
         bag_size = total_unseen - 7  # unseen minus opponent rack
         if bag_size == 0:
             # Bag empty: opponent rack is known exactly — use deterministic 2-ply
@@ -979,9 +979,9 @@ class Game:
                 
                 if is_exch:
                     pos = "EXCHANGE"
-                    word_display = f"⇄ dump {m.get('exchange_dump', '?')}"
+                    word_display = f"<-> dump {m.get('exchange_dump', '?')}"
                     if m.get('exchange_keep'):
-                        word_display = f"⇄ keep {m['exchange_keep']}"
+                        word_display = f"<-> keep {m['exchange_keep']}"
                 else:
                     pos = f"R{m['row']}C{m['col']} {m['direction']}"
                     word_display = m['word']
@@ -998,7 +998,7 @@ class Game:
                 # Markers
                 bingo_marker = ""
                 if is_exch:
-                    bingo_marker = "📦"
+                    bingo_marker = "[EXCH]"
                 else:
                     opp_word = m.get('opp_word', '')
                     if len(opp_word) >= 7 and m['mc_max_opp'] >= 41:
@@ -1028,11 +1028,11 @@ class Game:
                     margin = best_exch_in_top['total_equity'] - best_play_in_top['total_equity']
                     keep = best_exch_in_top.get('exchange_keep', '') or '(none)'
                     dump = best_exch_in_top.get('exchange_dump', '')
-                    print(f"\n  ⚠️  EXCHANGE RECOMMENDED: dump [{dump}], keep [{keep}]")
+                    print(f"\n  WARNING:  EXCHANGE RECOMMENDED: dump [{dump}], keep [{keep}]")
                     print(f"      MC advantage: +{margin:.1f} equity over {best_play_in_top['word']}")
                 elif exch_rank <= 3:
                     keep = best_exch_in_top.get('exchange_keep', '') or '(none)'
-                    print(f"\n  📦 Exchange (keep [{keep}]) ranked #{exch_rank} — competitive option")
+                    print(f"\n  [EXCH] Exchange (keep [{keep}]) ranked #{exch_rank} -- competitive option")
             
             # Show top opponent responses for #1 ranked move
             best = results[0]
@@ -1109,10 +1109,10 @@ class Game:
     
     def _show_bingo_blocking_analysis(self, rack: str, unseen_str: str, baseline_bingo: dict, results: list):
         """Show analysis of moves that block opponent's bingo."""
-        print(f"\n{'─'*70}")
-        print(f"⚠️  BINGO THREAT: {baseline_bingo['word']} at R{baseline_bingo['row']}C{baseline_bingo['col']} "
+        print(f"\n{'-'*70}")
+        print(f"WARNING:  BINGO THREAT: {baseline_bingo['word']} at R{baseline_bingo['row']}C{baseline_bingo['col']} "
               f"{baseline_bingo['direction']} for {baseline_bingo['score']} pts")
-        print(f"{'─'*70}")
+        print(f"{'-'*70}")
         
         # Find ALL moves that block the bingo lane
         bingo_row = baseline_bingo['row']
@@ -1207,21 +1207,21 @@ class Game:
             overall_net = best_overall['score'] - best_overall['opp_best']
             blocker_net = best_blocker['net']
             
-            print(f"\n📊 Comparison:")
+            print(f"\n[INFO] Comparison:")
             print(f"   Best 2-ply (no block): {best_overall['word']} ({best_overall['score']} pts)")
-            print(f"      → Opp plays {best_overall.get('opp_word', '?')} ({best_overall['opp_best']} pts)")
-            print(f"      → Net: {overall_net:+.0f}")
+            print(f"      -> Opp plays {best_overall.get('opp_word', '?')} ({best_overall['opp_best']} pts)")
+            print(f"      -> Net: {overall_net:+.0f}")
             print(f"   Best BLOCKER: {best_blocker['word']} ({best_blocker['score']} pts)")
-            print(f"      → Opp plays {best_blocker['opp_word']} ({best_blocker['opp_score']} pts)")
-            print(f"      → Net: {blocker_net:+d}")
+            print(f"      -> Opp plays {best_blocker['opp_word']} ({best_blocker['opp_score']} pts)")
+            print(f"      -> Net: {blocker_net:+d}")
             
             if blocker_net > overall_net:
                 advantage = blocker_net - overall_net
-                print(f"\n   🎯 BLOCKING IS BETTER! {best_blocker['word']} gains {advantage} pts net")
+                print(f"\n   --> BLOCKING IS BETTER! {best_blocker['word']} gains {advantage} pts net")
                 print(f"      Blocks {baseline_bingo['score']} pt bingo, opp limited to {best_blocker['opp_score']} pts")
             else:
                 disadvantage = overall_net - blocker_net
-                print(f"\n   ✓ Non-blocking play is better by {disadvantage} pts net")
+                print(f"\n   OK Non-blocking play is better by {disadvantage} pts net")
                 print(f"      But blocking keeps game closer if you're ahead")
     
     def _show_catchup_advice(self, unseen: dict, total_unseen: int, results: list):
@@ -1241,9 +1241,9 @@ class Game:
         if not power_tiles:
             return
         
-        print(f"\n{'─'*70}")
-        print(f"💡 CATCH-UP STRATEGY (down {abs(score_diff)} pts, {bag_size} in bag)")
-        print(f"{'─'*70}")
+        print(f"\n{'-'*70}")
+        print(f"TIP: CATCH-UP STRATEGY (down {abs(score_diff)} pts, {bag_size} in bag)")
+        print(f"{'-'*70}")
         
         # Find moves with different draw counts
         draw_options = {}
@@ -1266,28 +1266,28 @@ class Game:
                 word = move['word']
                 leave = move.get('leave', '')
                 pts = move['score']
-                print(f"   • {word} ({pts} pts) → draw {draw_count} → {prob*100:.0f}% power tile, leave: {leave or '(empty)'}")
+                print(f"   * {word} ({pts} pts) -> draw {draw_count} -> {prob*100:.0f}% power tile, leave: {leave or '(empty)'}")
         
         # Strategic advice based on situation
         print()
         if score_diff <= -100:
-            print("   ⚠️  DOWN 100+: High variance is your friend!")
+            print("   WARNING:  DOWN 100+: High variance is your friend!")
             print("      Consider plays that draw more tiles for better power tile odds.")
             print("      Keeping a great leave matters less when you need big swings.")
         elif score_diff <= -50:
-            print("   📊 DOWN 50-100: Balance scoring with power tile chances.")
+            print("   [INFO] DOWN 50-100: Balance scoring with power tile chances.")
             print("      Plays that empty your rack give more lottery tickets.")
     
     def _show_3ply_analysis(self, rack: str, unseen_str: str, total_unseen: int, time_budget: float = 30.0):
-        """Show 3-ply lookahead analysis for endgame (≤12 in bag)."""
+        """Show 3-ply lookahead analysis for endgame (<=12 in bag)."""
         from crossplay_v9.lookahead_3ply import evaluate_3ply
         
         bag_size = total_unseen - 7
         
         print(f"\n{'='*70}")
-        print(f"3-PLY LOOKAHEAD (You → Opp → You) [bag: {bag_size}, unseen: {total_unseen}]")
+        print(f"3-PLY LOOKAHEAD (You -> Opp -> You) [bag: {bag_size}, unseen: {total_unseen}]")
         print("=" * 70)
-        print("Your move → Opponent's best → Your counter-response")
+        print("Your move -> Opponent's best -> Your counter-response")
         print()
         
         try:
@@ -1328,10 +1328,10 @@ class Game:
             
             # Show best 3-ply recommendation
             best_3ply = results[0]
-            print(f"\n🎯 3-ply best: {best_3ply['word']} ({best_3ply['score']} pts)")
-            print(f"   → Opp plays {best_3ply['opp_word']} ({best_3ply['opp_score']} pts)")
-            print(f"   → You counter with {best_3ply['your_response']} ({best_3ply['your_response_score']} pts)")
-            print(f"   → Net after 3 plies: {best_3ply['net_3ply']:+d}")
+            print(f"\n--> 3-ply best: {best_3ply['word']} ({best_3ply['score']} pts)")
+            print(f"   -> Opp plays {best_3ply['opp_word']} ({best_3ply['opp_score']} pts)")
+            print(f"   -> You counter with {best_3ply['your_response']} ({best_3ply['your_response_score']} pts)")
+            print(f"   -> Net after 3 plies: {best_3ply['net_3ply']:+d}")
             
             # Show top opp responses for awareness
             opp_resps = best_3ply.get('opp_responses', [])
@@ -1419,7 +1419,7 @@ class Game:
     
     def _calculate_exhaustive_opp_risk(self, move: dict, unseen: dict) -> tuple:
         """Calculate risk by exhaustively enumerating all possible opponent racks
-        and finding the best move for each. Used when bag is small enough (≤4).
+        and finding the best move for each. Used when bag is small enough (<=4).
         
         Returns (risk_str, expected_risk, max_damage) matching the interface
         of _calculate_probabilistic_risk.
@@ -1665,7 +1665,7 @@ class Game:
 
         # Validate word
         if len(word) > 2 and not self.dictionary.is_valid(word):
-            print(f"❌ '{word}' is not a valid word!")
+            print(f"[X] '{word}' is not a valid word!")
             return False, 0
 
         # Get tiles used
@@ -1687,7 +1687,7 @@ class Game:
                     if used_idx < len(new_indices):
                         blank_word_indices.append(new_indices[used_idx])
                 else:
-                    print(f"❌ Missing tile '{t}' for word '{word}'!")
+                    print(f"[X] Missing tile '{t}' for word '{word}'!")
                     return False, 0
                 used_idx += 1
 
@@ -1699,13 +1699,13 @@ class Game:
                 board_blanks=self.state.blank_positions
             )
         except Exception as e:
-            print(f"❌ Invalid placement: {e}")
+            print(f"[X] Invalid placement: {e}")
             return False, 0
 
         # Bingo bonus (Crossplay uses 40, not Scrabble's 50)
         if len(tiles_used) == 7:
             score += 40
-            print("🎉 BINGO! +40 bonus!")
+            print("[WIN] BINGO! +40 bonus!")
 
         # Place word on board
         self.board.place_word(word, row, col, horizontal)
@@ -1763,7 +1763,7 @@ class Game:
 
         d = 'H' if horizontal else 'V'
         who = self.state.opponent_name if is_opponent else "You"
-        print(f"✅ {who} played {word} at R{row}C{col} {d} for {score} points!")
+        print(f"[OK] {who} played {word} at R{row}C{col} {d} for {score} points!")
 
         # Show existing threats after every move
         self.show_existing_threats(top_n=5)
@@ -1837,7 +1837,7 @@ class Game:
             
             expected_score = _calc_score_with_blanks(detected_blanks)
             if expected_score is not None and expected_score != score:
-                print(f"\n⚠️  SCORE MISMATCH (with specified blanks)")
+                print(f"\nWARNING:  SCORE MISMATCH (with specified blanks)")
                 print(f"    Reported: {score} pts, Calculated: {expected_score} pts")
         else:
             # No blanks specified — check if score matches without blanks
@@ -1869,15 +1869,15 @@ class Game:
                     idx_or_pair, letter_info = candidates[0]
                     if isinstance(idx_or_pair, tuple):
                         detected_blanks = list(idx_or_pair)
-                        print(f"\n🔍 AUTO-DETECTED BLANKS: {word[idx_or_pair[0]]} and {word[idx_or_pair[1]]}")
-                        print(f"    Score {no_blank_score} → {score} (only valid blank assignment)")
+                        print(f"\n[?] AUTO-DETECTED BLANKS: {word[idx_or_pair[0]]} and {word[idx_or_pair[1]]}")
+                        print(f"    Score {no_blank_score} -> {score} (only valid blank assignment)")
                     else:
                         detected_blanks = [idx_or_pair]
-                        print(f"\n🔍 AUTO-DETECTED BLANK: {word[idx_or_pair]} (position {idx_or_pair + 1} in word)")
-                        print(f"    Score {no_blank_score} → {score} (only valid blank assignment)")
+                        print(f"\n[?] AUTO-DETECTED BLANK: {word[idx_or_pair]} (position {idx_or_pair + 1} in word)")
+                        print(f"    Score {no_blank_score} -> {score} (only valid blank assignment)")
                 elif len(candidates) > 1:
                     # Multiple possible blank assignments
-                    print(f"\n⚠️  SCORE MISMATCH — possible blank detected!")
+                    print(f"\nWARNING:  SCORE MISMATCH -- possible blank detected!")
                     print(f"    Reported: {score} pts, Without blanks: {no_blank_score} pts")
                     print(f"    Possible blanks (each makes score match):")
                     for idx_or_pair, letter_info in candidates:
@@ -1889,12 +1889,12 @@ class Game:
                                 print(f"      blanks=['{word[pos]}']  (R{row}C{col + pos})")
                             else:
                                 print(f"      blanks=['{word[pos]}']  (R{row + pos}C{col})")
-                    print(f"    💡 Re-record with blanks=['X'] to confirm")
+                    print(f"    TIP: Re-record with blanks=['X'] to confirm")
                 else:
                     # No single/double blank makes the score match
-                    print(f"\n⚠️  SCORE MISMATCH!")
+                    print(f"\nWARNING:  SCORE MISMATCH!")
                     print(f"    Reported: {score} pts, Calculated: {no_blank_score} pts")
-                    print(f"    No blank assignment found — check move details")
+                    print(f"    No blank assignment found -- check move details")
             else:
                 expected_score = no_blank_score
         
@@ -1908,7 +1908,7 @@ class Game:
             else:
                 blank_row, blank_col = row + i, col
             self.state.blank_positions.append((blank_row, blank_col, word[i]))
-            print(f"    📌 Blank recorded at R{blank_row}C{blank_col} = {word[i]}")
+            print(f"    [>] Blank recorded at R{blank_row}C{blank_col} = {word[i]}")
 
         # Update opponent score
         old_opp_score = self.state.opp_score
@@ -1917,7 +1917,7 @@ class Game:
         # Validate opponent total score
         if new_opp_score is not None:
             if self.state.opp_score != new_opp_score:
-                print(f"\n⚠️  OPP SCORE MISMATCH!")
+                print(f"\nWARNING:  OPP SCORE MISMATCH!")
                 print(f"    Expected: {old_opp_score} + {score} = {self.state.opp_score}")
                 print(f"    Reported: {new_opp_score}")
                 print(f"    Using reported score.")
@@ -1936,12 +1936,12 @@ class Game:
 
             if expected_bag != new_bag_count:
                 diff = expected_bag - new_bag_count
-                print(f"\n⚠️  BAG COUNT MISMATCH!")
+                print(f"\nWARNING:  BAG COUNT MISMATCH!")
                 print(f"    Expected: ~{expected_bag} tiles")
                 print(f"    Reported: {new_bag_count} tiles")
                 print(f"    Difference: {diff} tiles")
                 if diff > 0:
-                    print(f"    💡 Missing tiles - check if blanks were reported")
+                    print(f"    TIP: Missing tiles - check if blanks were reported")
 
         # Compute bag count for enriched record
         bag_count = max(0, len(self.bag) - RACK_SIZE)
@@ -1968,7 +1968,7 @@ class Game:
         self.blocked_cache.update_after_move(self.board, word, row, col, horizontal)
         self._threats_cache = None
 
-        print(f"\n📝 Recorded: {self.state.opponent_name} played {word} for {score} pts")
+        print(f"\n[NOTE] Recorded: {self.state.opponent_name} played {word} for {score} pts")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score}")
 
         # Show existing threats after every move
@@ -2004,7 +2004,7 @@ class Game:
     def set_rack(self, rack: str):
         """Set your rack."""
         self.state.your_rack = rack.upper().replace(' ', '')
-        print(f"🎯 Rack set to: [{' '.join(self.state.your_rack)}]")
+        print(f"--> Rack set to: [{' '.join(self.state.your_rack)}]")
     
     def save(self, filename: str = None, quiet: bool = False) -> str:
         """Save game to file.
@@ -2027,7 +2027,7 @@ class Game:
             json.dump(self.state.to_dict(), f, indent=2)
         
         if not quiet:
-            print(f"💾 Saved to {filepath}")
+            print(f"[SAVE] Saved to {filepath}")
         return filepath
     
     @classmethod
@@ -2072,17 +2072,17 @@ def _create_saved_game_3() -> Game:
         name="Game 3",
         board_moves=[
             ('PIVOT', 8, 8, True),      # Opp opening: PIVOT R8C8 H for 36
-            ('QUAYAGE', 9, 2, True),    # Me: QUAYAGE R9C2 H for 87 (bingo, ★ best move)
+            ('QUAYAGE', 9, 2, True),    # Me: QUAYAGE R9C2 H for 87 (bingo, * best move)
             ('ISLANDER', 8, 9, False),  # Opp: ISLANDER R8C9 V for 76 (bingo)
             ('RABI', 15, 9, True),      # Me: RABI R15C9 H for 21
             ('FANNY', 8, 4, False),     # Opp: FANNY R8C4 V for 30
             ('ALIYOT', 12, 1, True),    # Me: ALIYOT R12C1 H for 30
             ('USUAL', 11, 6, True),     # Opp: USUAL R11C6 H for 23
-            ('CLEG', 11, 2, False),     # Me: CLEG R11C2 V for 20 (⚠️ RECIPE was better)
+            ('CLEG', 11, 2, False),     # Me: CLEG R11C2 V for 20 (WARNING: RECIPE was better)
             ('HEDGE', 7, 11, True),     # Opp: HEDGE R7C11 H for 25
             ('COALIER', 6, 5, True),    # Me: COALIER R6C5 H for 63 (bingo, blank=L)
             ('AZOTE', 3, 15, False),    # Opp: AZOTE R3C15 V for 39 (blank=A)
-            ('TOWNEES', 9, 13, False),  # Me: TOWNEES R9C13 V for 63 (bingo, blank=T, ★ winning move)
+            ('TOWNEES', 9, 13, False),  # Me: TOWNEES R9C13 V for 63 (bingo, blank=T, * winning move)
             ('JAG', 5, 14, False),      # Opp: JAG R5C14 V for 28
             ('FOB', 8, 4, True),        # Me: FOB R8C4 H for 27
             ('FEAR', 10, 14, False),    # Opp: FEAR R10C14 V for 22
@@ -2090,7 +2090,7 @@ def _create_saved_game_3() -> Game:
             ('SHIM', 11, 7, False),     # Opp: SHIM R11C7 V for 27
             ('AW', 12, 1, False),       # Me: AW R12C1 V for 12 (A overlaps ALIYOT, WE crossword)
             ('KNOLL', 2, 8, False),     # Opp: KNOLL R2C8 V for 20
-            ('JAGS', 5, 14, False),     # Me: JAGS R5C14 V for 16 (⚠️ STEROIDS was better)
+            ('JAGS', 5, 14, False),     # Me: JAGS R5C14 V for 16 (WARNING: STEROIDS was better)
             ('DRIVE', 2, 10, False),    # Opp: DRIVE R2C10 V for 23
             ('TI', 1, 9, False),        # Me: TI R1C9 V for 15
             ('PRIMO', 2, 6, False),     # Opp: PRIMO R2C6 V for 15 (final opp move)
@@ -2432,7 +2432,7 @@ class GameManager:
         its full state. Game identity comes from GameState.name and
         opponent_name, not from the factory function name.
         """
-        # Registry: slot number → factory function
+        # Registry: slot number -> factory function
         # Add/remove/reorder entries here as games come and go.
         _SAVED_GAME_REGISTRY: Dict[int, callable] = {
             1: _create_saved_game_5,
@@ -2458,7 +2458,7 @@ class GameManager:
                       f"({s.your_score}-{s.opp_score}, {'+' if spread >= 0 else ''}{spread}) "
                       f"| {status}")
             except Exception as e:
-                print(f"  Slot {slot}: ⚠ Failed to load: {e}")
+                print(f"  Slot {slot}: ! Failed to load: {e}")
                 self.games[slot] = None
     
     def show_slots(self):
@@ -2469,7 +2469,7 @@ class GameManager:
         
         for slot in range(1, self.MAX_GAMES + 1):
             game = self.games.get(slot)
-            marker = "→ " if slot == self.current_slot else "  "
+            marker = "-> " if slot == self.current_slot else "  "
             
             if game:
                 spread = game.state.your_score - game.state.opp_score
@@ -2489,16 +2489,16 @@ class GameManager:
         if 1 <= slot <= self.MAX_GAMES:
             self.current_slot = slot
             if self.games.get(slot):
-                print(f"✅ Selected Slot {slot}: {self.games[slot].state.name}")
+                print(f"[OK] Selected Slot {slot}: {self.games[slot].state.name}")
             else:
-                print(f"✅ Selected Slot {slot} (empty)")
+                print(f"[OK] Selected Slot {slot} (empty)")
         else:
-            print(f"❌ Invalid slot. Use 1-{self.MAX_GAMES}")
+            print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
     
     def new_game(self, slot: int, opponent_name: str = "Opponent"):
         """Start a new game in a slot."""
         if slot < 1 or slot > self.MAX_GAMES:
-            print(f"❌ Invalid slot. Use 1-{self.MAX_GAMES}")
+            print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
             return
         
         state = GameState(
@@ -2516,16 +2516,16 @@ class GameManager:
         )
         self.games[slot] = Game(state)
         self.current_slot = slot
-        print(f"✅ New game created in Slot {slot} vs {opponent_name}")
+        print(f"[OK] New game created in Slot {slot} vs {opponent_name}")
     
     def reset_slot(self, slot: int):
         """Reset a game slot."""
         if slot < 1 or slot > self.MAX_GAMES:
-            print(f"❌ Invalid slot. Use 1-{self.MAX_GAMES}")
+            print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
             return
         
         self.games[slot] = None
-        print(f"✅ Slot {slot} reset")
+        print(f"[OK] Slot {slot} reset")
     
     def save_slot(self, slot: int, filename: str = None):
         """Save a game slot."""
@@ -2533,25 +2533,25 @@ class GameManager:
         if game:
             game.save(filename)
         else:
-            print(f"❌ Slot {slot} is empty")
+            print(f"[X] Slot {slot} is empty")
     
     def load_slot(self, slot: int, filepath: str):
         """Load a game into a slot."""
         if slot < 1 or slot > self.MAX_GAMES:
-            print(f"❌ Invalid slot. Use 1-{self.MAX_GAMES}")
+            print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
             return
         
         try:
             self.games[slot] = Game.load(filepath)
             self.current_slot = slot
-            print(f"✅ Loaded into Slot {slot}")
+            print(f"[OK] Loaded into Slot {slot}")
         except Exception as e:
-            print(f"❌ Failed to load: {e}")
+            print(f"[X] Failed to load: {e}")
     
     def list_saves(self):
         """List all saved games."""
         if not os.path.exists(SAVE_DIR):
-            print("📁 No saves directory yet")
+            print("[DIR] No saves directory yet")
             return []
         
         saves = []
@@ -2587,7 +2587,7 @@ class GameManager:
                 print(f"{i}. {s['filename']}")
                 print(f"   {s['name']} vs {s['opponent']} | {s['score']} | {s['updated']}")
         else:
-            print("📁 No saved games found")
+            print("[DIR] No saved games found")
         
         return saves
     

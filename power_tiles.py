@@ -129,19 +129,19 @@ def format_power_tile_display(unseen: Dict[str, int], bag_size: int) -> str:
     Format power tile info for display in analysis.
     
     Returns:
-        Formatted string like "⚡ Power tiles: X(8), Y(5)×2 | Draw 2→35%"
+        Formatted string like "* Power tiles: X(8), Y(5)x2 | Draw 2->35%"
     """
     power_tiles = get_power_tiles_in_pool(unseen)
     
     if not power_tiles:
-        return "⚡ No power tiles remaining"
+        return "* No power tiles remaining"
     
     # Format each power tile
     parts = []
     for tile in sorted(power_tiles.keys(), key=lambda t: -power_tiles[t][1]):  # Sort by value desc
         count, value = power_tiles[tile]
         if count > 1:
-            parts.append(f"{tile}({value})×{count}")
+            parts.append(f"{tile}({value})x{count}")
         else:
             parts.append(f"{tile}({value})")
     
@@ -152,11 +152,11 @@ def format_power_tile_display(unseen: Dict[str, int], bag_size: int) -> str:
     for draw in range(1, 7):
         prob = prob_draw_any_power_tile(unseen, bag_size, draw)
         if prob > 0.01:  # Only show if >1%
-            probs.append(f"{draw}→{prob*100:.0f}%")
+            probs.append(f"{draw}->{prob*100:.0f}%")
     
     prob_str = " | ".join(["Draw " + probs[0]] + probs[1:]) if probs else ""
     
-    return f"⚡ Power tiles: {tile_str}" + (f" | {prob_str}" if prob_str else "")
+    return f"* Power tiles: {tile_str}" + (f" | {prob_str}" if prob_str else "")
 
 
 def calculate_leave_power_synergy(leave: str, unseen: Dict[str, int], bag_size: int, draw_count: int) -> float:
@@ -219,7 +219,7 @@ def test_power_tiles():
     }
     bag_size = 10  # 17 unseen - 7 opp rack
     
-    print("Test: Late game with X and Y×2 in pool")
+    print("Test: Late game with X and Yx2 in pool")
     print(f"Unseen: {unseen}")
     print(f"Bag size: {bag_size}")
     print()

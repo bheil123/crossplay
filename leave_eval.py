@@ -215,7 +215,7 @@ def evaluate_leave_detailed(leave: str, bag_empty: bool = False) -> Tuple[float,
         if count > 1 and tile != '?':
             penalty = DUPLICATE_PENALTY * (count - 1)
             value -= penalty
-            reasons.append(f"Duplicate {tile}×{count}")
+            reasons.append(f"Duplicate {tile}x{count}")
 
     # Bingo bonus
     if not bag_empty and len(leave) < 7:
@@ -224,7 +224,7 @@ def evaluate_leave_detailed(leave: str, bag_empty: bool = False) -> Tuple[float,
         if bingo_prob > 0:
             bingo_bonus = BINGO_WEIGHT * bingo_prob * EXPECTED_BINGO_SCORE
             value += bingo_bonus
-            reasons.append(f"Bingo {bingo_prob*100:.1f}% → +{bingo_bonus:.1f}")
+            reasons.append(f"Bingo {bingo_prob*100:.1f}% -> +{bingo_bonus:.1f}")
 
     return (value, reasons)
 
@@ -315,7 +315,7 @@ if __name__ == "__main__":
     # Test leave evaluation with bingo DB
     test_leaves = ['AEINST', 'RR', 'QVJ', 'S?', 'AEIO', 'BCDKM', '', 'ERST', 'ER', 'Q']
 
-    print("LEAVE EVALUATION TESTS (v9 — Bingo-Aware)")
+    print("LEAVE EVALUATION TESTS (v9 -- Bingo-Aware)")
     print("=" * 60)
 
     for leave in test_leaves:
@@ -324,7 +324,7 @@ if __name__ == "__main__":
         _, reasons = evaluate_leave_detailed(leave)
         delta = value_new - value_old
         print(f"\n{leave or '(empty)'}:")
-        print(f"  Formula: {value_old:+.1f}  |  With bingo: {value_new:+.1f}  |  Δ = {delta:+.1f}")
+        print(f"  Formula: {value_old:+.1f}  |  With bingo: {value_new:+.1f}  |  Delta = {delta:+.1f}")
         for r in reasons:
             print(f"    - {r}")
 

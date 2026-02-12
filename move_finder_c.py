@@ -325,7 +325,7 @@ def find_all_moves_c(board, gaddag, rack_str: str,
 
     if rejected:
         import sys
-        print(f"  ⚠ Post-validation rejected {len(moves)-len(validated)} moves "
+        print(f"  ! Post-validation rejected {len(moves)-len(validated)} moves "
               f"(showing first 5):", file=sys.stderr)
         for word, pos, reason in rejected[:5]:
             print(f"    {word} @ {pos}: {reason}", file=sys.stderr)

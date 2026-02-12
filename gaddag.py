@@ -189,7 +189,7 @@ def get_gaddag():
             f"No GADDAG or dictionary found in {base_dir}. "
             f"Need gaddag_compact.bin, gaddag.pkl, or crossplay_dict.pkl")
     
-    print(f"GADDAG not found — building from dictionary (one-time, ~48s)...")
+    print(f"GADDAG not found -- building from dictionary (one-time, ~48s)...")
     t0 = time.perf_counter()
     
     with open(dict_path, 'rb') as f:
@@ -253,10 +253,10 @@ if __name__ == "__main__":
     test_words = ['CARE', 'RETINAS', 'NASTIER', 'QI', 'ZA', 'XU', 'ZXQJ']
     for word in test_words:
         valid = gaddag.is_word(word)
-        print(f"  {word}: {'✓ valid' if valid else '✗ invalid'}")
+        print(f"  {word}: {'OK valid' if valid else 'X invalid'}")
     
     # Test GADDAG paths for CARE
     print("\nPath tests for 'CARE':")
     for path in ['C+ARE', 'AC+RE', 'RAC+E', 'ERAC+']:
         exists = gaddag.is_complete_word(path)
-        print(f"  {path}: {'✓' if exists else '✗'}")
+        print(f"  {path}: {'OK' if exists else 'X'}")

@@ -84,14 +84,14 @@ class CrossplayGame:
         """Display current scores."""
         spread = self.human_score - self.claude_score
         spread_str = f"+{spread}" if spread >= 0 else str(spread)
-        print(f"\n📊 SCORE: You {self.human_score} - Claude {self.claude_score} ({spread_str})")
-        print(f"📦 Tiles in bag: {len(self.bag)}")
+        print(f"\nSCORE: You {self.human_score} - Claude {self.claude_score} ({spread_str})")
+        print(f"Tiles in bag: {len(self.bag)}")
     
     def show_rack(self):
         """Show human's rack."""
         rack_str = ' '.join(self.human_rack)
         values = sum(TILE_VALUES.get(t, 0) for t in self.human_rack)
-        print(f"\n🎯 Your rack: [{rack_str}] (value: {values})")
+        print(f"\n--> Your rack: [{rack_str}] (value: {values})")
     
     def analyze_human_moves(self):
         """Show best moves for human's rack."""
@@ -100,7 +100,7 @@ class CrossplayGame:
         moves = finder.find_all_moves(rack_str)
         
         if not moves:
-            print("\n❌ No valid moves found for your rack!")
+            print("\n[X] No valid moves found for your rack!")
             return
         
         print(f"\n{'='*60}")
@@ -139,7 +139,7 @@ class CrossplayGame:
         
         # Check word is valid
         if not self.dictionary.is_valid(word) and len(word) > 2:
-            print(f"❌ '{word}' is not a valid word!")
+            print(f"[X] '{word}' is not a valid word!")
             return False
         
         # Check tiles available
@@ -155,14 +155,14 @@ class CrossplayGame:
             elif '?' in rack_copy:
                 rack_copy.remove('?')
             else:
-                print(f"❌ You don't have the tiles for '{word}'! Need: {tiles_needed}")
+                print(f"[X] You don't have the tiles for '{word}'! Need: {tiles_needed}")
                 return False
         
         # Try to place
         try:
             score, crosswords = calculate_move_score(self.board, word, row, col, horizontal)
         except Exception as e:
-            print(f"❌ Invalid placement: {e}")
+            print(f"[X] Invalid placement: {e}")
             return False
         
         # Place the word
@@ -178,7 +178,7 @@ class CrossplayGame:
         # Bingo bonus (Crossplay uses 40)
         if len(tiles_needed) == 7:
             score += 40
-            print("🎉 BINGO! +40 bonus!")
+            print("[WIN] BINGO! +40 bonus!")
         
         self.human_score += score
         self._refill_rack(self.human_rack)
@@ -190,7 +190,7 @@ class CrossplayGame:
         self.consecutive_passes = 0
         
         d = 'H' if horizontal else 'V'
-        print(f"\n✅ You played {word} at R{row}C{col} {d} for {score} points!")
+        print(f"\n[OK] You played {word} at R{row}C{col} {d} for {score} points!")
         if crosswords:
             cw_str = ', '.join(f"{c['word']}({c['score']})" for c in crosswords)
             print(f"   Cross-words: {cw_str}")
@@ -204,7 +204,7 @@ class CrossplayGame:
         moves = finder.find_all_moves(rack_str)
         
         if not moves:
-            print("\n🤖 Claude passes (no valid moves).")
+            print("\n[AI] Claude passes (no valid moves).")
             self.consecutive_passes += 1
             if self.final_turns_remaining is not None:
                 self.final_turns_remaining -= 1
@@ -235,7 +235,7 @@ class CrossplayGame:
         # Bingo bonus (Crossplay uses 40)
         if len(tiles_needed) == 7:
             score += 40
-            print("🤖 Claude got a BINGO! +40 bonus!")
+            print("[AI] Claude got a BINGO! +40 bonus!")
         
         self.claude_score += score
         self._refill_rack(self.claude_rack)
@@ -247,14 +247,14 @@ class CrossplayGame:
         self.consecutive_passes = 0
         
         d = 'H' if horizontal else 'V'
-        print(f"\n🤖 Claude plays {word} at R{row}C{col} {d} for {score} points!")
+        print(f"\n[AI] Claude plays {word} at R{row}C{col} {d} for {score} points!")
     
     def human_exchange(self, tiles: str):
         """Human exchanges tiles."""
         tiles = tiles.upper()
         
         if len(self.bag) < 7:
-            print("❌ Not enough tiles in bag to exchange!")
+            print("[X] Not enough tiles in bag to exchange!")
             return False
         
         # Check tiles available
@@ -263,7 +263,7 @@ class CrossplayGame:
             if tile in rack_copy:
                 rack_copy.remove(tile)
             else:
-                print(f"❌ You don't have '{tile}' to exchange!")
+                print(f"[X] You don't have '{tile}' to exchange!")
                 return False
         
         # Do exchange
@@ -274,7 +274,7 @@ class CrossplayGame:
         random.shuffle(self.bag)
         self._refill_rack(self.human_rack)
         
-        print(f"✅ Exchanged {tiles}. Drew {len(tiles)} new tiles.")
+        print(f"[OK] Exchanged {tiles}. Drew {len(tiles)} new tiles.")
         self.consecutive_passes = 0
         return True
     

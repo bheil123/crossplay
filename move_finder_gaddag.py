@@ -343,10 +343,12 @@ class GADDAGMoveFinder:
                 start_row = anchor_row - len(partial_word)
                 start_col = anchor_col
             
+            pw_len = len(partial_word)
+            fixed_blanks = [pw_len + bi if bi < 0 else bi for bi in blanks_used]
             self._extend_right(
                 moves, anchor_row, anchor_col, horizontal,
                 delim_node, partial_word, rack,
-                start_row, start_col, blanks_remaining, blanks_used[:]
+                start_row, start_col, blanks_remaining, fixed_blanks
             )
         
         # Try extending left (placing letters LEFT of current position)
@@ -686,10 +688,11 @@ class GADDAGMoveFinder:
                 start_row = anchor_row - pw_len
                 start_col = anchor_col
             
+            fixed_blanks = [pw_len + bi if bi < 0 else bi for bi in blanks_used]
             self._fast_extend_right(
                 moves, anchor_row, anchor_col, horizontal,
                 delim_child, partial_word, rack,
-                start_row, start_col, blanks_remaining, blanks_used[:],
+                start_row, start_col, blanks_remaining, fixed_blanks,
                 g, grid, CI, DELIM_IDX
             )
         

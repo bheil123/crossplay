@@ -73,7 +73,8 @@ def _mc_find_best_score(grid, gdata_bytes, rack_str, set_dict, board_blank_set):
     """
     from crossplay_v9.move_finder_c import _accel
     if _accel is None:
-        return (0, None, 0, 0, None)
+        from crossplay_v9.move_finder_opt import find_best_score_opt
+        return find_best_score_opt(grid, gdata_bytes, rack_str, board_blank_set)
     
     tv = _MC_TV
     bonus = _MC_BONUS
@@ -285,8 +286,15 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         from crossplay_v9.move_finder_gaddag import GADDAGMoveFinder
 
     # Pre-compute board blank set for fast scoring
-    _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])} if _use_c else None
-    _grid = board._grid if _use_c else None
+    _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])}
+    _grid = board._grid
+
+    # For Python fallback: shared cross_cache across K sims (same board)
+    if not _use_c:
+        from crossplay_v9.move_finder_opt import find_best_score_opt
+        from crossplay_v9.dictionary import get_dictionary as _get_dict_py
+        _dict_py = _get_dict_py()
+        _cross_cache = {}
 
     for _ in range(k_sims):
         # Sample random opponent rack
@@ -297,27 +305,18 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         if _use_c:
             opp_score, opp_word, opp_row, opp_col, opp_dir = _mc_find_best_score(
                 _grid, _mc_worker_gdata_bytes, opp_rack, _mc_worker_set_dict, _bb_set)
-            if opp_score > 0:
-                opp_scores.append(opp_score)
-                key = (opp_word, opp_row, opp_col, opp_dir)
-                if key not in opp_responses or opp_score > opp_responses[key]:
-                    opp_responses[key] = opp_score
-            else:
-                opp_scores.append(0)
         else:
-            opp_finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks or [])
-            opp_moves = opp_finder.find_all_moves(opp_rack)
+            opp_score, opp_word, opp_row, opp_col, opp_dir = find_best_score_opt(
+                _grid, gaddag._data, opp_rack, _bb_set,
+                cross_cache=_cross_cache, dictionary=_dict_py)
 
-            if opp_moves:
-                opp_best = max(opp_moves, key=lambda m: m['score'])
-                opp_score = opp_best['score']
-                opp_scores.append(opp_score)
-                key = (opp_best['word'], opp_best['row'], opp_best['col'],
-                       opp_best['direction'])
-                if key not in opp_responses or opp_score > opp_responses[key]:
-                    opp_responses[key] = opp_score
-            else:
-                opp_scores.append(0)
+        if opp_score > 0:
+            opp_scores.append(opp_score)
+            key = (opp_word, opp_row, opp_col, opp_dir)
+            if key not in opp_responses or opp_score > opp_responses[key]:
+                opp_responses[key] = opp_score
+        else:
+            opp_scores.append(0)
 
     # Undo our move (not strictly necessary since board is local, but clean)
     board.undo_move(placed)
@@ -445,8 +444,15 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
         _use_c = is_available() and _mc_worker_gdata_bytes is not None
     except ImportError:
         _use_c = False
-    _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])} if _use_c else None
-    _grid = board._grid if _use_c else None
+    _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])}
+    _grid = board._grid
+
+    # For Python fallback: shared cross_cache across K sims (same board)
+    if not _use_c:
+        from crossplay_v9.move_finder_opt import find_best_score_opt
+        from crossplay_v9.dictionary import get_dictionary as _get_dict_py
+        _dict_py = _get_dict_py()
+        _cross_cache = {}
 
     from crossplay_v9.leave_eval import evaluate_leave
 
@@ -463,11 +469,16 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
         if _use_c:
             opp_score, opp_word, opp_row, opp_col, opp_dir = _mc_find_best_score(
                 _grid, _mc_worker_gdata_bytes, opp_rack, _mc_worker_set_dict, _bb_set)
-            if opp_score > 0:
-                opp_scores.append(opp_score)
-                key = (opp_word, opp_row, opp_col, opp_dir)
-                if key not in opp_responses or opp_score > opp_responses[key]:
-                    opp_responses[key] = opp_score
+        else:
+            opp_score, opp_word, opp_row, opp_col, opp_dir = find_best_score_opt(
+                _grid, gaddag._data, opp_rack, _bb_set,
+                cross_cache=_cross_cache, dictionary=_dict_py)
+
+        if opp_score > 0:
+            opp_scores.append(opp_score)
+            key = (opp_word, opp_row, opp_col, opp_dir)
+            if key not in opp_responses or opp_score > opp_responses[key]:
+                opp_responses[key] = opp_score
         else:
             opp_scores.append(0)
 
@@ -538,7 +549,7 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
         'pct_opp_beats': round(pct_beats, 1),
         # Equity — leave is E[new rack leave from draw simulation]
         'mc_equity': round(mc_equity, 1),
-        'leave': f'→{keep_str}+{len(dump_tiles)}',
+        'leave': f'>{keep_str}+{len(dump_tiles)}',
         'leave_value': round(avg_new_leave, 1),
         'total_equity': round(mc_equity + avg_new_leave, 1),
         # Detail
@@ -746,6 +757,20 @@ def _mc_eval_sequential(
     total = len(candidates)
     t0 = time.time()
 
+    # Determine which path to use (once, not per sim)
+    try:
+        from .move_finder_c import is_available as _c_avail
+        _use_c = _c_avail()
+    except ImportError:
+        _use_c = False
+
+    if not _use_c:
+        from .move_finder_opt import find_best_score_opt
+        from .dictionary import get_dictionary as _get_dict_seq
+        _dict_seq = _get_dict_seq()
+
+    _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])}
+
     for idx, move in enumerate(candidates):
         horizontal = move['direction'] == 'H'
         placed = board.place_move(move['word'], move['row'], move['col'], horizontal)
@@ -753,40 +778,47 @@ def _mc_eval_sequential(
         opp_scores = []
         opp_responses = {}
 
+        # Cross cache per candidate (board changes after place_move)
+        _cross_cache = {}
+
         for _ in range(k_sims):
             opp_rack_list = random.sample(unseen_pool, rack_size)
             opp_rack = ''.join(opp_rack_list)
 
-            try:
-                from .move_finder_c import find_all_moves_c, is_available
-                if is_available():
-                    opp_moves = find_all_moves_c(board, gaddag, opp_rack,
-                                                  board_blanks=board_blanks)
+            if _use_c:
+                from .move_finder_c import find_all_moves_c
+                opp_moves = find_all_moves_c(board, gaddag, opp_rack,
+                                              board_blanks=board_blanks)
+                if opp_moves:
+                    opp_best = max(opp_moves, key=lambda m: m['score'])
+                    opp_score = opp_best['score']
+                    opp_scores.append(opp_score)
+                    key = (opp_best['word'], opp_best['row'], opp_best['col'],
+                           opp_best['direction'])
+                    if key not in opp_responses or opp_score > opp_responses[key]:
+                        opp_responses[key] = opp_score
                 else:
-                    raise ImportError("C accel not available")
-            except ImportError:
-                opp_finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks)
-                opp_moves = opp_finder.find_all_moves(opp_rack)
-
-            if opp_moves:
-                opp_best = max(opp_moves, key=lambda m: m['score'])
-                opp_score = opp_best['score']
-                opp_scores.append(opp_score)
-                key = (opp_best['word'], opp_best['row'], opp_best['col'],
-                       opp_best['direction'])
-                if key not in opp_responses or opp_score > opp_responses[key]:
-                    opp_responses[key] = opp_score
+                    opp_scores.append(0)
             else:
-                opp_scores.append(0)
+                opp_score, opp_word, opp_row, opp_col, opp_dir = find_best_score_opt(
+                    board._grid, gaddag._data, opp_rack, _bb_set,
+                    cross_cache=_cross_cache, dictionary=_dict_seq)
+                if opp_score > 0:
+                    opp_scores.append(opp_score)
+                    key = (opp_word, opp_row, opp_col, opp_dir)
+                    if key not in opp_responses or opp_score > opp_responses[key]:
+                        opp_responses[key] = opp_score
+                else:
+                    opp_scores.append(0)
 
         board.undo_move(placed)
         elapsed = time.time() - t0
         pct = (idx + 1) / total
         filled = int(20 * pct)
-        bar = '█' * filled + '░' * (20 - filled)
+        bar = '#' * filled + '-' * (20 - filled)
         # Print at 25% milestones and final
         if idx + 1 == total or int(pct * 4) > int((idx) / total * 4):
-            print(f"  ⚡ MC [{bar}] {idx+1}/{total}  {elapsed:.0f}s")
+            print(f"  MC [{bar}] {idx+1}/{total}  {elapsed:.0f}s")
 
         # Stats
         n = len(opp_scores)
@@ -987,10 +1019,10 @@ def mc_evaluate_2ply(
             elapsed = time.time() - t0
             pct = (i + 1) / total
             filled = int(20 * pct)
-            bar = '█' * filled + '░' * (20 - filled)
+            bar = '#' * filled + '-' * (20 - filled)
             # Print at 25% milestones and final
             if i + 1 == total or int(pct * 4) > int(i / total * 4):
-                print(f"  ⚡ MC [{bar}] {i+1}/{total}  {elapsed:.0f}s")
+                print(f"  MC [{bar}] {i+1}/{total}  {elapsed:.0f}s")
         elapsed = time.time() - t0
 
         # Apply blank correction to parallel results
@@ -1009,7 +1041,7 @@ def mc_evaluate_2ply(
         return results
 
     except Exception as e:
-        print(f"  (MC parallel eval failed: {e} — falling back to sequential)")
+        print(f"  (MC parallel eval failed: {e} -- falling back to sequential)")
         return _mc_eval_sequential(
             board, candidates, unseen_pool, your_rack, board_blanks,
             gaddag, k_sims, blank_corr
@@ -1037,7 +1069,7 @@ def quick_mc_analysis(board: Board, rack: str, unseen_str: str,
         return
 
     print(f"\n{'#':<3} {'Word':<12} {'Pos':<10} {'Pts':>4} "
-          f"{'AvgOpp':>6} {'MaxOpp':>6} {'σ':>5} "
+          f"{'AvgOpp':>6} {'MaxOpp':>6} {'StdD':>5} "
           f"{'%Beats':>6} {'Leave':>6} {'MC Eq':>7}")
     print("-" * 80)
 

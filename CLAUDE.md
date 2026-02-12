@@ -142,6 +142,18 @@ does not justify the MC penalty. The `.pyd` has been renamed to
 - Move dicts use `'direction': 'H'` or `'V'`, plus `'row'`/`'col'` (1-indexed)
 - The `_tiles_used()` method computes which rack tiles a move consumes
 
+## IMPORTANT: No Unicode/emoji in output
+
+**NEVER use emoji or non-ASCII characters in print statements, f-strings,
+or any string that may be printed/logged.** Windows cp1252 encoding cannot
+handle characters outside the cp1252 codepage, causing `UnicodeEncodeError`
+crashes. This includes: emojis (any), arrows (→ ←), check marks (✓ ✗ ✅ ❌),
+box-drawing (█ ░ ─), Greek letters (σ Δ), bullets (•), and similar.
+
+Use ASCII alternatives: `->`, `[OK]`, `[X]`, `#`, `-`, `*`, `!`, etc.
+
+A pre-commit hook enforces this rule.
+
 ## Common tasks
 
 **Add a new saved game:** Add a `_create_saved_game_N()` function and register

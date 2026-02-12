@@ -25,54 +25,70 @@ _env_reported = False
 # --- Constants ---
 MIN_K = 100           # Below this, MC variance too high to be useful
 MAX_K = 2000          # Diminishing returns above this (Maven/Quackle rarely exceed ~1000)
-MIN_N = 25            # Quackle uses 23 fixed candidates; 25 gives buffer to avoid
-                      # missing moves that look mediocre in static eval but have
-                      # strong leave synergy or defensive value
+MIN_N = 15            # With Python MC path (~80-150 sims/sec), 15 candidates
+                      # gives K~200-400 (better per-candidate confidence) while
+                      # still covering the competitive equity window
 EQUITY_SPREAD = 15.0  # Include candidates within this equity of best
 CALIBRATION_SECS = 3  # Time budget for benchmark
 
 
 def _run_benchmark():
     """Run a quick MC benchmark to measure sims/sec on this hardware.
-    
+
     Uses a reference board position (sparse + dense) to get representative
     throughput for different game phases.
+
+    When C accel is unavailable (e.g. Windows), benchmarks find_best_score_opt
+    instead of the C fast path — gives realistic throughput for calibration.
     """
     from crossplay_v9.board import Board
     from crossplay_v9.gaddag import get_gaddag
-    from crossplay_v9.move_finder_c import _get_dict
-    from crossplay_v9.mc_eval import _mc_find_best_score
     from crossplay_v9.config import VALID_TWO_LETTER
     import random
-    
+
     gaddag = get_gaddag()
-    gdata_bytes = bytes(gaddag._data)
-    d = _get_dict()
-    
-    class SD:
-        __slots__ = ('is_valid',)
-        def __init__(self, s): self.is_valid = s.__contains__
-    sd = SD(d._words)
-    
+
+    # Detect which path to benchmark
+    from crossplay_v9.move_finder_c import is_available as _c_avail
+    use_c = _c_avail()
+
+    if use_c:
+        from crossplay_v9.move_finder_c import _get_dict
+        from crossplay_v9.mc_eval import _mc_find_best_score
+        gdata_bytes = bytes(gaddag._data)
+        d = _get_dict()
+        class SD:
+            __slots__ = ('is_valid',)
+            def __init__(self, s): self.is_valid = s.__contains__
+        sd = SD(d._words)
+    else:
+        from crossplay_v9.move_finder_opt import find_best_score_opt
+        from crossplay_v9.dictionary import get_dictionary
+        _dict = get_dictionary()
+
     pool = list("AAABCDDEEEEEFGHIIIJKLMNOOOOPQRRSTTTUUVWXYZ")
     random.seed(42)
-    
+
     # --- Sparse board (opening-like) ---
     b_sparse = Board()
     b_sparse.place_word("HELLO", 8, 4, True)
-    
+
+    cross_cache_sparse = {}
     n_sparse = 0
     t0 = time.perf_counter()
     deadline = t0 + CALIBRATION_SECS / 2
     while time.perf_counter() < deadline:
         rack = ''.join(random.sample(pool, 7))
-        _mc_find_best_score(b_sparse._grid, gdata_bytes, rack, sd, set())
+        if use_c:
+            _mc_find_best_score(b_sparse._grid, gdata_bytes, rack, sd, set())
+        else:
+            find_best_score_opt(b_sparse._grid, gaddag._data, rack, set(),
+                                cross_cache=cross_cache_sparse, dictionary=_dict)
         n_sparse += 1
     t_sparse = time.perf_counter() - t0
     sps_sparse = n_sparse / t_sparse
-    
+
     # --- Dense board (mid/late-game) ---
-    # Build a dense board by replaying moves (avoids Game() which triggers calibrate)
     b_dense = Board()
     for word, r, c, h in [
         ("HELLO", 8, 4, True), ("OAK", 8, 8, False),
@@ -83,19 +99,24 @@ def _run_benchmark():
             b_dense.place_word(word, r, c, h)
         except ValueError:
             pass  # skip conflicting words
-    
+
+    cross_cache_dense = {}
     n_dense = 0
     t0 = time.perf_counter()
     deadline = t0 + CALIBRATION_SECS / 2
     while time.perf_counter() < deadline:
         rack = ''.join(random.sample(pool, 7))
-        _mc_find_best_score(b_dense._grid, gdata_bytes, rack, sd, set())
+        if use_c:
+            _mc_find_best_score(b_dense._grid, gdata_bytes, rack, sd, set())
+        else:
+            find_best_score_opt(b_dense._grid, gaddag._data, rack, set(),
+                                cross_cache=cross_cache_dense, dictionary=_dict)
         n_dense += 1
     t_dense = time.perf_counter() - t0
     sps_dense = n_dense / t_dense
-    
+
     n_workers = min(8, multiprocessing.cpu_count())
-    
+
     return {
         'sps_sparse_1w': round(sps_sparse, 1),
         'sps_dense_1w': round(sps_dense, 1),
@@ -348,13 +369,13 @@ def show_calibration():
     print(f"Cores:        {info['total_cores']} total, {info['mc_workers']} MC workers")
     print(f"Platform:     {info['platform']}")
     print(f"Python:       {info['python']} ({info['arch']})")
-    print(f"{'─'*60}")
+    print(f"{'-'*60}")
     print(f"Sparse (1w):  {cal['sps_sparse_1w']:.0f} sims/s")
     print(f"Dense (1w):   {cal['sps_dense_1w']:.0f} sims/s")
     print(f"Sparse ({cal['n_workers']}w):  {cal['sps_sparse_nw']:.0f} sims/s")
     print(f"Dense ({cal['n_workers']}w):   {cal['sps_dense_nw']:.0f} sims/s")
     
-    print(f"\n{'Phase':<20} {'sims/s':>8} {'Budget':>7} {'Max N':>6} {'K@N=80':>7} {'N×K':>10}")
+    print(f"\n{'Phase':<20} {'sims/s':>8} {'Budget':>7} {'Max N':>6} {'K@N=80':>7} {'NxK':>10}")
     print("-" * 60)
     
     for label, bag_size, mc_budget in [

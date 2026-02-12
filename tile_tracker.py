@@ -253,7 +253,7 @@ def test_tile_tracker():
     print("CAN OPPONENT PLAY:")
     for word in test_words:
         can_play, reason = tracker.can_opponent_play_word(word)
-        status = "✓" if can_play else "✗"
+        status = "Y" if can_play else "N"
         print(f"  {word}: {status} - {reason}")
 
 
