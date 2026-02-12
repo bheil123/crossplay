@@ -2044,6 +2044,27 @@ class Game:
 # =============================================================================
 
 
+def _create_saved_game_5() -> Game:
+    """Game 5 vs garnetgirl. In progress. Exchange on turn 1."""
+    state = GameState(
+        name="Game 5",
+        board_moves=[],
+        blank_positions=[],
+        your_score=0,
+        opp_score=0,
+        your_rack="ETDIENZ",
+        bag=[],
+        is_your_turn=False,
+        opponent_name="garnetgirl",
+        created_at="2026-02-11",
+        updated_at="2026-02-11",
+        notes="Turn 1: exchanged OVCJ, kept EIT, drew DENZ. Rack ETDIENZ. Opp turn."
+    )
+    game = Game(state)
+    game.bag = game._calculate_remaining_bag()
+    return game
+
+
 def _create_saved_game_3() -> Game:
     """Game 3 vs mallenmelon (PIVOT game). COMPLETED. Final: 424-364 (+60) WIN.
     Updated v9.0.3: Full 24-move game record."""
@@ -2414,8 +2435,9 @@ class GameManager:
         # Registry: slot number → factory function
         # Add/remove/reorder entries here as games come and go.
         _SAVED_GAME_REGISTRY: Dict[int, callable] = {
-            1: _create_saved_game_3,
-            2: _create_saved_game_4,
+            1: _create_saved_game_5,
+            2: _create_saved_game_3,
+            3: _create_saved_game_4,
         }
         
         print("Initializing game slots...")
