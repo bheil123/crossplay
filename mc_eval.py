@@ -184,6 +184,8 @@ def _mc_find_best_score(grid, gdata_bytes, rack_str, set_dict, board_blank_set):
 _mc_worker_gaddag = None
 _mc_worker_gdata_bytes = None  # cached bytes(gaddag._data) — avoids 3ms conversion per call
 _mc_worker_set_dict = None     # SetDict with __contains__ — avoids is_valid overhead
+_mc_worker_word_set = None     # raw set for Cython fast path
+_mc_worker_cython_fast = False # True if Cython MC fast path available
 
 
 def _mc_init_worker():
@@ -191,6 +193,7 @@ def _mc_init_worker():
     import sys
     sys.path.insert(0, '/home/claude')
     global _mc_worker_gaddag, _mc_worker_gdata_bytes, _mc_worker_set_dict
+    global _mc_worker_word_set, _mc_worker_cython_fast
     from crossplay_v9.gaddag import get_gaddag
     _mc_worker_gaddag = get_gaddag()
     _mc_worker_gdata_bytes = bytes(_mc_worker_gaddag._data)
@@ -201,6 +204,13 @@ def _mc_init_worker():
         __slots__ = ('is_valid',)
         def __init__(self, s): self.is_valid = s.__contains__
     _mc_worker_set_dict = _SetDict(_d._words)
+    _mc_worker_word_set = _d._words  # raw set for Cython fast path
+    # Detect Cython MC fast path
+    try:
+        from crossplay_v9.move_finder_c import is_mc_fast_available
+        _mc_worker_cython_fast = is_mc_fast_available()
+    except ImportError:
+        _mc_worker_cython_fast = False
 
 
 # ---------------------------------------------------------------------------
@@ -276,21 +286,23 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
     pool_size = len(unseen_pool)
     rack_size = min(7, pool_size)
 
-    # Try C-accelerated fast path
-    try:
-        from crossplay_v9.move_finder_c import _accel, is_available
-        _use_c = is_available() and _mc_worker_gdata_bytes is not None
-    except ImportError:
-        _use_c = False
-    if not _use_c:
-        from crossplay_v9.move_finder_gaddag import GADDAGMoveFinder
-
     # Pre-compute board blank set for fast scoring
     _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])}
     _grid = board._grid
 
-    # For Python fallback: shared cross_cache across K sims (same board)
-    if not _use_c:
+    # Determine which path to use (priority: Cython fast > Python best-score)
+    global _mc_worker_cython_fast, _mc_worker_word_set
+    _use_cython_fast = _mc_worker_cython_fast and _mc_worker_gdata_bytes is not None
+    _use_c = False  # legacy C path (find_moves_c) — disabled in favor of above
+
+    _ctx = None
+    if _use_cython_fast:
+        import gaddag_accel as _accel
+        _ctx = _accel.prepare_board_context(
+            _grid, _mc_worker_gdata_bytes, _bb_set,
+            _mc_worker_word_set, VALID_TWO_LETTER,
+            _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
+    else:
         from crossplay_v9.move_finder_opt import find_best_score_opt
         from crossplay_v9.dictionary import get_dictionary as _get_dict_py
         _dict_py = _get_dict_py()
@@ -307,7 +319,7 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
     sim_i = 0
     while sim_i < effective_k:
         # After probe sims, check if we need to reduce K
-        if sim_i == _PROBE_COUNT and not _use_c:
+        if sim_i == _PROBE_COUNT and not _use_cython_fast:
             elapsed = time.perf_counter() - _t_sim_start
             ms_per_sim = elapsed / _PROBE_COUNT * 1000
             if ms_per_sim > 20:  # slow board (>20ms/sim)
@@ -320,9 +332,9 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         opp_rack = ''.join(opp_rack_list)
 
         # Find opponent's best move
-        if _use_c:
-            opp_score, opp_word, opp_row, opp_col, opp_dir = _mc_find_best_score(
-                _grid, _mc_worker_gdata_bytes, opp_rack, _mc_worker_set_dict, _bb_set)
+        if _use_cython_fast:
+            opp_score, opp_word, opp_row, opp_col, opp_dir = _accel.find_best_score_c(
+                _ctx, opp_rack)
         else:
             opp_score, opp_word, opp_row, opp_col, opp_dir = find_best_score_opt(
                 _grid, gaddag._data, opp_rack, _bb_set,
@@ -458,16 +470,21 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
     pool_size = len(unseen_pool)
     rack_size = min(7, pool_size)
 
-    try:
-        from crossplay_v9.move_finder_c import _accel, is_available
-        _use_c = is_available() and _mc_worker_gdata_bytes is not None
-    except ImportError:
-        _use_c = False
     _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])}
     _grid = board._grid
 
-    # For Python fallback: shared cross_cache across K sims (same board)
-    if not _use_c:
+    # Determine which path to use (priority: Cython fast > Python best-score)
+    global _mc_worker_cython_fast, _mc_worker_word_set
+    _use_cython_fast = _mc_worker_cython_fast and _mc_worker_gdata_bytes is not None
+
+    _ctx = None
+    if _use_cython_fast:
+        import gaddag_accel as _accel
+        _ctx = _accel.prepare_board_context(
+            _grid, _mc_worker_gdata_bytes, _bb_set,
+            _mc_worker_word_set, VALID_TWO_LETTER,
+            _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
+    else:
         from crossplay_v9.move_finder_opt import find_best_score_opt
         from crossplay_v9.dictionary import get_dictionary as _get_dict_py
         _dict_py = _get_dict_py()
@@ -487,7 +504,7 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
 
     sim_i = 0
     while sim_i < effective_k:
-        if sim_i == _PROBE_COUNT and not _use_c:
+        if sim_i == _PROBE_COUNT and not _use_cython_fast:
             elapsed = time.perf_counter() - _t_sim_start
             ms_per_sim = elapsed / _PROBE_COUNT * 1000
             if ms_per_sim > 20:
@@ -500,9 +517,9 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
         opp_rack = ''.join(opp_rack_list)
 
         # 2. Find opponent's best move on UNCHANGED board
-        if _use_c:
-            opp_score, opp_word, opp_row, opp_col, opp_dir = _mc_find_best_score(
-                _grid, _mc_worker_gdata_bytes, opp_rack, _mc_worker_set_dict, _bb_set)
+        if _use_cython_fast:
+            opp_score, opp_word, opp_row, opp_col, opp_dir = _accel.find_best_score_c(
+                _ctx, opp_rack)
         else:
             opp_score, opp_word, opp_row, opp_col, opp_dir = find_best_score_opt(
                 _grid, gaddag._data, opp_rack, _bb_set,
@@ -793,18 +810,26 @@ def _mc_eval_sequential(
     t0 = time.time()
 
     # Determine which path to use (once, not per sim)
+    # Priority: Cython fast path > Python find_best_score_opt
+    _use_cython_fast = False
     try:
-        from .move_finder_c import is_available as _c_avail
-        _use_c = _c_avail()
+        from .move_finder_c import is_mc_fast_available
+        _use_cython_fast = is_mc_fast_available()
     except ImportError:
-        _use_c = False
+        pass
 
-    if not _use_c:
+    if _use_cython_fast:
+        import gaddag_accel as _accel_seq
+        from .dictionary import get_dictionary as _get_dict_seq
+        _dict_seq = _get_dict_seq()
+        _word_set_seq = _dict_seq._words
+    else:
         from .move_finder_opt import find_best_score_opt
         from .dictionary import get_dictionary as _get_dict_seq
         _dict_seq = _get_dict_seq()
 
     _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])}
+    _gdata_bytes_seq = bytes(gaddag._data) if _use_cython_fast else None
 
     for idx, move in enumerate(candidates):
         horizontal = move['direction'] == 'H'
@@ -813,8 +838,14 @@ def _mc_eval_sequential(
         opp_scores = []
         opp_responses = {}
 
-        # Cross cache per candidate (board changes after place_move)
-        _cross_cache = {}
+        # Pre-compute context per candidate (board changes after place_move)
+        if _use_cython_fast:
+            _ctx = _accel_seq.prepare_board_context(
+                board._grid, _gdata_bytes_seq, _bb_set,
+                _word_set_seq, VALID_TWO_LETTER,
+                _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
+        else:
+            _cross_cache = {}
 
         # Adaptive K for sequential path
         _PER_CANDIDATE_BUDGET = 8.0
@@ -824,7 +855,7 @@ def _mc_eval_sequential(
 
         sim_i = 0
         while sim_i < effective_k:
-            if sim_i == _PROBE_COUNT and not _use_c:
+            if sim_i == _PROBE_COUNT and not _use_cython_fast:
                 elapsed_probe = time.perf_counter() - _t_cand_start
                 ms_per_sim = elapsed_probe / _PROBE_COUNT * 1000
                 if ms_per_sim > 20:
@@ -835,31 +866,20 @@ def _mc_eval_sequential(
             opp_rack_list = random.sample(unseen_pool, rack_size)
             opp_rack = ''.join(opp_rack_list)
 
-            if _use_c:
-                from .move_finder_c import find_all_moves_c
-                opp_moves = find_all_moves_c(board, gaddag, opp_rack,
-                                              board_blanks=board_blanks)
-                if opp_moves:
-                    opp_best = max(opp_moves, key=lambda m: m['score'])
-                    opp_score = opp_best['score']
-                    opp_scores.append(opp_score)
-                    key = (opp_best['word'], opp_best['row'], opp_best['col'],
-                           opp_best['direction'])
-                    if key not in opp_responses or opp_score > opp_responses[key]:
-                        opp_responses[key] = opp_score
-                else:
-                    opp_scores.append(0)
+            if _use_cython_fast:
+                opp_score, opp_word, opp_row, opp_col, opp_dir = _accel_seq.find_best_score_c(
+                    _ctx, opp_rack)
             else:
                 opp_score, opp_word, opp_row, opp_col, opp_dir = find_best_score_opt(
                     board._grid, gaddag._data, opp_rack, _bb_set,
                     cross_cache=_cross_cache, dictionary=_dict_seq)
-                if opp_score > 0:
-                    opp_scores.append(opp_score)
-                    key = (opp_word, opp_row, opp_col, opp_dir)
-                    if key not in opp_responses or opp_score > opp_responses[key]:
-                        opp_responses[key] = opp_score
-                else:
-                    opp_scores.append(0)
+            if opp_score > 0:
+                opp_scores.append(opp_score)
+                key = (opp_word, opp_row, opp_col, opp_dir)
+                if key not in opp_responses or opp_score > opp_responses[key]:
+                    opp_responses[key] = opp_score
+            else:
+                opp_scores.append(0)
             sim_i += 1
 
         board.undo_move(placed)

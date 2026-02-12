@@ -25,11 +25,36 @@ _env_reported = False
 # --- Constants ---
 MIN_K = 100           # Below this, MC variance too high to be useful
 MAX_K = 2000          # Diminishing returns above this (Maven/Quackle rarely exceed ~1000)
-MIN_N = 15            # With Python MC path (~80-150 sims/sec), 15 candidates
+MIN_N_PYTHON = 15     # With Python MC path (~80-150 sims/sec), 15 candidates
                       # gives K~200-400 (better per-candidate confidence) while
                       # still covering the competitive equity window
+MIN_N_CYTHON = 25     # With Cython fast path, budget allows 25 candidates
+                      # (Maven/Quackle research: 25 catches moves that look
+                      # weak in static eval but have strong leave synergy)
 EQUITY_SPREAD = 15.0  # Include candidates within this equity of best
 CALIBRATION_SECS = 3  # Time budget for benchmark
+
+
+def _get_min_n():
+    """Return MIN_N based on detected engine."""
+    return MIN_N_CYTHON if _detect_engine() == 'cython' else MIN_N_PYTHON
+
+
+def _detect_engine():
+    """Detect which MC engine is available: 'cython', 'c', or 'python'."""
+    try:
+        from crossplay_v9.move_finder_c import is_mc_fast_available
+        if is_mc_fast_available():
+            return 'cython'
+    except ImportError:
+        pass
+    try:
+        from crossplay_v9.move_finder_c import is_available
+        if is_available():
+            return 'c'
+    except ImportError:
+        pass
+    return 'python'
 
 
 def _run_benchmark():
@@ -38,24 +63,33 @@ def _run_benchmark():
     Uses a reference board position (sparse + dense) to get representative
     throughput for different game phases.
 
-    When C accel is unavailable (e.g. Windows), benchmarks find_best_score_opt
-    instead of the C fast path — gives realistic throughput for calibration.
+    Auto-detects the fastest available path:
+    - Cython fast path (BoardContext + find_best_score_c): all-C traversal+scoring
+    - Python find_best_score_opt: pure Python fallback
     """
     from crossplay_v9.board import Board
     from crossplay_v9.gaddag import get_gaddag
-    from crossplay_v9.config import VALID_TWO_LETTER
+    from crossplay_v9.config import VALID_TWO_LETTER, BINGO_BONUS, RACK_SIZE
     import random
 
     gaddag = get_gaddag()
 
     # Detect which path to benchmark
-    from crossplay_v9.move_finder_c import is_available as _c_avail
-    use_c = _c_avail()
+    engine = _detect_engine()
+    use_cython = (engine == 'cython')
+    use_c = (engine == 'c')
 
-    if use_c:
+    gdata_bytes = bytes(gaddag._data)
+
+    if use_cython:
+        import gaddag_accel as _accel
+        from crossplay_v9.dictionary import get_dictionary
+        _dict = get_dictionary()
+        _word_set = _dict._words
+        from crossplay_v9.mc_eval import _MC_TV, _MC_BONUS
+    elif use_c:
         from crossplay_v9.move_finder_c import _get_dict
         from crossplay_v9.mc_eval import _mc_find_best_score
-        gdata_bytes = bytes(gaddag._data)
         d = _get_dict()
         class SD:
             __slots__ = ('is_valid',)
@@ -88,9 +122,15 @@ def _run_benchmark():
     n_sparse = 0
     t0 = time.perf_counter()
     deadline = t0 + CALIBRATION_SECS / 2
+    if use_cython:
+        ctx_sparse = _accel.prepare_board_context(
+            b_sparse._grid, gdata_bytes, set(),
+            _word_set, VALID_TWO_LETTER, _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
     while time.perf_counter() < deadline:
         rack = ''.join(random.sample(pool_sparse, 7))
-        if use_c:
+        if use_cython:
+            _accel.find_best_score_c(ctx_sparse, rack)
+        elif use_c:
             _mc_find_best_score(b_sparse._grid, gdata_bytes, rack, sd, set())
         else:
             find_best_score_opt(b_sparse._grid, gaddag._data, rack, set(),
@@ -115,9 +155,15 @@ def _run_benchmark():
     n_dense = 0
     t0 = time.perf_counter()
     deadline = t0 + CALIBRATION_SECS / 2
+    if use_cython:
+        ctx_dense = _accel.prepare_board_context(
+            b_dense._grid, gdata_bytes, set(),
+            _word_set, VALID_TWO_LETTER, _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
     while time.perf_counter() < deadline:
         rack = ''.join(random.sample(pool_dense, 7))
-        if use_c:
+        if use_cython:
+            _accel.find_best_score_c(ctx_dense, rack)
+        elif use_c:
             _mc_find_best_score(b_dense._grid, gdata_bytes, rack, sd, set())
         else:
             find_best_score_opt(b_dense._grid, gaddag._data, rack, set(),
@@ -153,9 +199,15 @@ def _run_benchmark():
     # Allow more time: sims with blanks are much slower (~300-500ms each),
     # so we need 6+ seconds to get 15-20 samples for statistical stability
     deadline = t0 + max(CALIBRATION_SECS * 2, 6.0)
+    if use_cython:
+        ctx_vdense = _accel.prepare_board_context(
+            b_vdense._grid, gdata_bytes, set(),
+            _word_set, VALID_TWO_LETTER, _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
     while time.perf_counter() < deadline:
         rack = ''.join(random.sample(pool_vdense, min(7, len(pool_vdense))))
-        if use_c:
+        if use_cython:
+            _accel.find_best_score_c(ctx_vdense, rack)
+        elif use_c:
             _mc_find_best_score(b_vdense._grid, gdata_bytes, rack, sd, set())
         else:
             find_best_score_opt(b_vdense._grid, gaddag._data, rack, set(),
@@ -176,6 +228,7 @@ def _run_benchmark():
         'n_workers': n_workers,
         'timestamp': time.time(),
         'calibration_secs': CALIBRATION_SECS,
+        'engine': engine,
         'env': get_env_info(),
     }
 
@@ -192,28 +245,37 @@ def calibrate(force=False, quiet=False):
     """
     global _calibration, _env_reported
     
+    # Detect current engine
+    current_engine = _detect_engine()
+
     # Check cache
     if not force and os.path.exists(_CACHE_PATH):
         try:
             with open(_CACHE_PATH, 'r') as f:
                 cached = json.load(f)
-            # Cache valid for 48 hours
+            # Cache valid for 48 hours AND engine must match
+            cache_engine = cached.get('engine', 'python')
             if time.time() - cached.get('timestamp', 0) < 172800:
-                _calibration = cached
-                if not quiet:
-                    if not _env_reported:
-                        print(f"  Environment: {env_summary_line()}")
-                        _env_reported = True
-                    vd = cached.get('sps_vdense_nw', '?')
-                    vd_str = f"{vd:.0f}" if isinstance(vd, (int, float)) else vd
-                    print(f"  MC calibration: dense={cached['sps_dense_nw']:.0f} "
-                          f"vdense={vd_str} sims/s ({cached['n_workers']}w, cached)")
-                return cached
+                if cache_engine != current_engine:
+                    # Engine changed (e.g. Cython extension was built/removed)
+                    if not quiet:
+                        print(f"  MC engine changed: {cache_engine} -> {current_engine}, recalibrating...")
+                else:
+                    _calibration = cached
+                    if not quiet:
+                        if not _env_reported:
+                            print(f"  Environment: {env_summary_line()}")
+                            _env_reported = True
+                        vd = cached.get('sps_vdense_nw', '?')
+                        vd_str = f"{vd:.0f}" if isinstance(vd, (int, float)) else vd
+                        print(f"  MC calibration: dense={cached['sps_dense_nw']:.0f} "
+                              f"vdense={vd_str} sims/s ({cached['n_workers']}w, {cache_engine}, cached)")
+                    return cached
         except (json.JSONDecodeError, KeyError):
             pass
-    
+
     if not quiet:
-        print(f"  Calibrating MC throughput ({CALIBRATION_SECS}s benchmark)...")
+        print(f"  Calibrating MC throughput ({CALIBRATION_SECS}s benchmark, {current_engine} path)...")
         if not _env_reported:
             print(f"  Environment: {env_summary_line()}")
             _env_reported = True
@@ -231,7 +293,8 @@ def calibrate(force=False, quiet=False):
     if not quiet:
         print(f"  MC calibration: sparse={result['sps_sparse_nw']:.0f} "
               f"dense={result['sps_dense_nw']:.0f} "
-              f"vdense={result['sps_vdense_nw']:.0f} sims/s ({result['n_workers']}w)")
+              f"vdense={result['sps_vdense_nw']:.0f} sims/s "
+              f"({result['n_workers']}w, {result.get('engine', 'python')})")
     
     return result
 
@@ -300,8 +363,9 @@ def get_mc_params(bag_size, n_candidates, mc_budget_secs,
     # The actual spread-based N is determined by the caller who knows
     # the equity values. Here we compute the K given N.
     # We return a "max N" that fits the budget with MIN_K sims each.
-    max_n_for_budget = max(MIN_N, int(total_budget / MIN_K))
-    
+    min_n = _get_min_n()
+    max_n_for_budget = max(min_n, int(total_budget / MIN_K))
+
     # Clamp to available candidates
     n = min(max_n_for_budget, n_candidates)
     n = max(n, min(top_n_display, n_candidates))  # at least display count
@@ -336,23 +400,25 @@ def compute_adaptive_n(candidates, mc_budget_secs, bag_size,
     if equity_spread is None:
         equity_spread = EQUITY_SPREAD
     
+    min_n = _get_min_n()
+
     if not candidates:
-        return MIN_N, MIN_K, "no candidates"
-    
+        return min_n, MIN_K, "no candidates"
+
     sps = estimate_throughput(bag_size)
     total_budget = sps * mc_budget_secs
-    
+
     # Find best equity
     best_eq = max(m.get('equity', m.get('prelim_equity', 0)) for m in candidates)
-    
+
     # Count candidates within spread
     n_in_spread = sum(1 for m in candidates
-                      if (best_eq - m.get('equity', m.get('prelim_equity', 0))) 
+                      if (best_eq - m.get('equity', m.get('prelim_equity', 0)))
                       <= equity_spread)
-    
+
     # N: at least top_n_display, at most what budget allows with MIN_K
     max_n = int(total_budget / MIN_K)
-    n = max(MIN_N, min(n_in_spread, max_n, len(candidates)))
+    n = max(min_n, min(n_in_spread, max_n, len(candidates)))
     n = max(n, min(top_n_display, len(candidates)))
     
     # K: fill budget

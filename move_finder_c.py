@@ -60,6 +60,11 @@ def is_available():
     return _accel is not None
 
 
+def is_mc_fast_available():
+    """Check if Cython MC fast path (BoardContext + find_best_score_c) is available."""
+    return _accel is not None and hasattr(_accel, 'prepare_board_context')
+
+
 def find_all_moves_c(board, gaddag, rack_str: str,
                      board_blanks: List[Tuple[int, int, str]] = None) -> List[Dict]:
     """
