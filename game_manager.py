@@ -533,6 +533,32 @@ class Game:
         preliminary.sort(key=lambda m: -m['prelim_equity'])
         candidates = preliminary[:max(130, top_n * 3)]  # Ensure enough for MC stage
         
+        # ENDGAME FAST PATH: When bag=0, skip risk analysis entirely.
+        # The endgame 2-ply solver gives exact results (opponent rack is known).
+        # Risk analysis is redundant and extremely slow with blanks in opp rack.
+        if endgame_exact:
+            # Show 1-ply table (score only, no risk/leave since they're meaningless)
+            for i, move in enumerate(candidates[:top_n]):
+                word = move['word']
+                pts = move['score']
+                pos = f"R{move['row']}C{move['col']} {move['direction']}"
+                flags = '*' if i == 0 else ''
+                print(f"{i+1:<3} {word:<12} {pos:<12} {pts:>4} {'--':<20} {'--':>6} {'--':>5} {'--':>4} {'--':>4} {pts:>+6.0f} {pts:>+6.0f} {flags}")
+
+            # Build unseen tile string for opponent rack (same logic as _show_2ply_analysis)
+            opp_tiles = []
+            blank_count = unseen.get('?', 0)
+            for letter in sorted(unseen.keys()):
+                if letter == '?':
+                    continue
+                opp_tiles.extend([letter] * unseen[letter])
+            opp_tiles.extend(['?'] * blank_count)
+            opp_rack_str = ''.join(opp_tiles)
+
+            # Jump directly to endgame 2-ply (exact solver)
+            self._show_endgame_2ply(rack, opp_rack_str, sum(unseen.values()))
+            return moves
+
         # Risk analysis with comparative pruning (historical: was "Phase 2" during development)
         # Two-tier approach: full risk for top candidates within ~3s budget,
         # remaining candidates keep prelim_equity for MC evaluation.
@@ -958,13 +984,13 @@ class Game:
                 print("No MC 2-ply results available.")
                 return
             
-            print(f"  \u26a1 MC 2-ply completed in {t_mc*1000:.0f}ms ({k_sims * len(results)} total sims)")
+            print(f"  >> MC 2-ply completed in {t_mc*1000:.0f}ms ({k_sims * len(results)} total sims)")
             
             # Check for bingo threats BEFORE any move (baseline)
             baseline_bingo = self._find_opponent_bingo(unseen_str)
             
             print(f"\n{'#':<3} {'Word':<12} {'Pos':<10} {'Pts':>4} "
-                  f"{'AvgOpp':>6} {'MaxOpp':>6} {'\u03c3':>5} "
+                  f"{'AvgOpp':>6} {'MaxOpp':>6} {'Std':>5} "
                   f"{'%Beats':>6} {'Leave':>6} {'MC Eq':>7}")
             print("-" * 78)
             
@@ -1002,9 +1028,9 @@ class Game:
                 else:
                     opp_word = m.get('opp_word', '')
                     if len(opp_word) >= 7 and m['mc_max_opp'] >= 41:
-                        bingo_marker = "\u26a0\ufe0f"
+                        bingo_marker = "[!B]"
                     elif blocks_bingo:
-                        bingo_marker = "\U0001f6e1\ufe0f"
+                        bingo_marker = "[DB]"
                 
                 leave_display = m['leave'] if not is_exch else m['leave'][:8]
                 
@@ -1049,11 +1075,11 @@ class Game:
             
             if best_1ply and best_mc:
                 if best_mc_is_exch:
-                    print(f"\n\u26a1 MC 2-ply recommends EXCHANGE over 1-ply pick: {best_1ply}")
+                    print(f"\n>> MC 2-ply recommends EXCHANGE over 1-ply pick: {best_1ply}")
                 elif best_1ply == best_mc:
-                    print(f"\n\u2713 1-ply and MC 2-ply agree: {best_1ply}")
+                    print(f"\n[OK] 1-ply and MC 2-ply agree: {best_1ply}")
                 else:
-                    print(f"\n\u26a1 Different recommendations:")
+                    print(f"\n>> Different recommendations:")
                     print(f"   1-ply: {best_1ply}")
                     print(f"   MC 2-ply: {best_mc}")
             
@@ -1350,6 +1376,9 @@ class Game:
 
         Opponent rack is known exactly (= all unseen tiles).  Both players
         get one final turn; leftover tiles don't penalize.
+
+        Uses upper-bound pruning: evaluates ALL moves but only does full
+        opponent search for moves that could actually be optimal.
         """
         from crossplay_v9.lookahead_3ply import evaluate_endgame_2ply
 
@@ -1374,32 +1403,35 @@ class Game:
                 return
 
             meta = results[0].get('_meta', {})
-            evald = meta.get('candidates_evaluated', '?')
-            pruned_ct = meta.get('candidates_pruned', 0)
+            total_moves = meta.get('total_moves', '?')
+            n_interfering = meta.get('interfering', '?')
+            fully_evald = meta.get('fully_evaluated', '?')
+            pruned_ct = meta.get('pruned_by_bound', 0)
             elapsed = meta.get('elapsed_s', '?')
-            print(f"  Evaluated {evald} candidates, pruned {pruned_ct}, in {elapsed}s")
+            opp_bl = meta.get('opp_baseline', '?')
+            bl_time = meta.get('baseline_time_s', '?')
+
+            print(f"  {total_moves} total moves, {n_interfering} interfering, "
+                  f"{fully_evald} fully evaluated, {pruned_ct} pruned by bound")
+            print(f"  Opp baseline: {opp_bl} (found in {bl_time}s)")
+            print(f"  Total time: {elapsed}s")
             print()
 
             print(f"{'#':<3} {'Your Move':<12} {'Pos':<12} {'Pts':>4} "
-                  f"{'Opp Move':<12} {'Opp Pts':>7} {'Net':>6}")
-            print("-" * 62)
+                  f"{'Opp Move':<12} {'Opp Pts':>7} {'Net':>6} {'':>5}")
+            print("-" * 67)
 
             for i, r in enumerate(results[:15], 1):
                 pos = f"R{r['row']}C{r['col']} {r['direction']}"
                 opp_move = r['opp_word'][:10]
+                tag = "" if r.get('exact', True) else " (ub)"
                 print(f"{i:<3} {r['word']:<12} {pos:<12} {r['score']:>4} "
-                      f"{opp_move:<12} {r['opp_score']:>7} {r['net_2ply']:>+6}")
+                      f"{opp_move:<12} {r['opp_score']:>7} {r['net_2ply']:>+6}{tag}")
 
             best = results[0]
             print(f"\n  Best: {best['word']} ({best['score']} pts)")
             print(f"    -> Opp plays {best['opp_word']} ({best['opp_score']} pts)")
             print(f"    -> Net: {best['net_2ply']:+d}")
-
-            opp_resps = best.get('opp_responses', [])
-            if len(opp_resps) > 1:
-                print(f"\n  Top opponent responses to {best['word']}:")
-                for resp in opp_resps[:3]:
-                    print(f"    {resp['word']} @ {resp['pos']} = {resp['score']} pts")
 
         except Exception as e:
             print(f"Endgame 2-ply error: {e}")
@@ -2045,7 +2077,7 @@ class Game:
 
 
 def _create_saved_game_5() -> Game:
-    """Game 5 vs garnetgirl. In progress. Turn 22, bag=15."""
+    """Game 5 vs garnetgirl. In progress. Turn 28, bag=0. Endgame."""
     state = GameState(
         name="Game 5",
         board_moves=[
@@ -2060,7 +2092,7 @@ def _create_saved_game_5() -> Game:
             ('AWE', 10, 9, True),       # Opp: AWE R10C9 H
             ('OBE', 11, 8, True),       # Me: OBE R11C8 H
             ('QI', 12, 7, True),        # Opp: QI R12C7 H
-            ('PIGEON', 10, 4, False),   # Me: PIGEON R10C4 V (bingo? 40pt bonus)
+            ('PIGEON', 10, 4, False),   # Me: PIGEON R10C4 V (bingo, 40pt bonus)
             ('LODGE', 12, 1, True),     # Opp: LODGE R12C1 H
             ('EX', 13, 4, True),        # Me: EX R13C4 H
             ('JET', 7, 2, True),        # Opp: JET R7C2 H
@@ -2069,17 +2101,47 @@ def _create_saved_game_5() -> Game:
             ('PEAL', 12, 12, True),     # Me: PEAL R12C12 H
             ('PERM', 12, 12, False),    # Opp: PERM R12C12 V
             ('GEE', 6, 5, False),       # Me: GEE R6C5 V for 27
+            ('HA', 14, 14, True),       # Opp: HA R14C14 H for 18
+            ('FIDO', 14, 1, True),      # Me: FIDO R14C1 H
+            ('OWL', 13, 9, False),      # Opp: OWL R13C9 V for 18
+            ('VOE', 13, 11, False),     # Me: VOE R13C11 V for 14
+            ('VISUAL', 7, 15, False),   # Opp: VISUAL R7C15 V for 14
+            ('GIRD', 2, 7, True),       # Me: GIRD R2C7 H for 10
         ],
         blank_positions=[(13, 10, 'U')],  # Opp blank U in LOUVERS
-        your_score=342,
-        opp_score=287,
-        your_rack="SREIFDI",
+        your_score=382,
+        opp_score=337,
+        your_rack="ERSSRO",
         bag=[],
         is_your_turn=False,
         opponent_name="garnetgirl",
         created_at="2026-02-11",
         updated_at="2026-02-12",
-        notes="Turn 22. Me +55. Bag 15. Rack SREIFDI. Last rec: FIDO R14C1 H (eq+22.6). T1: exchanged OVCJ."
+        notes="Turn 28. Me +45. Bag 0. Endgame - each player has 1 turn left. Opp's turn. Rack ERSSRO."
+    )
+    game = Game(state)
+    game.bag = game._calculate_remaining_bag()
+    return game
+
+
+def _create_saved_game_6() -> Game:
+    """Game 6 vs mallenmelon. In progress. Turn 3, bag=77."""
+    state = GameState(
+        name="Game 6",
+        board_moves=[
+            ('FEIGNS', 8, 3, True),     # Opp: FEIGNS R8C3 H for 32
+            ('VIM', 7, 2, True),        # Me: VIM R7C2 H for 31
+        ],
+        blank_positions=[],
+        your_score=31,
+        opp_score=32,
+        your_rack="LTHOUPE",
+        bag=[],
+        is_your_turn=False,
+        opponent_name="mallenmelon",
+        created_at="2026-02-12",
+        updated_at="2026-02-12",
+        notes="Turn 3. Me 31, Opp 32. Bag 77. Opp's turn. Rack LTHOUPE."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2457,8 +2519,9 @@ class GameManager:
         # Add/remove/reorder entries here as games come and go.
         _SAVED_GAME_REGISTRY: Dict[int, callable] = {
             1: _create_saved_game_5,
-            2: _create_saved_game_3,
-            3: _create_saved_game_4,
+            2: _create_saved_game_6,
+            3: _create_saved_game_3,
+            4: _create_saved_game_4,
         }
         
         print("Initializing game slots...")

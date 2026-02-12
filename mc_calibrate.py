@@ -66,7 +66,18 @@ def _run_benchmark():
         from crossplay_v9.dictionary import get_dictionary
         _dict = get_dictionary()
 
-    pool = list("AAABCDDEEEEEFGHIIIJKLMNOOOOPQRRSTTTUUVWXYZ")
+    # Phase-specific tile pools.  Blanks have a massive impact on sim cost
+    # (~14x slower per blank in rack) because each blank explores all 26
+    # GADDAG children at every traversal step.  The old single pool had zero
+    # blanks, causing calibration to overestimate late-game throughput by >10x.
+    #
+    # Pool sizes and blank counts are representative of real game conditions:
+    #   Sparse (opening): large pool, 1 blank (~16% of racks get a blank)
+    #   Dense  (mid):     moderate pool, 1 blank (~20% of racks get a blank)
+    #   VDense (late):    small pool, 2 blanks (~60% of racks get a blank)
+    pool_sparse = list("AAABCDDEEEEEFGHIIIJKLMNOOOOPQRRSTTTUUVWXYZ?")    # 43 tiles, 1 blank
+    pool_dense  = list("AABCDEEEEFGHIIJKLMNOOOPRRSTTUUVWX?")             # 33 tiles, 1 blank
+    pool_vdense = list("AALMNNOORRSTTUUVW??")                            # 19 tiles, 2 blanks
     random.seed(42)
 
     # --- Sparse board (opening-like) ---
@@ -78,7 +89,7 @@ def _run_benchmark():
     t0 = time.perf_counter()
     deadline = t0 + CALIBRATION_SECS / 2
     while time.perf_counter() < deadline:
-        rack = ''.join(random.sample(pool, 7))
+        rack = ''.join(random.sample(pool_sparse, 7))
         if use_c:
             _mc_find_best_score(b_sparse._grid, gdata_bytes, rack, sd, set())
         else:
@@ -105,7 +116,7 @@ def _run_benchmark():
     t0 = time.perf_counter()
     deadline = t0 + CALIBRATION_SECS / 2
     while time.perf_counter() < deadline:
-        rack = ''.join(random.sample(pool, 7))
+        rack = ''.join(random.sample(pool_dense, 7))
         if use_c:
             _mc_find_best_score(b_dense._grid, gdata_bytes, rack, sd, set())
         else:
@@ -115,8 +126,10 @@ def _run_benchmark():
     t_dense = time.perf_counter() - t0
     sps_dense = n_dense / t_dense
 
-    # --- Very dense board (late-game, ~18 words, ~65+ tiles, ~70 anchors) ---
+    # --- Very dense board (late-game, ~18 words, ~52 tiles, ~81 anchors) ---
     # Representative of turns 18-24 in a real game.
+    # Uses a small pool with 2 blanks to match real late-game conditions
+    # where ~60% of opponent racks contain at least one blank.
     b_vdense = Board()
     for word, r, c, h in [
         ("HELLO", 8, 4, True), ("OAK", 8, 8, False),
@@ -137,10 +150,11 @@ def _run_benchmark():
     cross_cache_vdense = {}
     n_vdense = 0
     t0 = time.perf_counter()
-    # Allow a bit more time for very dense since sims are slow
-    deadline = t0 + max(CALIBRATION_SECS / 2, 2.0)
+    # Allow more time: sims with blanks are much slower (~300-500ms each),
+    # so we need 6+ seconds to get 15-20 samples for statistical stability
+    deadline = t0 + max(CALIBRATION_SECS * 2, 6.0)
     while time.perf_counter() < deadline:
-        rack = ''.join(random.sample(pool, 7))
+        rack = ''.join(random.sample(pool_vdense, min(7, len(pool_vdense))))
         if use_c:
             _mc_find_best_score(b_vdense._grid, gdata_bytes, rack, sd, set())
         else:

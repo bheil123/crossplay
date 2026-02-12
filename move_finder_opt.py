@@ -31,6 +31,7 @@ _C2I = {chr(65 + i): i for i in range(26)}
 _C2I['+'] = 26
 _I2C = {v: k for k, v in _C2I.items()}
 _DELIM = 26
+_I2C_LIST = [chr(65 + i) for i in range(26)] + ['+']
 
 # Tile values as a list indexed by (ord(c) - 65) for A-Z
 _TV = [0] * 26
@@ -991,29 +992,44 @@ def find_best_score_opt(grid, gdata, rack_str, board_blank_set,
     def extend_right(row0, col0, horiz, offset, wchars, wlen, rack, sr0, sc0,
                      blanks_rem, blanks_used):
         if row0 < 0 or row0 >= 15 or col0 < 0 or col0 >= 15:
-            if is_terminal(offset) and wlen >= 2:
+            if gdata[offset] > 127 and wlen >= 2:
                 try_record_best(wchars, wlen, sr0, sc0, horiz, blanks_used)
             return
 
         existing = grid[row0][col0]
 
         if existing is not None:
-            idx = c2i.get(existing)
-            if idx is not None:
-                child = get_child(offset, idx)
-                if child >= 0:
+            idx = ord(existing) - 65
+            if 0 <= idx < 26:
+                # Inline get_child(offset, idx)
+                if offset == 0:
+                    _child = _root_children.get(idx, -1)
+                else:
+                    _cnt = gdata[offset] & 0x1F
+                    _off = offset + 1
+                    _end = _off + _cnt * 5
+                    _child = -1
+                    while _off < _end:
+                        _ci = gdata[_off]
+                        if _ci == idx:
+                            _child = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+                            break
+                        if _ci > idx:
+                            break
+                        _off += 5
+                if _child >= 0:
                     wchars.append(existing)
                     if horiz:
-                        extend_right(row0, col0 + 1, True, child, wchars, wlen + 1,
+                        extend_right(row0, col0 + 1, True, _child, wchars, wlen + 1,
                                      rack, sr0, sc0, blanks_rem, blanks_used)
                     else:
-                        extend_right(row0 + 1, col0, False, child, wchars, wlen + 1,
+                        extend_right(row0 + 1, col0, False, _child, wchars, wlen + 1,
                                      rack, sr0, sc0, blanks_rem, blanks_used)
                     wchars.pop()
         else:
             cc = cross_check(row0, col0, horiz)
 
-            if is_terminal(offset) and wlen >= 2:
+            if gdata[offset] > 127 and wlen >= 2:
                 try_record_best(wchars, wlen, sr0, sc0, horiz, blanks_used)
 
             for letter in rack:
@@ -1021,43 +1037,81 @@ def find_best_score_opt(grid, gdata, rack_str, board_blank_set,
                     continue
                 if cc is not None and letter not in cc:
                     continue
-                idx = c2i.get(letter)
-                if idx is None:
+                idx = ord(letter) - 65
+                if idx < 0 or idx >= 26:
                     continue
-                child = get_child(offset, idx)
-                if child < 0:
+                # Inline get_child(offset, idx)
+                if offset == 0:
+                    _child = _root_children.get(idx, -1)
+                else:
+                    _cnt = gdata[offset] & 0x1F
+                    _off = offset + 1
+                    _end = _off + _cnt * 5
+                    _child = -1
+                    while _off < _end:
+                        _ci = gdata[_off]
+                        if _ci == idx:
+                            _child = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+                            break
+                        if _ci > idx:
+                            break
+                        _off += 5
+                if _child < 0:
                     continue
 
                 rack[letter] -= 1
                 wchars.append(letter)
                 if horiz:
-                    extend_right(row0, col0 + 1, True, child, wchars, wlen + 1,
+                    extend_right(row0, col0 + 1, True, _child, wchars, wlen + 1,
                                  rack, sr0, sc0, blanks_rem, blanks_used)
                 else:
-                    extend_right(row0 + 1, col0, False, child, wchars, wlen + 1,
+                    extend_right(row0 + 1, col0, False, _child, wchars, wlen + 1,
                                  rack, sr0, sc0, blanks_rem, blanks_used)
                 wchars.pop()
                 rack[letter] += 1
 
             if blanks_rem > 0:
-                for letter, child_off in iter_children(offset):
-                    if letter == '+':
+                # Inline iter_children(offset)
+                _cnt = gdata[offset] & 0x1F
+                _off = offset + 1
+                for _j in range(_cnt):
+                    _ci = gdata[_off]
+                    if _ci == 26:  # delimiter
+                        _off += 5
                         continue
-                    if cc is not None and letter not in cc:
+                    _letter = _I2C_LIST[_ci]
+                    _child_off = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+                    _off += 5
+                    if cc is not None and _letter not in cc:
                         continue
-                    wchars.append(letter)
+                    wchars.append(_letter)
                     blanks_used_new = blanks_used + [wlen]
                     if horiz:
-                        extend_right(row0, col0 + 1, True, child_off, wchars, wlen + 1,
+                        extend_right(row0, col0 + 1, True, _child_off, wchars, wlen + 1,
                                      rack, sr0, sc0, blanks_rem - 1, blanks_used_new)
                     else:
-                        extend_right(row0 + 1, col0, False, child_off, wchars, wlen + 1,
+                        extend_right(row0 + 1, col0, False, _child_off, wchars, wlen + 1,
                                      rack, sr0, sc0, blanks_rem - 1, blanks_used_new)
                     wchars.pop()
 
     def gen_left_part(anchor_r0, anchor_c0, horiz, offset, wchars, wlen, rack,
                       limit, blanks_rem, blanks_used):
-        delim_child = get_child(offset, delim_idx)
+        # Inline get_child(offset, delim_idx)
+        if offset == 0:
+            delim_child = _root_children.get(delim_idx, -1)
+        else:
+            _cnt = gdata[offset] & 0x1F
+            _off = offset + 1
+            _end = _off + _cnt * 5
+            delim_child = -1
+            while _off < _end:
+                _ci = gdata[_off]
+                if _ci == delim_idx:
+                    delim_child = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+                    break
+                if _ci > delim_idx:
+                    break
+                _off += 5
         if delim_child >= 0:
             if horiz:
                 sr0 = anchor_r0
@@ -1089,24 +1143,47 @@ def find_best_score_opt(grid, gdata, rack_str, board_blank_set,
                     continue
                 if cc is not None and letter not in cc:
                     continue
-                child = get_child(offset, idx)
-                if child < 0:
+                # Inline get_child(offset, idx)
+                if offset == 0:
+                    _child = _root_children.get(idx, -1)
+                else:
+                    _cnt = gdata[offset] & 0x1F
+                    _off = offset + 1
+                    _end = _off + _cnt * 5
+                    _child = -1
+                    while _off < _end:
+                        _ci = gdata[_off]
+                        if _ci == idx:
+                            _child = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+                            break
+                        if _ci > idx:
+                            break
+                        _off += 5
+                if _child < 0:
                     continue
 
                 rack[letter] -= 1
                 new_wchars = [letter] + wchars
-                gen_left_part(anchor_r0, anchor_c0, horiz, child, new_wchars,
+                gen_left_part(anchor_r0, anchor_c0, horiz, _child, new_wchars,
                               wlen + 1, rack, limit - 1, blanks_rem, blanks_used)
                 rack[letter] += 1
 
             if blanks_rem > 0:
-                for letter, child_off in iter_children(offset):
-                    if letter == '+':
+                # Inline iter_children(offset)
+                _cnt = gdata[offset] & 0x1F
+                _off = offset + 1
+                for _j in range(_cnt):
+                    _ci = gdata[_off]
+                    if _ci == 26:  # delimiter
+                        _off += 5
                         continue
-                    if cc is not None and letter not in cc:
+                    _letter = _I2C_LIST[_ci]
+                    _child_off = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+                    _off += 5
+                    if cc is not None and _letter not in cc:
                         continue
-                    new_wchars = [letter] + wchars
-                    gen_left_part(anchor_r0, anchor_c0, horiz, child_off, new_wchars,
+                    new_wchars = [_letter] + wchars
+                    gen_left_part(anchor_r0, anchor_c0, horiz, _child_off, new_wchars,
                                   wlen + 1, rack, limit - 1, blanks_rem - 1,
                                   blanks_used + [pos_idx])
 
@@ -1118,10 +1195,12 @@ def find_best_score_opt(grid, gdata, rack_str, board_blank_set,
                     continue
                 if cc is not None and letter not in cc:
                     continue
-                letter_child = get_child(offset, idx)
+                # offset is always 0 here — use root cache
+                letter_child = _root_children.get(idx, -1)
                 if letter_child < 0:
                     continue
-                dc = get_child(letter_child, delim_idx)
+                # level-1 node — use level2 cache
+                dc = _level2_cache.get((idx, delim_idx), -1)
                 if dc < 0:
                     continue
 
@@ -1135,19 +1214,22 @@ def find_best_score_opt(grid, gdata, rack_str, board_blank_set,
                 rack[letter] += 1
 
             if blanks_rem > 0:
-                for letter, letter_child in iter_children(offset):
-                    if letter == '+':
+                # Inline iter_children at root — use _root_children directly
+                for _ci, _letter_child in _root_children.items():
+                    if _ci == 26:  # delimiter
                         continue
-                    if cc is not None and letter not in cc:
+                    _letter = _I2C_LIST[_ci]
+                    if cc is not None and _letter not in cc:
                         continue
-                    dc = get_child(letter_child, delim_idx)
+                    # level-1 node — use level2 cache
+                    dc = _level2_cache.get((_ci, delim_idx), -1)
                     if dc < 0:
                         continue
                     if horiz:
-                        extend_right(anchor_r0, anchor_c0 + 1, True, dc, [letter], 1,
+                        extend_right(anchor_r0, anchor_c0 + 1, True, dc, [_letter], 1,
                                      rack, anchor_r0, anchor_c0, blanks_rem - 1, [0])
                     else:
-                        extend_right(anchor_r0 + 1, anchor_c0, False, dc, [letter], 1,
+                        extend_right(anchor_r0 + 1, anchor_c0, False, dc, [_letter], 1,
                                      rack, anchor_r0, anchor_c0, blanks_rem - 1, [0])
 
     def extend_from_existing(anchor_r0, anchor_c0, horiz, rack_counter, blanks_rem):
@@ -1172,15 +1254,42 @@ def find_best_score_opt(grid, gdata, rack_str, board_blank_set,
         reversed_prefix = prefix[::-1]
         offset = 0
         for ch in reversed_prefix:
-            idx = c2i.get(ch)
-            if idx is None:
+            idx = ord(ch) - 65
+            if idx < 0 or idx >= 26:
                 return
-            child = get_child(offset, idx)
-            if child < 0:
+            # Inline get_child with root cache for offset==0
+            if offset == 0:
+                _child = _root_children.get(idx, -1)
+            else:
+                _cnt = gdata[offset] & 0x1F
+                _off = offset + 1
+                _end = _off + _cnt * 5
+                _child = -1
+                while _off < _end:
+                    _ci = gdata[_off]
+                    if _ci == idx:
+                        _child = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+                        break
+                    if _ci > idx:
+                        break
+                    _off += 5
+            if _child < 0:
                 return
-            offset = child
+            offset = _child
 
-        dc = get_child(offset, delim_idx)
+        # Inline get_child(offset, delim_idx)
+        _cnt = gdata[offset] & 0x1F
+        _off = offset + 1
+        _end = _off + _cnt * 5
+        dc = -1
+        while _off < _end:
+            _ci = gdata[_off]
+            if _ci == delim_idx:
+                dc = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+                break
+            if _ci > delim_idx:
+                break
+            _off += 5
         if dc < 0:
             return
 
@@ -1244,7 +1353,30 @@ def find_best_score_opt(grid, gdata, rack_str, board_blank_set,
     # ------------------------------------------------------------------
 
     rack_counter = Counter(rack_letters)
-    rack_letter_indices = [(letter, c2i[letter]) for letter in rack_counter]
+    rack_letter_indices = [(letter, ord(letter) - 65) for letter in rack_counter]
+
+    # ------------------------------------------------------------------
+    # Shallow GADDAG cache: root (level 0) and level 1 children
+    # Avoids repeated linear scans of the largest nodes (~27 children each)
+    # ------------------------------------------------------------------
+    _root_children = {}
+    _cnt = gdata[0] & 0x1F
+    _off = 1
+    for _ in range(_cnt):
+        _ci = gdata[_off]
+        _child = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+        _root_children[_ci] = _child
+        _off += 5
+
+    _level2_cache = {}
+    for _pci, _poff in _root_children.items():
+        _cnt = gdata[_poff] & 0x1F
+        _off = _poff + 1
+        for _ in range(_cnt):
+            _ci = gdata[_off]
+            _child = gdata[_off+1] | (gdata[_off+2] << 8) | (gdata[_off+3] << 16) | (gdata[_off+4] << 24)
+            _level2_cache[(_pci, _ci)] = _child
+            _off += 5
 
     for ar0, ac0 in anchors_0:
         for horiz in (True, False):
