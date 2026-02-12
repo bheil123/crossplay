@@ -98,6 +98,29 @@ class GameState:
     
     @classmethod
     def from_dict(cls, d):
+        # Normalize board_moves: support both old tuple format and enriched dicts
+        raw_moves = d.get('board_moves', [])
+        normalized = []
+        for m in raw_moves:
+            if isinstance(m, dict):
+                # Already enriched — keep as-is
+                normalized.append(m)
+            elif isinstance(m, (list, tuple)):
+                if len(m) == 4:
+                    # Old format: (word, row, col, horizontal)
+                    normalized.append({
+                        'word': m[0], 'row': m[1], 'col': m[2],
+                        'dir': 'H' if m[3] else 'V',
+                        'player': None, 'score': None, 'bag': None,
+                        'blanks': [], 'cumulative': None, 'note': '',
+                    })
+                else:
+                    # Unknown tuple length — keep raw for debugging
+                    normalized.append(m)
+            else:
+                normalized.append(m)
+        d = dict(d)  # Don't mutate caller's dict
+        d['board_moves'] = normalized
         return cls(**d)
 
 
@@ -118,7 +141,13 @@ class Game:
         if state:
             self.state = state
             self.board = Board()
-            for word, row, col, horiz in state.board_moves:
+            for move in state.board_moves:
+                if isinstance(move, dict):
+                    word = move['word']
+                    row, col = move['row'], move['col']
+                    horiz = move.get('dir', 'H') == 'H' if 'dir' in move else move.get('horizontal', True)
+                else:
+                    word, row, col, horiz = move[0], move[1], move[2], move[3]
                 self.board.place_word(word, row, col, horiz)
             self.bag = state.bag.copy() if state.bag else self._new_bag()
             # Initialize blocked cache with current board state
@@ -1629,51 +1658,58 @@ class Game:
             return indices[used_idx]
         return -1
     
-    def play_move(self, word: str, row: int, col: int, horizontal: bool, 
+    def play_move(self, word: str, row: int, col: int, horizontal: bool,
                   is_opponent: bool = False, rack: str = None) -> Tuple[bool, int]:
         """Play a move. Returns (success, score)."""
         word = word.upper()
-        
+
         # Validate word
         if len(word) > 2 and not self.dictionary.is_valid(word):
             print(f"❌ '{word}' is not a valid word!")
             return False, 0
-        
+
         # Get tiles used
         move_dict = {'word': word, 'row': row, 'col': col, 'direction': 'H' if horizontal else 'V'}
         tiles_used = self._tiles_used(move_dict)
-        
-        # Check rack if provided
+
+        # Check rack and detect blanks
+        blank_word_indices = []
         if rack:
             rack_list = list(rack)
+            new_indices = self._get_new_tile_word_indices(move_dict)
+            used_idx = 0
             for t in tiles_used:
                 if t in rack_list:
                     rack_list.remove(t)
                 elif '?' in rack_list:
                     rack_list.remove('?')
+                    # Map this used tile to its word index
+                    if used_idx < len(new_indices):
+                        blank_word_indices.append(new_indices[used_idx])
                 else:
                     print(f"❌ Missing tile '{t}' for word '{word}'!")
                     return False, 0
-        
+                used_idx += 1
+
         # Calculate score
         try:
             score, crosswords = calculate_move_score(
                 self.board, word, row, col, horizontal,
+                blanks_used=blank_word_indices,
                 board_blanks=self.state.blank_positions
             )
         except Exception as e:
             print(f"❌ Invalid placement: {e}")
             return False, 0
-        
+
         # Bingo bonus (Crossplay uses 40, not Scrabble's 50)
         if len(tiles_used) == 7:
             score += 40
             print("🎉 BINGO! +40 bonus!")
-        
-        # Place word
+
+        # Place word on board
         self.board.place_word(word, row, col, horizontal)
-        self.state.board_moves.append((word, row, col, horizontal))
-        
+
         # Update score
         if is_opponent:
             self.state.opp_score += score
@@ -1691,23 +1727,53 @@ class Game:
                 new_tiles = self.draw_tiles(len(tiles_used))
                 rack_list.extend(new_tiles)
                 self.state.your_rack = ''.join(rack_list)
-        
+
+        # Record blank positions
+        for wi in blank_word_indices:
+            if horizontal:
+                br, bc = row, col + wi
+            else:
+                br, bc = row + wi, col
+            self.state.blank_positions.append((br, bc, word[wi]))
+
+        # Compute bag count (tiles visible to opponent: bag minus their rack)
+        bag_count = max(0, len(self.bag) - RACK_SIZE)
+
+        # Build enriched move record
+        player = self.state.opponent_name if is_opponent else 'me'
+        enriched = {
+            'word': word,
+            'row': row,
+            'col': col,
+            'dir': 'H' if horizontal else 'V',
+            'player': player,
+            'score': score,
+            'bag': bag_count,
+            'blanks': blank_word_indices,
+            'cumulative': [self.state.your_score, self.state.opp_score],
+            'note': 'bingo' if len(tiles_used) >= RACK_SIZE else '',
+        }
+        self.state.board_moves.append(enriched)
+
         self.state.updated_at = datetime.now().isoformat()
-        
+
         # Update blocked square cache and invalidate threats cache
         self.blocked_cache.update_after_move(self.board, word, row, col, horizontal)
         self._threats_cache = None
-        
+
         d = 'H' if horizontal else 'V'
         who = self.state.opponent_name if is_opponent else "You"
         print(f"✅ {who} played {word} at R{row}C{col} {d} for {score} points!")
-        
+
         # Show existing threats after every move
         self.show_existing_threats(top_n=5)
-        
+
         # Auto-save if enabled
         self._auto_save()
-        
+
+        # Check if game should be archived
+        self._check_archive()
+
         return True, score
     
     def record_opponent_move(self, word: str, row: int, col: int, horizontal: bool, 
@@ -1834,8 +1900,7 @@ class Game:
         
         # Place the word on board
         self.board.place_word(word, row, col, horizontal)
-        self.state.board_moves.append((word, row, col, horizontal))
-        
+
         # Record blank positions (from explicit blanks or auto-detected)
         for i in detected_blanks:
             if horizontal:
@@ -1844,11 +1909,11 @@ class Game:
                 blank_row, blank_col = row + i, col
             self.state.blank_positions.append((blank_row, blank_col, word[i]))
             print(f"    📌 Blank recorded at R{blank_row}C{blank_col} = {word[i]}")
-        
+
         # Update opponent score
         old_opp_score = self.state.opp_score
         self.state.opp_score += score
-        
+
         # Validate opponent total score
         if new_opp_score is not None:
             if self.state.opp_score != new_opp_score:
@@ -1857,18 +1922,18 @@ class Game:
                 print(f"    Reported: {new_opp_score}")
                 print(f"    Using reported score.")
                 self.state.opp_score = new_opp_score
-        
+
         # Validate bag count
         if new_bag_count is not None:
             # Sync tracker to get current count
             from crossplay_v9.tile_tracker import TileTracker
             tracker = TileTracker()
             tracker.sync_with_board(self.board, self.state.your_rack, 0, self.state.blank_positions)
-            
+
             # Expected: unseen - 7 (opp rack) = bag
             unseen = tracker.get_unseen_count()
             expected_bag = unseen - 7  # Assuming opp has 7 tiles
-            
+
             if expected_bag != new_bag_count:
                 diff = expected_bag - new_bag_count
                 print(f"\n⚠️  BAG COUNT MISMATCH!")
@@ -1877,23 +1942,65 @@ class Game:
                 print(f"    Difference: {diff} tiles")
                 if diff > 0:
                     print(f"    💡 Missing tiles - check if blanks were reported")
-        
+
+        # Compute bag count for enriched record
+        bag_count = max(0, len(self.bag) - RACK_SIZE)
+
+        # Build enriched move record (after score/bag updates for accurate cumulative)
+        enriched = {
+            'word': word,
+            'row': row,
+            'col': col,
+            'dir': 'H' if horizontal else 'V',
+            'player': 'opp',
+            'score': score,
+            'bag': new_bag_count if new_bag_count is not None else bag_count,
+            'blanks': detected_blanks,
+            'cumulative': [self.state.your_score, self.state.opp_score],
+            'note': 'bingo' if len(new_tile_indices) >= RACK_SIZE else '',
+        }
+        self.state.board_moves.append(enriched)
+
         self.state.is_your_turn = True
         self.state.updated_at = datetime.now().isoformat()
-        
+
         # Update blocked square cache and invalidate threats cache
         self.blocked_cache.update_after_move(self.board, word, row, col, horizontal)
         self._threats_cache = None
-        
+
         print(f"\n📝 Recorded: {self.state.opponent_name} played {word} for {score} pts")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score}")
-        
+
         # Show existing threats after every move
         self.show_existing_threats(top_n=5)
-        
+
         # Auto-save if enabled
         self._auto_save()
+
+        # Check if game should be archived
+        self._check_archive()
     
+    def _check_archive(self):
+        """Auto-archive the game when it's complete."""
+        if self.is_complete():
+            try:
+                from crossplay_v9.game_archive import enrich_move_history, archive_game
+                # If moves are already enriched dicts, archive directly
+                has_enriched = all(isinstance(m, dict) and m.get('score') is not None
+                                  for m in self.state.board_moves)
+                if has_enriched:
+                    archive_game(self.state, self.state.board_moves)
+                else:
+                    # Fallback: enrich from tuples (shouldn't happen in live play)
+                    enriched = enrich_move_history(
+                        self.state.board_moves,
+                        self.state.blank_positions,
+                        first_player='me'
+                    )
+                    archive_game(self.state, enriched)
+            except Exception as e:
+                print(f"Warning: auto-archive failed: {e}")
+
     def set_rack(self, rack: str):
         """Set your rack."""
         self.state.your_rack = rack.upper().replace(' ', '')
@@ -1936,122 +2043,6 @@ class Game:
 # PRELOADED GAMES (Your current games)
 # =============================================================================
 
-def _create_saved_game_1() -> Game:
-    """Game 1 vs mallenmelon - current board state."""
-    # Board tiles as individual placements (row, col, letter)
-    board_tiles = [
-        # AMAZED at col 8, rows 1-6 (M is blank)
-        (1, 8, 'A'), (2, 8, 'M'), (3, 8, 'A'), (4, 8, 'Z'), (5, 8, 'E'), (6, 8, 'D'),
-        # MOLAR at col 9, rows 1-5 (your move)
-        (1, 9, 'M'), (2, 9, 'O'), (3, 9, 'L'), (4, 9, 'A'),  # R at 5,9 already exists
-        # DRUG at row 1, cols 12-15
-        (1, 12, 'D'), (1, 13, 'R'), (1, 14, 'U'), (1, 15, 'G'),
-        # GREE at col 15, rows 1-4
-        (2, 15, 'R'), (3, 15, 'E'), (4, 15, 'E'),
-        # NOSEY at col 14, rows 3-7
-        (3, 14, 'N'), (4, 14, 'O'), (5, 14, 'S'), (6, 14, 'E'), (7, 14, 'Y'),
-        # JILT at col 11, rows 3-6
-        (3, 11, 'J'), (4, 11, 'I'), (5, 11, 'L'), (6, 11, 'T'),
-        # OVERFLOWS at row 5, cols 6-14
-        (5, 6, 'O'), (5, 7, 'V'), (5, 9, 'R'), (5, 10, 'F'), (5, 11, 'L'), (5, 12, 'O'), (5, 13, 'W'),
-        # WOOS column
-        (6, 13, 'O'), (7, 13, 'O'),
-        # G at row 7 col 5, Q at col 9
-        (7, 5, 'G'), (7, 9, 'Q'),
-        # PAP at row 8 cols 4-6, HIKERS at cols 8-13
-        (8, 4, 'P'), (8, 5, 'A'), (8, 6, 'P'),
-        (8, 8, 'H'), (8, 9, 'I'), (8, 10, 'K'), (8, 11, 'E'), (8, 12, 'R'), (8, 13, 'S'),
-        # RIME at row 9 cols 5-8, U at col 12
-        (9, 5, 'R'), (9, 6, 'I'), (9, 7, 'M'), (9, 8, 'E'), (9, 12, 'U'),
-        # D at row 10 col 5, OXYGEN at cols 7-12
-        (10, 5, 'D'), (10, 7, 'O'), (10, 8, 'X'), (10, 9, 'Y'), (10, 10, 'G'), (10, 11, 'E'), (10, 12, 'N'),
-        # NAV at row 11 cols 4-6, OFT at cols 10-12
-        (11, 4, 'N'), (11, 5, 'A'), (11, 6, 'V'), (11, 10, 'O'), (11, 11, 'F'), (11, 12, 'T'),
-        # URAEI at row 12 cols 1-5, EBBS at cols 8-11
-        (12, 1, 'U'), (12, 2, 'R'), (12, 3, 'A'), (12, 4, 'E'), (12, 5, 'I'),
-        (12, 8, 'E'), (12, 9, 'B'), (12, 10, 'B'), (12, 11, 'S'),
-        # CRATE at col 2, rows 11-15
-        (11, 2, 'C'), (12, 2, 'R'), (13, 2, 'A'), (14, 2, 'T'), (15, 2, 'E'),
-        # NEWTS at col 4, rows 11-15
-        (11, 4, 'N'), (12, 4, 'E'), (13, 4, 'W'), (14, 4, 'T'), (15, 4, 'S'),
-        # AH at col 1, rows 14-15
-        (14, 1, 'A'), (15, 1, 'H'),
-    ]
-    # Convert to board_moves format (letter, row, col, horizontal)
-    board_moves = [(letter, row, col, True) for row, col, letter in board_tiles]
-    
-    state = GameState(
-        name="Game 1",
-        board_moves=board_moves,
-        blank_positions=[
-            (2, 8, 'M'),   # M in AMAZED at R2C8 is blank
-            (12, 2, 'R'),  # R in CRATE at R12C2 is blank
-            (15, 4, 'S'),  # S in NEWTS at R15C4 is blank
-        ],
-        your_score=313,
-        opp_score=287,
-        your_rack="ATRTIIC",
-        bag=[],  # Will be recalculated
-        is_your_turn=False,  # Opponent's turn
-        opponent_name="mallenmelon",
-        created_at="2026-01-31",
-        updated_at="2026-02-03",
-        notes="Score 313-287 (+26). You played MOLAR 31. Bag: 5. Opp turn."
-    )
-    game = Game(state)
-    # Recalculate bag based on board
-    game.bag = game._calculate_remaining_bag()
-    return game
-
-
-def _create_saved_game_2() -> Game:
-    """Game 2 vs mallenmelon (the detailed game from our analysis)."""
-    state = GameState(
-        name="Game 2",
-        board_moves=[
-            ('FRAUD', 8, 4, True),
-            ('STREW', 6, 5, False),
-            ('DOGIE', 8, 8, False),
-            ('SPEW', 13, 8, True),
-            ('LOOGIE', 14, 10, True),
-            ('QUIETS', 11, 6, True),
-            ('TAEL', 12, 15, False),
-            ('EH', 15, 11, True),
-            ('MAKI', 12, 3, True),
-            ('URN', 10, 11, True),
-            ('VERJUS', 6, 11, False),
-            ('CRAP', 11, 1, True),
-            # Moves added in session:
-            ('DIORAMIC', 4, 1, False),  # Opp bingo, D is blank, 76 pts
-            ('PACED', 11, 4, False),    # You, 30 pts
-            ('ZENS', 7, 14, False),     # Opp, 40 pts
-            ('BEVEL', 14, 1, True),     # You, 28 pts
-            # Latest moves:
-            ('HOYAS', 4, 15, False),    # Opp, 47 pts
-            ('DOZENS', 5, 14, False),   # You, 24 pts
-            ('HUT', 4, 13, False),      # Opp, 21 pts
-            ('REBATE', 1, 4, False),    # You, 32 pts
-        ],
-        blank_positions=[
-            (11, 7, 'U'),  # U in QUIETS is blank
-            (7, 11, 'E'),  # E in VERJUS is blank
-            (4, 1, 'D'),   # D in DIORAMIC is blank
-        ],
-        your_score=260,
-        opp_score=343,
-        your_rack="EFGNNTN",
-        bag=[],  # Will be recalculated
-        is_your_turn=False,  # Opponent's turn
-        opponent_name="mallenmelon",
-        created_at="2026-01-31",
-        updated_at="2026-02-03",
-        notes="Game 2 - Score: 260-343 (-83). Rack: EFGNNTN (3 N's!). Opp turn."
-    )
-    game = Game(state)
-    # Recalculate bag based on board
-    game.bag = game._calculate_remaining_bag()
-    return game
-
 
 def _create_saved_game_3() -> Game:
     """Game 3 vs mallenmelon (PIVOT game). COMPLETED. Final: 424-364 (+60) WIN.
@@ -2076,7 +2067,7 @@ def _create_saved_game_3() -> Game:
             ('FEAR', 10, 14, False),    # Opp: FEAR R10C14 V for 22
             ('THE', 11, 15, False),     # Me: THE R11C15 V for 40 (MC pick, ERST 52% bingo)
             ('SHIM', 11, 7, False),     # Opp: SHIM R11C7 V for 27
-            ('AW', 10, 1, False),       # Me: AW R10C1 V for 12
+            ('AW', 12, 1, False),       # Me: AW R12C1 V for 12 (A overlaps ALIYOT, WE crossword)
             ('KNOLL', 2, 8, False),     # Opp: KNOLL R2C8 V for 20
             ('JAGS', 5, 14, False),     # Me: JAGS R5C14 V for 16 (⚠️ STEROIDS was better)
             ('DRIVE', 2, 10, False),    # Opp: DRIVE R2C10 V for 23
@@ -2105,8 +2096,8 @@ def _create_saved_game_3() -> Game:
 
 
 def _create_saved_game_4() -> Game:
-    """Game 4 vs mallenmelon (LOGON game). 19 moves played, opp turn.
-    Updated v12.1: +CUBE(16), +VEERY(38). Score 432-271."""
+    """Game 4 vs mallenmelon (LOGON game). COMPLETED. Final: 468-322 (+146) WIN.
+    Updated v13.1: +KEEP(21), +CHEST(36), +NAH(30). 22 moves total."""
     state = GameState(
         name="Game 4",
         board_moves=[
@@ -2129,21 +2120,24 @@ def _create_saved_game_4() -> Game:
             ('XI', 8, 15, False),      # Me: XI R8C15 V for 38 (X on 2L)
             ('CUBE', 2, 7, True),      # Opp: CUBE R2C7 H for 16
             ('VEERY', 1, 10, False),   # Me: VEERY R1C10 V for 38 (MC 2-ply pick)
+            ('KEEP', 15, 4, True),     # Opp: KEEP R15C4 H for 21
+            ('CHEST', 12, 11, True),   # Me: CHEST R12C11 H for 36 (T on 3W)
+            ('NAH', 15, 10, True),     # Opp: NAH R15C10 H for 30 (final opp move)
         ],
         blank_positions=[
             (12, 6, 'E'),  # E in GAUZE is blank (opp)
             (8, 12, 'S'),  # S in DOWDIEST is blank
             (14, 11, 'K'), # K in JAKEST is blank
         ],
-        your_score=432,     # 26+48+30+26+66+43+49+68+38+38
-        opp_score=271,      # 37+36+25+28+20+70+14+25+16
-        your_rack="TCDQHRR", # Current rack
-        bag=[],             # Will be recalculated
-        is_your_turn=False,  # Opp turn (waiting for their move)
+        your_score=468,     # 26+48+30+26+66+43+49+68+38+38+36
+        opp_score=322,      # 37+36+25+28+20+70+14+25+16+21+30
+        your_rack="DQRR",   # Leftover tiles (no penalty in Crossplay)
+        bag=[],
+        is_your_turn=False,  # Game over
         opponent_name="mallenmelon",
         created_at="2026-02-05",
-        updated_at="2026-02-10",
-        notes="Score 432-271 (+161). Me VEERY(38). Opp turn. Bag: 3. Rack TCDQHRR."
+        updated_at="2026-02-11",
+        notes="COMPLETED. 468-322 (+146) WIN. 1 bingo (DOWDIEST). 22 moves."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2420,10 +2414,8 @@ class GameManager:
         # Registry: slot number → factory function
         # Add/remove/reorder entries here as games come and go.
         _SAVED_GAME_REGISTRY: Dict[int, callable] = {
-            1: _create_saved_game_1,
-            2: _create_saved_game_2,
-            3: _create_saved_game_3,
-            4: _create_saved_game_4,
+            1: _create_saved_game_3,
+            2: _create_saved_game_4,
         }
         
         print("Initializing game slots...")

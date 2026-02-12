@@ -20,6 +20,11 @@ build/
 # Game saves (local to each machine)
 /crossplay_saves/
 
+# Game archive (local play history)
+game_archive.jsonl
+game_archive_summary.csv
+game_archive_moves.csv
+
 # Claude Code local settings
 .claude/
 

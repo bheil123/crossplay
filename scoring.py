@@ -214,9 +214,18 @@ def calculate_move_score(
             new_tile_positions.append((row, col))
             new_tile_indices.append(i)
     
-    # Score the main word (board blanks don't affect main word since they're already placed)
+    # Include board blanks that fall within this word (they score 0)
+    all_blanks = list(blanks_used)
+    for i in range(len(word)):
+        if horizontal:
+            row, col = start_row, start_col + i
+        else:
+            row, col = start_row + i, start_col
+        if (row, col) in board_blank_positions and i not in blanks_set:
+            all_blanks.append(i)
+
     main_score = calculate_word_score(
-        board, word, start_row, start_col, horizontal, new_tile_positions, blanks_used
+        board, word, start_row, start_col, horizontal, new_tile_positions, all_blanks
     )
     
     # Find and score crosswords
