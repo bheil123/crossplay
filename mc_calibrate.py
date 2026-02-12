@@ -88,7 +88,7 @@ def _run_benchmark():
     t_sparse = time.perf_counter() - t0
     sps_sparse = n_sparse / t_sparse
 
-    # --- Dense board (mid/late-game) ---
+    # --- Dense board (mid-game, ~6 words, ~25 tiles) ---
     b_dense = Board()
     for word, r, c, h in [
         ("HELLO", 8, 4, True), ("OAK", 8, 8, False),
@@ -115,13 +115,50 @@ def _run_benchmark():
     t_dense = time.perf_counter() - t0
     sps_dense = n_dense / t_dense
 
-    n_workers = min(8, multiprocessing.cpu_count())
+    # --- Very dense board (late-game, ~18 words, ~65+ tiles, ~70 anchors) ---
+    # Representative of turns 18-24 in a real game.
+    b_vdense = Board()
+    for word, r, c, h in [
+        ("HELLO", 8, 4, True), ("OAK", 8, 8, False),
+        ("PLANE", 10, 4, True), ("BRAVE", 12, 5, True),
+        ("TIGER", 6, 10, False), ("JAM", 4, 10, False),
+        ("DONE", 5, 3, True), ("QUIT", 2, 8, False),
+        ("WAXEN", 14, 3, True), ("SLY", 4, 10, True),
+        ("PIE", 12, 9, True), ("RUN", 3, 12, False),
+        ("MOB", 9, 3, True), ("FIG", 7, 5, True),
+        ("VEND", 9, 10, False), ("CUT", 11, 13, False),
+        ("HEW", 13, 1, True), ("DIN", 1, 8, False),
+    ]:
+        try:
+            b_vdense.place_word(word, r, c, h)
+        except ValueError:
+            pass
+
+    cross_cache_vdense = {}
+    n_vdense = 0
+    t0 = time.perf_counter()
+    # Allow a bit more time for very dense since sims are slow
+    deadline = t0 + max(CALIBRATION_SECS / 2, 2.0)
+    while time.perf_counter() < deadline:
+        rack = ''.join(random.sample(pool, 7))
+        if use_c:
+            _mc_find_best_score(b_vdense._grid, gdata_bytes, rack, sd, set())
+        else:
+            find_best_score_opt(b_vdense._grid, gaddag._data, rack, set(),
+                                cross_cache=cross_cache_vdense, dictionary=_dict)
+        n_vdense += 1
+    t_vdense = time.perf_counter() - t0
+    sps_vdense = n_vdense / t_vdense
+
+    n_workers = min(10, multiprocessing.cpu_count())
 
     return {
         'sps_sparse_1w': round(sps_sparse, 1),
         'sps_dense_1w': round(sps_dense, 1),
+        'sps_vdense_1w': round(sps_vdense, 1),
         'sps_sparse_nw': round(sps_sparse * n_workers, 1),
         'sps_dense_nw': round(sps_dense * n_workers, 1),
+        'sps_vdense_nw': round(sps_vdense * n_workers, 1),
         'n_workers': n_workers,
         'timestamp': time.time(),
         'calibration_secs': CALIBRATION_SECS,
@@ -153,8 +190,10 @@ def calibrate(force=False, quiet=False):
                     if not _env_reported:
                         print(f"  Environment: {env_summary_line()}")
                         _env_reported = True
-                    print(f"  MC calibration: {cached['sps_dense_nw']:.0f} sims/s "
-                          f"({cached['n_workers']}w, cached)")
+                    vd = cached.get('sps_vdense_nw', '?')
+                    vd_str = f"{vd:.0f}" if isinstance(vd, (int, float)) else vd
+                    print(f"  MC calibration: dense={cached['sps_dense_nw']:.0f} "
+                          f"vdense={vd_str} sims/s ({cached['n_workers']}w, cached)")
                 return cached
         except (json.JSONDecodeError, KeyError):
             pass
@@ -177,7 +216,8 @@ def calibrate(force=False, quiet=False):
     
     if not quiet:
         print(f"  MC calibration: sparse={result['sps_sparse_nw']:.0f} "
-              f"dense={result['sps_dense_nw']:.0f} sims/s ({result['n_workers']}w)")
+              f"dense={result['sps_dense_nw']:.0f} "
+              f"vdense={result['sps_vdense_nw']:.0f} sims/s ({result['n_workers']}w)")
     
     return result
 
@@ -191,27 +231,31 @@ def get_calibration():
 
 
 def estimate_throughput(bag_size):
-    """Estimate 4-worker throughput for a given game phase.
-    
-    Interpolates between sparse (opening) and dense (late game) measurements.
-    Endgame is faster due to smaller search space.
+    """Estimate N-worker throughput for a given game phase.
+
+    Interpolates between sparse (opening), dense (mid), and very-dense
+    (late game) measurements. Late-game boards are much denser with more
+    anchors, making each sim significantly slower.
     """
     cal = get_calibration()
     sps_sparse = cal['sps_sparse_nw']
     sps_dense = cal['sps_dense_nw']
-    
+    # Very-dense: fall back to dense * 0.3 if not measured (old cache)
+    sps_vdense = cal.get('sps_vdense_nw', sps_dense * 0.3)
+
     if bag_size > 70:
         return sps_sparse  # Opening: sparse board
     elif bag_size > 40:
-        # Linear interpolation sparse → dense
+        # Linear interpolation sparse -> dense
         frac = (70 - bag_size) / 30.0
         return sps_sparse * (1 - frac) + sps_dense * frac
-    elif bag_size > 12:
-        return sps_dense  # Mid-late: dense board
+    elif bag_size > 15:
+        return sps_dense  # Mid-game: moderately dense board
     else:
-        # Endgame: fewer unseen tiles = fewer rack combos = faster
-        # But also more tiles on board. Roughly 1.5x dense speed.
-        return sps_dense * 1.5
+        # Late game / endgame: board is very dense, sims are much slower.
+        # Interpolate dense -> very-dense as bag shrinks from 15 to 0.
+        frac = (15 - bag_size) / 15.0
+        return sps_dense * (1 - frac) + sps_vdense * frac
 
 
 def get_mc_params(bag_size, n_candidates, mc_budget_secs,
@@ -317,7 +361,7 @@ def get_env_info() -> dict:
     """Gather environment info for reporting."""
     import sys
     total_cores = os.cpu_count() or 1
-    n_workers = min(8, total_cores)
+    n_workers = min(10, total_cores)
     
     # Try to get CPU model name
     cpu_model = platform.processor() or "unknown"
@@ -370,10 +414,12 @@ def show_calibration():
     print(f"Platform:     {info['platform']}")
     print(f"Python:       {info['python']} ({info['arch']})")
     print(f"{'-'*60}")
-    print(f"Sparse (1w):  {cal['sps_sparse_1w']:.0f} sims/s")
-    print(f"Dense (1w):   {cal['sps_dense_1w']:.0f} sims/s")
-    print(f"Sparse ({cal['n_workers']}w):  {cal['sps_sparse_nw']:.0f} sims/s")
-    print(f"Dense ({cal['n_workers']}w):   {cal['sps_dense_nw']:.0f} sims/s")
+    print(f"Sparse (1w):    {cal['sps_sparse_1w']:.0f} sims/s")
+    print(f"Dense (1w):     {cal['sps_dense_1w']:.0f} sims/s")
+    print(f"VDense (1w):    {cal.get('sps_vdense_1w', '?')} sims/s")
+    print(f"Sparse ({cal['n_workers']}w):   {cal['sps_sparse_nw']:.0f} sims/s")
+    print(f"Dense ({cal['n_workers']}w):    {cal['sps_dense_nw']:.0f} sims/s")
+    print(f"VDense ({cal['n_workers']}w):   {cal.get('sps_vdense_nw', '?')} sims/s")
     
     print(f"\n{'Phase':<20} {'sims/s':>8} {'Budget':>7} {'Max N':>6} {'K@N=80':>7} {'NxK':>10}")
     print("-" * 60)

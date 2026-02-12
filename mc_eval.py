@@ -296,7 +296,25 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         _dict_py = _get_dict_py()
         _cross_cache = {}
 
-    for _ in range(k_sims):
+    # Adaptive K: time first few sims to detect slow boards.
+    # Target: each candidate completes in <=8s so 15 candidates / 10 workers
+    # finishes in ~12s total (2 waves of work).
+    _PER_CANDIDATE_BUDGET = 8.0  # seconds
+    _PROBE_COUNT = 3             # sims to time before adapting
+    effective_k = k_sims
+    _t_sim_start = time.perf_counter()
+
+    sim_i = 0
+    while sim_i < effective_k:
+        # After probe sims, check if we need to reduce K
+        if sim_i == _PROBE_COUNT and not _use_c:
+            elapsed = time.perf_counter() - _t_sim_start
+            ms_per_sim = elapsed / _PROBE_COUNT * 1000
+            if ms_per_sim > 20:  # slow board (>20ms/sim)
+                max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
+                if max_k < effective_k:
+                    effective_k = max_k
+
         # Sample random opponent rack
         opp_rack_list = random.sample(unseen_pool, rack_size)
         opp_rack = ''.join(opp_rack_list)
@@ -317,6 +335,7 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
                 opp_responses[key] = opp_score
         else:
             opp_scores.append(0)
+        sim_i += 1
 
     # Undo our move (not strictly necessary since board is local, but clean)
     board.undo_move(placed)
@@ -460,7 +479,22 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
     opp_responses = {}
     new_rack_leaves = []
 
-    for _ in range(k_sims):
+    # Adaptive K (same logic as _mc_eval_single_candidate)
+    _PER_CANDIDATE_BUDGET = 8.0
+    _PROBE_COUNT = 3
+    effective_k = k_sims
+    _t_sim_start = time.perf_counter()
+
+    sim_i = 0
+    while sim_i < effective_k:
+        if sim_i == _PROBE_COUNT and not _use_c:
+            elapsed = time.perf_counter() - _t_sim_start
+            ms_per_sim = elapsed / _PROBE_COUNT * 1000
+            if ms_per_sim > 20:
+                max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
+                if max_k < effective_k:
+                    effective_k = max_k
+
         # 1. Sample opponent rack from unseen pool
         opp_rack_list = random.sample(unseen_pool, rack_size)
         opp_rack = ''.join(opp_rack_list)
@@ -501,6 +535,7 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
             new_rack = keep_tiles + remaining[:draw_n]
 
         new_rack_leaves.append(evaluate_leave(''.join(new_rack)))
+        sim_i += 1
 
     # Compute stats
     n = len(opp_scores)
@@ -781,7 +816,22 @@ def _mc_eval_sequential(
         # Cross cache per candidate (board changes after place_move)
         _cross_cache = {}
 
-        for _ in range(k_sims):
+        # Adaptive K for sequential path
+        _PER_CANDIDATE_BUDGET = 8.0
+        _PROBE_COUNT = 3
+        effective_k = k_sims
+        _t_cand_start = time.perf_counter()
+
+        sim_i = 0
+        while sim_i < effective_k:
+            if sim_i == _PROBE_COUNT and not _use_c:
+                elapsed_probe = time.perf_counter() - _t_cand_start
+                ms_per_sim = elapsed_probe / _PROBE_COUNT * 1000
+                if ms_per_sim > 20:
+                    max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
+                    if max_k < effective_k:
+                        effective_k = max_k
+
             opp_rack_list = random.sample(unseen_pool, rack_size)
             opp_rack = ''.join(opp_rack_list)
 
@@ -810,6 +860,7 @@ def _mc_eval_sequential(
                         opp_responses[key] = opp_score
                 else:
                     opp_scores.append(0)
+            sim_i += 1
 
         board.undo_move(placed)
         elapsed = time.time() - t0
@@ -958,7 +1009,7 @@ def mc_evaluate_2ply(
     # Decide parallel vs sequential
     if max_workers is None:
         cpu = os.cpu_count() or 1
-        max_workers = min(cpu, 8)
+        max_workers = min(cpu, 10)
 
     # Sequential for small batches or no board_moves
     if board_moves is None or len(candidates) <= 2 or max_workers <= 1:

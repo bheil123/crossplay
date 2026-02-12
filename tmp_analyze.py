@@ -36,16 +36,18 @@ BOARD_MOVES = [
     ("PEAL", 12, 12, True),    # You played
     ("PERM", 12, 12, False),   # Opp played
     ("GEE", 6, 5, False),      # You played
+    ("HA", 14, 14, True),       # Opp played for 18
+    ("FIDO", 14, 1, True),      # You played for 16
 ]
 
 BOARD_BLANKS = [(13, 10, 'U')]  # Blank U in LOUVERS
-YOUR_RACK = "SREIFDI"
-YOUR_SCORE = 342
-OPP_SCORE = 287
-BAG_SIZE = 15
+YOUR_RACK = "SRERIOE"
+YOUR_SCORE = 358
+OPP_SCORE = 305
+BAG_SIZE = 10
 N_MC = 15
 K_MC = 150
-MAX_WORKERS = 6
+MAX_WORKERS = 10
 
 
 def main():
