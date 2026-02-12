@@ -11,6 +11,7 @@ dist/
 build/
 *.so
 !gaddag_accel.cpython-312-x86_64-linux-gnu.so
+*.pyd.disabled
 
 # Cython build artifacts
 *.c
