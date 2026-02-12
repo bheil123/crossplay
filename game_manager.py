@@ -2045,20 +2045,41 @@ class Game:
 
 
 def _create_saved_game_5() -> Game:
-    """Game 5 vs garnetgirl. In progress. Exchange on turn 1."""
+    """Game 5 vs garnetgirl. In progress. Turn 22, bag=15."""
     state = GameState(
         name="Game 5",
-        board_moves=[],
-        blank_positions=[],
-        your_score=0,
-        opp_score=0,
-        your_rack="ETDIENZ",
+        board_moves=[
+            ('DIZEN', 4, 8, False),     # Opp: DIZEN R4C8 V
+            ('BUSKER', 9, 6, True),     # Me: BUSKER R9C6 H for 36
+            ('TOEA', 8, 3, True),       # Opp: TOEA R8C3 H
+            ('GAIT', 2, 7, False),      # Me: GAIT R2C7 V
+            ('YA', 10, 5, True),        # Opp: YA R10C5 H
+            ('NAH', 5, 9, False),       # Me: NAH R5C9 V
+            ('DUTY', 2, 10, False),     # Opp: DUTY R2C10 V
+            ('CHICS', 5, 12, False),    # Me: CHICS R5C12 V
+            ('AWE', 10, 9, True),       # Opp: AWE R10C9 H
+            ('OBE', 11, 8, True),       # Me: OBE R11C8 H
+            ('QI', 12, 7, True),        # Opp: QI R12C7 H
+            ('PIGEON', 10, 4, False),   # Me: PIGEON R10C4 V (bingo? 40pt bonus)
+            ('LODGE', 12, 1, True),     # Opp: LODGE R12C1 H
+            ('EX', 13, 4, True),        # Me: EX R13C4 H
+            ('JET', 7, 2, True),        # Opp: JET R7C2 H
+            ('FEH', 7, 7, True),        # Me: FEH R7C7 H
+            ('LOUVERS', 13, 8, True),   # Opp: LOUVERS R13C8 H (bingo, blank U at R13C10)
+            ('PEAL', 12, 12, True),     # Me: PEAL R12C12 H
+            ('PERM', 12, 12, False),    # Opp: PERM R12C12 V
+            ('GEE', 6, 5, False),       # Me: GEE R6C5 V for 27
+        ],
+        blank_positions=[(13, 10, 'U')],  # Opp blank U in LOUVERS
+        your_score=342,
+        opp_score=287,
+        your_rack="SREIFDI",
         bag=[],
         is_your_turn=False,
         opponent_name="garnetgirl",
         created_at="2026-02-11",
-        updated_at="2026-02-11",
-        notes="Turn 1: exchanged OVCJ, kept EIT, drew DENZ. Rack ETDIENZ. Opp turn."
+        updated_at="2026-02-12",
+        notes="Turn 22. Me +55. Bag 15. Rack SREIFDI. Last rec: FIDO R14C1 H (eq+22.6). T1: exchanged OVCJ."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()

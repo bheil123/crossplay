@@ -93,14 +93,22 @@ def main():
 
     rack_tiles = Counter(YOUR_RACK.upper())
 
+    # Blanks on board show as letters (e.g. 'U'), not '?'.
+    # Adjust: don't count blank-letter against that letter's distribution.
+    blanks_on_board = len(BOARD_BLANKS)
+    blank_letters_on_board = Counter(letter for _, _, letter in BOARD_BLANKS)
+
     unseen = Counter()
     for tile, count in full_dist.items():
         if tile == '?':
-            unseen['?'] = 3 - 1  # 1 blank used on board
+            blanks_in_rack = YOUR_RACK.count('?')
+            remaining = 3 - blanks_on_board - blanks_in_rack
         else:
-            remaining = count - board_tiles.get(tile, 0) - rack_tiles.get(tile, 0)
-            if remaining > 0:
-                unseen[tile] = remaining
+            # board_tiles includes blank letters; subtract those back out
+            board_count = board_tiles.get(tile, 0) - blank_letters_on_board.get(tile, 0)
+            remaining = count - board_count - rack_tiles.get(tile, 0)
+        if remaining > 0:
+            unseen[tile] = remaining
 
     unseen_str = ''.join(tile * count for tile, count in sorted(unseen.items()))
     print(f"Unseen tiles ({len(unseen_str)}): {unseen_str}")
@@ -110,7 +118,7 @@ def main():
     # Find all moves
     print("\n--- Finding all moves ---")
     t0 = time.time()
-    all_moves = find_all_moves_opt(board, gaddag, YOUR_RACK, board_blanks=[])
+    all_moves = find_all_moves_opt(board, gaddag, YOUR_RACK, board_blanks=BOARD_BLANKS)
     t1 = time.time()
     print(f"Found {len(all_moves)} moves in {t1-t0:.2f}s")
 
