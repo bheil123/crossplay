@@ -270,7 +270,13 @@ class Game:
 
         print(f"\n[INFO] {self.state.name} vs {self.state.opponent_name}")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score} ({spread_str})")
-        print(f"   Bag: {max(0, len(self.bag) - 7)} tiles | {status}")
+        # Compute bag from tracker (self.bag is stale in assisted mode)
+        _tracker = TileTracker()
+        _tracker.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
+                                 blank_positions=self.state.blank_positions)
+        bag_tiles = _tracker.get_bag_count()
+        print(f"   Bag: {bag_tiles} tiles | {status}")
         if self.state.your_rack:
             rack_val = sum(TILE_VALUES.get(t, 0) for t in self.state.your_rack)
             print(f"   Your rack: [{' '.join(self.state.your_rack)}] (value: {rack_val})")
@@ -1797,8 +1803,16 @@ class Game:
         who = self.state.opponent_name if is_opponent else "You"
         print(f"[OK] {who} played {word} at R{row}C{col} {d} for {score} points!")
 
-        # Show existing threats after every move
-        self.show_existing_threats(top_n=5)
+        # Show existing threats (skip in endgame -- opp has no turns left)
+        from crossplay_v9.tile_tracker import TileTracker as _TT1
+        _trk = _TT1()
+        _trk.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                             blanks_in_rack=(self.state.your_rack or "").count('?'),
+                             blank_positions=self.state.blank_positions)
+        if _trk.get_bag_count() > 0:
+            self.show_existing_threats(top_n=5)
+        else:
+            print("\n[ENDGAME] Bag empty -- opponent has no more turns. Use 'analyze' for 2-ply endgame solver.")
 
         # Auto-save if enabled
         self._auto_save()
@@ -2003,8 +2017,16 @@ class Game:
         print(f"\n[NOTE] Recorded: {self.state.opponent_name} played {word} for {score} pts")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score}")
 
-        # Show existing threats after every move
-        self.show_existing_threats(top_n=5)
+        # Show existing threats (skip in endgame -- opp has no turns left)
+        from crossplay_v9.tile_tracker import TileTracker as _TT2
+        _trk = _TT2()
+        _trk.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                             blanks_in_rack=(self.state.your_rack or "").count('?'),
+                             blank_positions=self.state.blank_positions)
+        if _trk.get_bag_count() > 0:
+            self.show_existing_threats(top_n=5)
+        else:
+            print("\n[ENDGAME] Bag empty -- opponent has no more turns. Use 'analyze' for 2-ply endgame solver.")
 
         # Auto-save if enabled
         self._auto_save()
