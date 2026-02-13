@@ -141,6 +141,11 @@ does not justify the MC penalty. The `.pyd` has been renamed to
 - Blanks are tracked as `(row, col, letter)` tuples in `blank_positions`
 - Move dicts use `'direction': 'H'` or `'V'`, plus `'row'`/`'col'` (1-indexed)
 - The `_tiles_used()` method computes which rack tiles a move consumes
+- `GameState.final_turns_remaining` tracks endgame final turns in assisted
+  mode: `None` = mid-game (bag not empty), `1` = one final turn left for
+  whoever's turn it is, `0` = game over. When `== 1` and it's your turn,
+  `analyze()` uses 1-ply (maximize score) instead of 2-ply, and threats
+  are skipped since the opponent has no response
 
 ## IMPORTANT: No Unicode/emoji in output
 

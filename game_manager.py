@@ -92,7 +92,8 @@ class GameState:
     created_at: str
     updated_at: str
     notes: str = ""
-    
+    final_turns_remaining: Optional[int] = None
+
     def to_dict(self):
         return asdict(self)
     
@@ -150,6 +151,15 @@ class Game:
                     word, row, col, horiz = move[0], move[1], move[2], move[3]
                 self.board.place_word(word, row, col, horiz)
             self.bag = state.bag.copy() if state.bag else self._new_bag()
+            # Infer final_turns_remaining for old saves missing it
+            if state.final_turns_remaining is None:
+                _tracker = TileTracker()
+                _tracker.sync_with_board(self.board, your_rack=state.your_rack or "",
+                                         blanks_in_rack=(state.your_rack or "").count('?'),
+                                         blank_positions=state.blank_positions)
+                if _tracker.get_bag_count() == 0:
+                    # Bag already empty but field not set -- assume 1 final turn left
+                    state.final_turns_remaining = 1
             # Initialize blocked cache with current board state
             self.blocked_cache.initialize(self.board, self.dictionary)
         else:
@@ -276,7 +286,19 @@ class Game:
                                  blanks_in_rack=(self.state.your_rack or "").count('?'),
                                  blank_positions=self.state.blank_positions)
         bag_tiles = _tracker.get_bag_count()
-        print(f"   Bag: {bag_tiles} tiles | {status}")
+        ftr = self.state.final_turns_remaining
+        if bag_tiles == 0 and ftr is not None:
+            if ftr == 1 and self.state.is_your_turn:
+                status_extra = f"   Bag: 0 tiles | {status} (final move -- no opp response)"
+            elif ftr == 1 and not self.state.is_your_turn:
+                status_extra = f"   Bag: 0 tiles | {status} (final move -- you respond after)"
+            elif ftr <= 0:
+                status_extra = f"   Bag: 0 tiles | {status} (no turns remaining)"
+            else:
+                status_extra = f"   Bag: 0 tiles | {status} (final turns: {ftr})"
+            print(status_extra)
+        else:
+            print(f"   Bag: {bag_tiles} tiles | {status}")
         if self.state.your_rack:
             rack_val = sum(TILE_VALUES.get(t, 0) for t in self.state.your_rack)
             print(f"   Your rack: [{' '.join(self.state.your_rack)}] (value: {rack_val})")
@@ -428,7 +450,10 @@ class Game:
             return []
         
         # Show existing threats FIRST so user sees board vulnerabilities
-        self.show_existing_threats(top_n=5)
+        # Skip when opponent has no remaining turns
+        ftr = self.state.final_turns_remaining
+        if ftr is None or ftr > 1 or (ftr == 1 and not self.state.is_your_turn):
+            self.show_existing_threats(top_n=5)
         
         # Move generation — prefer C-accelerated, fallback to Python
         try:
@@ -543,6 +568,9 @@ class Game:
         # The endgame 2-ply solver gives exact results (opponent rack is known).
         # Risk analysis is redundant and extremely slow with blanks in opp rack.
         if endgame_exact:
+            ftr = self.state.final_turns_remaining
+            is_final_move = (ftr == 1 and self.state.is_your_turn)
+
             # Show 1-ply table (score only, no risk/leave since they're meaningless)
             for i, move in enumerate(candidates[:top_n]):
                 word = move['word']
@@ -550,6 +578,13 @@ class Game:
                 pos = f"R{move['row']}C{move['col']} {move['direction']}"
                 flags = '*' if i == 0 else ''
                 print(f"{i+1:<3} {word:<12} {pos:<12} {pts:>4} {'--':<20} {'--':>6} {'--':>5} {'--':>4} {'--':>4} {pts:>+6.0f} {pts:>+6.0f} {flags}")
+
+            if is_final_move:
+                # 1-ply: this is the absolute last move of the game.
+                # Opponent has no response -- just maximize score.
+                print(f"\nENDGAME 1-PLY: your final move, no opponent response.")
+                print(f"Best: {candidates[0]['word']} ({candidates[0]['score']} pts)")
+                return moves
 
             # Build unseen tile string for opponent rack (same logic as _show_2ply_analysis)
             opp_tiles = []
@@ -1745,6 +1780,13 @@ class Game:
             score += 40
             print("[WIN] BINGO! +40 bonus!")
 
+        # Compute bag count BEFORE placing the move (for final_turns tracking)
+        _trk_pre = TileTracker()
+        _trk_pre.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
+                                 blank_positions=self.state.blank_positions)
+        bag_before_play = _trk_pre.get_bag_count()
+
         # Place word on board
         self.board.place_word(word, row, col, horizontal)
 
@@ -1793,6 +1835,18 @@ class Game:
         }
         self.state.board_moves.append(enriched)
 
+        # Track final_turns_remaining
+        _trk_post = TileTracker()
+        _trk_post.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                                  blanks_in_rack=(self.state.your_rack or "").count('?'),
+                                  blank_positions=self.state.blank_positions)
+        bag_after_play = _trk_post.get_bag_count()
+        if bag_before_play > 0 and bag_after_play == 0:
+            # Bag just emptied on user's turn: user used 1 of 2 final turns
+            self.state.final_turns_remaining = 1
+        elif bag_before_play == 0 and self.state.final_turns_remaining is not None:
+            self.state.final_turns_remaining = max(0, self.state.final_turns_remaining - 1)
+
         self.state.updated_at = datetime.now().isoformat()
 
         # Update blocked square cache and invalidate threats cache
@@ -1803,16 +1857,22 @@ class Game:
         who = self.state.opponent_name if is_opponent else "You"
         print(f"[OK] {who} played {word} at R{row}C{col} {d} for {score} points!")
 
-        # Show existing threats (skip in endgame -- opp has no turns left)
-        from crossplay_v9.tile_tracker import TileTracker as _TT1
-        _trk = _TT1()
-        _trk.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                             blanks_in_rack=(self.state.your_rack or "").count('?'),
-                             blank_positions=self.state.blank_positions)
-        if _trk.get_bag_count() > 0:
+        # Show existing threats (skip when opponent has no turns left)
+        # Note: is_your_turn hasn't been toggled yet, so use is_opponent param
+        ftr = self.state.final_turns_remaining
+        if ftr is not None and ftr <= 0:
+            print("\n[ENDGAME] Game over -- no turns remaining.")
+        elif ftr == 1 and not is_opponent:
+            # User just played and bag emptied -- opponent still gets final turn
+            print("\n[ENDGAME] Bag just emptied -- opponent gets one final turn.")
             self.show_existing_threats(top_n=5)
+        elif ftr == 1 and is_opponent:
+            # Opponent just played -- user's final move, no opp response
+            print("\n[ENDGAME] Bag empty -- your final move (no opponent response). Use 'analyze' for 1-ply ranking.")
+        elif bag_after_play == 0:
+            print("\n[ENDGAME] Bag empty -- use 'analyze' for endgame solver.")
         else:
-            print("\n[ENDGAME] Bag empty -- opponent has no more turns. Use 'analyze' for 2-ply endgame solver.")
+            self.show_existing_threats(top_n=5)
 
         # Auto-save if enabled
         self._auto_save()
@@ -1944,6 +2004,13 @@ class Game:
             else:
                 expected_score = no_blank_score
         
+        # Compute bag count BEFORE placing the move (for final_turns tracking)
+        _trk_pre = TileTracker()
+        _trk_pre.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
+                                 blank_positions=self.state.blank_positions)
+        bag_before = _trk_pre.get_bag_count()
+
         # Place the word on board
         self.board.place_word(word, row, col, horizontal)
 
@@ -2007,6 +2074,18 @@ class Game:
         }
         self.state.board_moves.append(enriched)
 
+        # Track final_turns_remaining
+        _trk_post = TileTracker()
+        _trk_post.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                                  blanks_in_rack=(self.state.your_rack or "").count('?'),
+                                  blank_positions=self.state.blank_positions)
+        bag_after = _trk_post.get_bag_count()
+        if bag_before > 0 and bag_after == 0:
+            # Bag just emptied on opponent's turn: opp used 1 of 2 final turns
+            self.state.final_turns_remaining = 1
+        elif bag_before == 0 and self.state.final_turns_remaining is not None:
+            self.state.final_turns_remaining = max(0, self.state.final_turns_remaining - 1)
+
         self.state.is_your_turn = True
         self.state.updated_at = datetime.now().isoformat()
 
@@ -2017,16 +2096,16 @@ class Game:
         print(f"\n[NOTE] Recorded: {self.state.opponent_name} played {word} for {score} pts")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score}")
 
-        # Show existing threats (skip in endgame -- opp has no turns left)
-        from crossplay_v9.tile_tracker import TileTracker as _TT2
-        _trk = _TT2()
-        _trk.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                             blanks_in_rack=(self.state.your_rack or "").count('?'),
-                             blank_positions=self.state.blank_positions)
-        if _trk.get_bag_count() > 0:
-            self.show_existing_threats(top_n=5)
+        # Show existing threats (skip when opponent has no turns left)
+        ftr = self.state.final_turns_remaining
+        if ftr is not None and ftr <= 0:
+            print("\n[ENDGAME] Game over -- no turns remaining.")
+        elif ftr == 1 and self.state.is_your_turn:
+            print("\n[ENDGAME] Bag empty -- your final move (no opponent response). Use 'analyze' for 1-ply ranking.")
+        elif bag_after == 0:
+            print("\n[ENDGAME] Bag empty -- opponent has no more turns. Use 'analyze' for endgame solver.")
         else:
-            print("\n[ENDGAME] Bag empty -- opponent has no more turns. Use 'analyze' for 2-ply endgame solver.")
+            self.show_existing_threats(top_n=5)
 
         # Auto-save if enabled
         self._auto_save()
@@ -2099,7 +2178,7 @@ class Game:
 
 
 def _create_saved_game_5() -> Game:
-    """Game 5 vs garnetgirl. In progress. Turn 28, bag=0. Endgame."""
+    """Game 5 vs garnetgirl. COMPLETED. Final: 393-351 (+42) WIN. 28 moves."""
     state = GameState(
         name="Game 5",
         board_moves=[
@@ -2129,17 +2208,20 @@ def _create_saved_game_5() -> Game:
             ('VOE', 13, 11, False),     # Me: VOE R13C11 V for 14
             ('VISUAL', 7, 15, False),   # Opp: VISUAL R7C15 V for 14
             ('GIRD', 2, 7, True),       # Me: GIRD R2C7 H for 10
+            ('TOMATO', 3, 4, False),    # Opp: TOMATO R3C4 V for 14 (final opp move)
+            ('GIRDERS', 2, 7, True),    # Me: GIRDERS R2C7 H for 11 (final move, extends GIRD)
         ],
         blank_positions=[(13, 10, 'U')],  # Opp blank U in LOUVERS
-        your_score=382,
-        opp_score=337,
-        your_rack="ERSSRO",
+        your_score=393,
+        opp_score=351,
+        your_rack="ORS",  # Leftover tiles (no penalty in Crossplay)
         bag=[],
-        is_your_turn=False,
+        is_your_turn=False,  # Game over
         opponent_name="garnetgirl",
         created_at="2026-02-11",
         updated_at="2026-02-12",
-        notes="Turn 28. Me +45. Bag 0. Endgame - each player has 1 turn left. Opp's turn. Rack ERSSRO."
+        final_turns_remaining=0,
+        notes="COMPLETED. 393-351 (+42) WIN. 1 bingo (PIGEON). 28 moves. Endgame: GIRDERS over GIRD for the win."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
