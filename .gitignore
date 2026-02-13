@@ -1,6 +1,7 @@
 # Generated / cached data (rebuilt automatically on first run)
 gaddag_compact.bin
 .mc_calibration.json
+.benchmark_baseline.json
 
 # Python
 __pycache__/
