@@ -2229,123 +2229,84 @@ def _create_saved_game_5() -> Game:
 
 
 def _create_saved_game_6() -> Game:
-    """Game 6 vs mallenmelon. In progress. Turn 3, bag=77."""
+    """Game 6 vs mallenmelon. In progress. Turn 5, bag=67."""
     state = GameState(
         name="Game 6",
         board_moves=[
             ('FEIGNS', 8, 3, True),     # Opp: FEIGNS R8C3 H for 32
             ('VIM', 7, 2, True),        # Me: VIM R7C2 H for 31
+            ('DELISTS', 6, 3, True),    # Opp: DELISTS R6C3 H for 66 (bingo)
+            ('HEP', 5, 4, True),        # Me: HEP R5C4 H for 34 (MC pick)
         ],
         blank_positions=[],
-        your_score=31,
-        opp_score=32,
-        your_rack="LTHOUPE",
+        your_score=65,
+        opp_score=98,
+        your_rack="LXTOUCH",
         bag=[],
         is_your_turn=False,
         opponent_name="mallenmelon",
         created_at="2026-02-12",
         updated_at="2026-02-12",
-        notes="Turn 3. Me 31, Opp 32. Bag 77. Opp's turn. Rack LTHOUPE."
+        notes="Turn 5. Me 65, Opp 98. Bag 67. Opp's turn. Rack LXTOUCH. Drew X!"
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
     return game
 
 
-def _create_saved_game_3() -> Game:
-    """Game 3 vs mallenmelon (PIVOT game). COMPLETED. Final: 424-364 (+60) WIN.
-    Updated v9.0.3: Full 24-move game record."""
+def _create_saved_game_7() -> Game:
+    """Game 7 vs eggsbenny. In progress. Turn 15, bag=27."""
     state = GameState(
-        name="Game 3",
+        name="Game 7",
         board_moves=[
-            ('PIVOT', 8, 8, True),      # Opp opening: PIVOT R8C8 H for 36
-            ('QUAYAGE', 9, 2, True),    # Me: QUAYAGE R9C2 H for 87 (bingo, * best move)
-            ('ISLANDER', 8, 9, False),  # Opp: ISLANDER R8C9 V for 76 (bingo)
-            ('RABI', 15, 9, True),      # Me: RABI R15C9 H for 21
-            ('FANNY', 8, 4, False),     # Opp: FANNY R8C4 V for 30
-            ('ALIYOT', 12, 1, True),    # Me: ALIYOT R12C1 H for 30
-            ('USUAL', 11, 6, True),     # Opp: USUAL R11C6 H for 23
-            ('CLEG', 11, 2, False),     # Me: CLEG R11C2 V for 20 (WARNING: RECIPE was better)
-            ('HEDGE', 7, 11, True),     # Opp: HEDGE R7C11 H for 25
-            ('COALIER', 6, 5, True),    # Me: COALIER R6C5 H for 63 (bingo, blank=L)
-            ('AZOTE', 3, 15, False),    # Opp: AZOTE R3C15 V for 39 (blank=A)
-            ('TOWNEES', 9, 13, False),  # Me: TOWNEES R9C13 V for 63 (bingo, blank=T, * winning move)
-            ('JAG', 5, 14, False),      # Opp: JAG R5C14 V for 28
-            ('FOB', 8, 4, True),        # Me: FOB R8C4 H for 27
-            ('FEAR', 10, 14, False),    # Opp: FEAR R10C14 V for 22
-            ('THE', 11, 15, False),     # Me: THE R11C15 V for 40 (MC pick, ERST 52% bingo)
-            ('SHIM', 11, 7, False),     # Opp: SHIM R11C7 V for 27
-            ('AW', 12, 1, False),       # Me: AW R12C1 V for 12 (A overlaps ALIYOT, WE crossword)
-            ('KNOLL', 2, 8, False),     # Opp: KNOLL R2C8 V for 20
-            ('JAGS', 5, 14, False),     # Me: JAGS R5C14 V for 16 (WARNING: STEROIDS was better)
-            ('DRIVE', 2, 10, False),    # Opp: DRIVE R2C10 V for 23
-            ('TI', 1, 9, False),        # Me: TI R1C9 V for 15
-            ('PRIMO', 2, 6, False),     # Opp: PRIMO R2C6 V for 15 (final opp move)
-            ('LEX', 10, 9, True),       # Me: LEX R10C9 H for 30 (engine pick, final move)
+            ('VALOR', 8, 8, True),      # Opp: VALOR R8C8 H for 26 (opening)
+            ('VIZIR', 8, 8, False),      # Me: VIZIR R8C8 V for 56 (double-double)
+            ('MOME', 11, 7, False),      # Opp: MOME R11C7 V for 15
+            ('GRODY', 6, 11, False),     # Me: GRODY R6C11 V for 28
+            ('AB', 10, 9, False),        # Opp: AB R10C9 V for 24
+            ('ESTRONE', 15, 6, True),    # Me: ESTRONE R15C6 H for 73 (bingo)
+            ('HI', 5, 12, False),        # Opp: HI R5C12 V for 9
+            ('OK', 4, 11, True),         # Me: OK R4C11 H for 29 (MC pick)
+            ('FISC', 6, 13, False),      # Opp: FISC R6C13 V for 30
+            ('UNLADEN', 3, 5, True),     # Me: UNLADEN R3C5 H for 56 (bingo)
+            ('AXE', 4, 7, True),         # Opp: AXE R4C7 H for 44
+            ('HAG', 5, 5, True),         # Me: HAG R5C5 H for 17
+            ('DUPER', 14, 10, True),     # Opp: DUPER R14C10 H for 26 (blank E)
+            ('RETAILS', 9, 15, False),   # Me: RETAILS R9C15 V for 76 (bingo)
         ],
-        blank_positions=[
-            (6, 8, 'L'),   # L in COALIER is blank
-            (3, 15, 'A'),  # A in AZOTE is blank
-            (9, 13, 'T'),  # T in TOWNEES is blank
-        ],
-        your_score=424,
-        opp_score=364,
-        your_rack="DSRT",  # Leftover tiles (no penalty in Crossplay)
+        blank_positions=[(14, 13, 'E')],  # Blank E in DUPER
+        your_score=335,
+        opp_score=174,
+        your_rack="ELEVENW",
         bag=[],
-        is_your_turn=False,  # Game over
-        opponent_name="mallenmelon",
-        created_at="2026-02-05",
-        updated_at="2026-02-09",
-        notes="COMPLETED. 424-364 (+60) WIN. Strategy 87/78. Luck 62/53. 3 bingos (QUAYAGE, COALIER, TOWNEES)."
+        is_your_turn=False,
+        opponent_name="eggsbenny",
+        created_at="2026-02-12",
+        updated_at="2026-02-12",
+        notes="Turn 15. Me 335, Opp 174. Bag 27. Opp's turn. 3 bingos (ESTRONE, UNLADEN, RETAILS). Rack ELEVENW."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
     return game
 
 
-def _create_saved_game_4() -> Game:
-    """Game 4 vs mallenmelon (LOGON game). COMPLETED. Final: 468-322 (+146) WIN.
-    Updated v13.1: +KEEP(21), +CHEST(36), +NAH(30). 22 moves total."""
+def _create_saved_game_8() -> Game:
+    """Game 8 vs sophie. In progress. Turn 2, bag=81."""
     state = GameState(
-        name="Game 4",
+        name="Game 8",
         board_moves=[
-            ('LOGON', 8, 4, True),     # Me: LOGON R8C4 H for 26 (opening)
-            ('GAUZE', 8, 6, False),    # Opp: GAUZE R8C6 V for 37 (blank E, Z on 3L)
-            ('NEWBIE', 12, 1, True),   # Me: NEWBIE R12C1 H for 48
-            ('BOOK', 12, 4, False),    # Opp: BOOK R12C4 V for 36 (K on 3W)
-            ('MANTLET', 6, 8, False),  # Me: MANTLET R6C8 V for 30 (double-double)
-            ('BARMIE', 2, 9, False),   # Opp: BARMIE R2C9 V for 25 (B on 3L, MI+AE crosses)
-            ('RUNOFF', 14, 1, True),   # Me: RUNOFF R14C1 H for 26
-            ('ARROW', 4, 8, True),     # Opp: ARROW R4C8 H for 28 (hooks BARMIE R)
-            ('DOWDIEST', 2, 12, False), # Me: DOWDIEST R2C12 V for 66 (bingo, blank=S)
-            ('SAN', 4, 13, False),     # Opp: SAN R4C13 V for 20
-            ('VOE', 6, 11, False),     # Me: VOE R6C11 V for 43
-            ('ELAPIDS', 6, 14, False), # Opp: ELAPIDS R6C14 V for 70 (bingo)
-            ('YOGHS', 2, 15, False),   # Me: YOGHS R2C15 V for 49
-            ('TIERS', 10, 13, False),  # Opp: TIERS R10C13 V for 14
-            ('JAKEST', 14, 9, True),   # Me: JAKEST R14C9 H for 68
-            ('AG', 2, 14, False),      # Opp: AG R2C14 V for 25
-            ('XI', 8, 15, False),      # Me: XI R8C15 V for 38 (X on 2L)
-            ('CUBE', 2, 7, True),      # Opp: CUBE R2C7 H for 16
-            ('VEERY', 1, 10, False),   # Me: VEERY R1C10 V for 38 (MC 2-ply pick)
-            ('KEEP', 15, 4, True),     # Opp: KEEP R15C4 H for 21
-            ('CHEST', 12, 11, True),   # Me: CHEST R12C11 H for 36 (T on 3W)
-            ('NAH', 15, 10, True),     # Opp: NAH R15C10 H for 30 (final opp move)
+            ('LYCEA', 8, 4, True),      # Me: LYCEA R8C4 H for 28 (opening, double-double)
         ],
-        blank_positions=[
-            (12, 6, 'E'),  # E in GAUZE is blank (opp)
-            (8, 12, 'S'),  # S in DOWDIEST is blank
-            (14, 11, 'K'), # K in JAKEST is blank
-        ],
-        your_score=468,     # 26+48+30+26+66+43+49+68+38+38+36
-        opp_score=322,      # 37+36+25+28+20+70+14+25+16+21+30
-        your_rack="DQRR",   # Leftover tiles (no penalty in Crossplay)
+        blank_positions=[],
+        your_score=28,
+        opp_score=0,
+        your_rack="UKSAESR",
         bag=[],
-        is_your_turn=False,  # Game over
-        opponent_name="mallenmelon",
-        created_at="2026-02-05",
-        updated_at="2026-02-11",
-        notes="COMPLETED. 468-322 (+146) WIN. 1 bingo (DOWDIEST). 22 moves."
+        is_your_turn=False,
+        opponent_name="sophie",
+        created_at="2026-02-12",
+        updated_at="2026-02-12",
+        notes="Turn 2. Me 28, Opp 0. Bag 81. Opp's turn. Rack UKSAESR."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2624,8 +2585,8 @@ class GameManager:
         _SAVED_GAME_REGISTRY: Dict[int, callable] = {
             1: _create_saved_game_5,
             2: _create_saved_game_6,
-            3: _create_saved_game_3,
-            4: _create_saved_game_4,
+            3: _create_saved_game_7,
+            4: _create_saved_game_8,
         }
         
         print("Initializing game slots...")
