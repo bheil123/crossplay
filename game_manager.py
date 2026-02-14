@@ -158,8 +158,9 @@ class Game:
                                          blanks_in_rack=(state.your_rack or "").count('?'),
                                          blank_positions=state.blank_positions)
                 if _tracker.get_bag_count() == 0:
-                    # Bag already empty but field not set -- assume 1 final turn left
-                    state.final_turns_remaining = 1
+                    # Bag already empty but field not set -- assume 2 final turns left
+                    # (both players get one final turn after bag empties)
+                    state.final_turns_remaining = 2
             # Initialize blocked cache with current board state
             self.blocked_cache.initialize(self.board, self.dictionary)
         else:
@@ -288,7 +289,11 @@ class Game:
         bag_tiles = _tracker.get_bag_count()
         ftr = self.state.final_turns_remaining
         if bag_tiles == 0 and ftr is not None:
-            if ftr == 1 and self.state.is_your_turn:
+            if ftr == 2 and self.state.is_your_turn:
+                status_extra = f"   Bag: 0 tiles | {status} (2 final turns -- you play, then opp responds)"
+            elif ftr == 2 and not self.state.is_your_turn:
+                status_extra = f"   Bag: 0 tiles | {status} (2 final turns -- opp plays, then you respond)"
+            elif ftr == 1 and self.state.is_your_turn:
                 status_extra = f"   Bag: 0 tiles | {status} (final move -- no opp response)"
             elif ftr == 1 and not self.state.is_your_turn:
                 status_extra = f"   Bag: 0 tiles | {status} (final move -- you respond after)"
@@ -450,9 +455,10 @@ class Game:
             return []
         
         # Show existing threats FIRST so user sees board vulnerabilities
-        # Skip when opponent has no remaining turns
+        # Skip when opponent has no remaining turns (ftr==1 and your turn = last move)
         ftr = self.state.final_turns_remaining
-        if ftr is None or ftr > 1 or (ftr == 1 and not self.state.is_your_turn):
+        skip_threats = (ftr == 1 and self.state.is_your_turn) or (ftr is not None and ftr <= 0)
+        if not skip_threats:
             self.show_existing_threats(top_n=5)
         
         # Move generation — prefer C-accelerated, fallback to Python
@@ -1842,8 +1848,8 @@ class Game:
                                   blank_positions=self.state.blank_positions)
         bag_after_play = _trk_post.get_bag_count()
         if bag_before_play > 0 and bag_after_play == 0:
-            # Bag just emptied on user's turn: user used 1 of 2 final turns
-            self.state.final_turns_remaining = 1
+            # Bag just emptied: both players get one final turn each = 2 turns remain
+            self.state.final_turns_remaining = 2
         elif bag_before_play == 0 and self.state.final_turns_remaining is not None:
             self.state.final_turns_remaining = max(0, self.state.final_turns_remaining - 1)
 
@@ -1862,9 +1868,17 @@ class Game:
         ftr = self.state.final_turns_remaining
         if ftr is not None and ftr <= 0:
             print("\n[ENDGAME] Game over -- no turns remaining.")
+        elif ftr == 2 and not is_opponent:
+            # User just played and bag emptied -- both players get final turns
+            print("\n[ENDGAME] Bag just emptied -- opponent plays next, then you get final move.")
+            self.show_existing_threats(top_n=5)
+        elif ftr == 2 and is_opponent:
+            # Opponent just played and bag emptied -- both players get final turns
+            print("\n[ENDGAME] Bag just emptied -- you play next, then opponent gets final move.")
+            self.show_existing_threats(top_n=5)
         elif ftr == 1 and not is_opponent:
-            # User just played and bag emptied -- opponent still gets final turn
-            print("\n[ENDGAME] Bag just emptied -- opponent gets one final turn.")
+            # User just played their final turn -- opponent gets last move
+            print("\n[ENDGAME] Your final turn done -- opponent gets last move.")
             self.show_existing_threats(top_n=5)
         elif ftr == 1 and is_opponent:
             # Opponent just played -- user's final move, no opp response
@@ -2080,8 +2094,8 @@ class Game:
                                   blank_positions=self.state.blank_positions)
         bag_after = _trk_post.get_bag_count()
         if bag_before > 0 and bag_after == 0:
-            # Bag just emptied on opponent's turn: opp used 1 of 2 final turns
-            self.state.final_turns_remaining = 1
+            # Bag just emptied: both players get one final turn each = 2 turns remain
+            self.state.final_turns_remaining = 2
         elif bag_before == 0 and self.state.final_turns_remaining is not None:
             self.state.final_turns_remaining = max(0, self.state.final_turns_remaining - 1)
 
@@ -2099,10 +2113,17 @@ class Game:
         ftr = self.state.final_turns_remaining
         if ftr is not None and ftr <= 0:
             print("\n[ENDGAME] Game over -- no turns remaining.")
+        elif ftr == 2 and self.state.is_your_turn:
+            # Opp just emptied bag, you play next, then opp gets final move
+            print("\n[ENDGAME] Bag just emptied -- you play next, then opponent gets final move.")
+            self.show_existing_threats(top_n=5)
         elif ftr == 1 and self.state.is_your_turn:
             print("\n[ENDGAME] Bag empty -- your final move (no opponent response). Use 'analyze' for 1-ply ranking.")
+        elif ftr == 1 and not self.state.is_your_turn:
+            print("\n[ENDGAME] Your final turn done -- opponent gets last move.")
+            self.show_existing_threats(top_n=5)
         elif bag_after == 0:
-            print("\n[ENDGAME] Bag empty -- opponent has no more turns. Use 'analyze' for endgame solver.")
+            print("\n[ENDGAME] Bag empty -- use 'analyze' for endgame solver.")
         else:
             self.show_existing_threats(top_n=5)
 
@@ -2228,7 +2249,7 @@ def _create_saved_game_5() -> Game:
 
 
 def _create_saved_game_9() -> Game:
-    """Game 9 vs charski. In progress. Turn 8, bag=62."""
+    """Game 9 vs charski. In progress. Turn 14, bag=42."""
     state = GameState(
         name="Game 9",
         board_moves=[
@@ -2239,17 +2260,23 @@ def _create_saved_game_9() -> Game:
             ('FROW', 3, 10, False),     # Me: FROW R3C10 V for 35 (1-ply + equity pick, hooks HOBS)
             ('DEAR', 7, 7, False),      # Opp: DEAR R7C7 V for 15 (no blanks, verified; xwords DAB+AL)
             ('QI', 2, 9, False),        # Me: QI R2C9 V for 36 (equity pick, dump Q)
+            # Opp swapped tiles (turn 8)
+            ('SCRAN', 6, 11, False),    # Me: SCRAN R6C11 V for 30
+            ('MAY', 9, 10, False),      # Opp: MAY R9C10 V for 22 (no blanks)
+            ('KEN', 9, 2, True),        # Me: KEN R9C2 H for 26
+            ('ET', 8, 12, False),       # Opp: ET R8C12 V for 13 (no blanks)
+            ('DUNITES', 12, 4, True),   # Me: DUNITES R12C4 H for 68 (bingo, blank S)
         ],
-        blank_positions=[],
-        your_score=121,
-        opp_score=77,
-        your_rack="NCSNRAN",
+        blank_positions=[(12, 10, 'S')],  # Blank S in DUNITES
+        your_score=245,
+        opp_score=112,
+        your_rack="AAEONUW",
         bag=[],
         is_your_turn=False,
         opponent_name="charski",
         created_at="2026-02-12",
-        updated_at="2026-02-12",
-        notes="Turn 8. Me 121, Opp 77. Bag 62. Opp turn. Rack NCSNRAN. Up 44."
+        updated_at="2026-02-14",
+        notes="Turn 14. Me 245, Opp 112. Bag 42. Opp turn. Rack AAEONUW. Up 133."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2257,7 +2284,7 @@ def _create_saved_game_9() -> Game:
 
 
 def _create_saved_game_6() -> Game:
-    """Game 6 vs mallenmelon. In progress. Turn 10, bag=44."""
+    """Game 6 vs mallenmelon. In progress. Turn 14, bag=25."""
     state = GameState(
         name="Game 6",
         board_moves=[
@@ -2271,17 +2298,21 @@ def _create_saved_game_6() -> Game:
             ('SLEUTH', 8, 8, False),    # Me: SLEUTH R8C8 V for 22 (equity pick)
             ('OUTWILED', 11, 7, True),  # Opp: OUTWILED R11C7 H for 64 (bingo, blank L at R11C12)
             ('JELLY', 8, 12, False),    # Me: JELLY R8C12 V for 42 (equity pick, through blank L)
+            ('AIRWISE', 1, 9, True),    # Opp: AIRWISE R1C9 H for 13 (no blanks)
+            ('TOE', 12, 8, True),       # Me: TOE R12C8 H for 11
+            ('WHOEVER', 4, 9, True),    # Opp: WHOEVER R4C9 H for 54 (blank E at R4C14)
+            ('AUREOLES', 1, 14, False), # Me: AUREOLES R1C14 V for 62 (bingo)
         ],
-        blank_positions=[(11, 12, 'L')],  # Blank L in OUTWILED
-        your_score=157,
-        opp_score=229,
-        your_rack="SEORAEO",
+        blank_positions=[(11, 12, 'L'), (4, 14, 'E')],  # Blank L in OUTWILED, blank E in WHOEVER
+        your_score=230,
+        opp_score=296,
+        your_rack="ARAATUN",
         bag=[],
         is_your_turn=False,
         opponent_name="mallenmelon",
         created_at="2026-02-12",
-        updated_at="2026-02-12",
-        notes="Turn 11. Me 157, Opp 229. Bag 40. Opp turn. Down 72. Rack SEORAEO. Blank L on board."
+        updated_at="2026-02-14",
+        notes="Turn 15. Me 230, Opp 296. Bag 25. Opp turn. Down 66. Rack ARAATUN. 2 blanks on board (L in OUTWILED, E in WHOEVER)."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
