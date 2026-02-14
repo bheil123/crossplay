@@ -2039,7 +2039,6 @@ class Game:
         # Validate bag count
         if new_bag_count is not None:
             # Sync tracker to get current count
-            from crossplay_v9.tile_tracker import TileTracker
             tracker = TileTracker()
             tracker.sync_with_board(self.board, self.state.your_rack, 0, self.state.blank_positions)
 
@@ -2258,7 +2257,7 @@ def _create_saved_game_9() -> Game:
 
 
 def _create_saved_game_6() -> Game:
-    """Game 6 vs mallenmelon. In progress. Turn 9, bag=51."""
+    """Game 6 vs mallenmelon. In progress. Turn 10, bag=44."""
     state = GameState(
         name="Game 6",
         board_moves=[
@@ -2270,17 +2269,19 @@ def _create_saved_game_6() -> Game:
             ('TOXIC', 1, 2, False),     # Me: TOXIC R1C2 V for 28 (MC pick, dump X)
             ('ATAP', 1, 1, True),       # Opp: ATAP R1C1 H for 24 (no blanks, verified)
             ('SLEUTH', 8, 8, False),    # Me: SLEUTH R8C8 V for 22 (equity pick)
+            ('OUTWILED', 11, 7, True),  # Opp: OUTWILED R11C7 H for 64 (bingo, blank L at R11C12)
+            ('JELLY', 8, 12, False),    # Me: JELLY R8C12 V for 42 (equity pick, through blank L)
         ],
-        blank_positions=[],
-        your_score=115,
-        opp_score=165,
-        your_rack="SEYLAJE",
+        blank_positions=[(11, 12, 'L')],  # Blank L in OUTWILED
+        your_score=157,
+        opp_score=229,
+        your_rack="SEORAEO",
         bag=[],
         is_your_turn=False,
         opponent_name="mallenmelon",
         created_at="2026-02-12",
         updated_at="2026-02-12",
-        notes="Turn 9. Me 115, Opp 165. Bag 51. Opp turn. Down 50. Rack SEYLAJE."
+        notes="Turn 11. Me 157, Opp 229. Bag 40. Opp turn. Down 72. Rack SEORAEO. Blank L on board."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2288,7 +2289,7 @@ def _create_saved_game_6() -> Game:
 
 
 def _create_saved_game_7() -> Game:
-    """Game 7 vs eggsbenny. In progress. Turn 19, bag=10."""
+    """Game 7 vs eggsbenny. In progress. Turn 21, bag=4."""
     state = GameState(
         name="Game 7",
         board_moves=[
@@ -2310,17 +2311,19 @@ def _create_saved_game_7() -> Game:
             ('VLEI', 12, 12, True),      # Me: VLEI R12C12 H for 39 (MC pick)
             ('NOTED', 6, 2, True),       # Opp: NOTED R6C2 H for 17 (no blanks, verified)
             ('WEENING', 1, 2, False),    # Me: WEENING R1C2 V for 44 (MC pick)
+            ('OWES', 1, 1, True),        # Opp: OWES R1C1 H for 30 (no blanks)
+            ('AAH', 3, 1, False),        # Me: AAH R3C1 V for 27 (MC pick)
         ],
         blank_positions=[(14, 13, 'E')],  # Blank E in DUPER
-        your_score=418,
-        opp_score=224,
-        your_rack="AOWUHA?",
+        your_score=445,
+        opp_score=254,
+        your_rack="SWOUIJ?",
         bag=[],
         is_your_turn=False,
         opponent_name="eggsbenny",
         created_at="2026-02-12",
-        updated_at="2026-02-12",
-        notes="Turn 19. Me 418, Opp 224. Bag 10. Opp's turn. 3 bingos (ESTRONE, UNLADEN, RETAILS). Rack AOWUHA + blank."
+        updated_at="2026-02-14",
+        notes="Turn 21. Me 445, Opp 254. Bag 4. Opp's turn. 3 bingos (ESTRONE, UNLADEN, RETAILS). Rack SWOUIJ + blank."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
