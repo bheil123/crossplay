@@ -2228,8 +2228,37 @@ def _create_saved_game_5() -> Game:
     return game
 
 
+def _create_saved_game_9() -> Game:
+    """Game 9 vs charski. In progress. Turn 8, bag=62."""
+    state = GameState(
+        name="Game 9",
+        board_moves=[
+            ('JARL', 6, 8, False),      # Me: JARL R6C8 V for 24 (opening, MC pick)
+            ('VARS', 10, 5, True),      # Opp: VARS R10C5 H for 38 (no blanks, verified; creates JARLS)
+            ('PINCER', 8, 3, True),     # Me: PINCER R8C3 H for 26 (MC pick, double-double + blocking)
+            ('HOB', 5, 9, False),       # Opp: HOB R5C9 V for 24 (no blanks, verified; xwords JO+AB)
+            ('FROW', 3, 10, False),     # Me: FROW R3C10 V for 35 (1-ply + equity pick, hooks HOBS)
+            ('DEAR', 7, 7, False),      # Opp: DEAR R7C7 V for 15 (no blanks, verified; xwords DAB+AL)
+            ('QI', 2, 9, False),        # Me: QI R2C9 V for 36 (equity pick, dump Q)
+        ],
+        blank_positions=[],
+        your_score=121,
+        opp_score=77,
+        your_rack="NCSNRAN",
+        bag=[],
+        is_your_turn=False,
+        opponent_name="charski",
+        created_at="2026-02-12",
+        updated_at="2026-02-12",
+        notes="Turn 8. Me 121, Opp 77. Bag 62. Opp turn. Rack NCSNRAN. Up 44."
+    )
+    game = Game(state)
+    game.bag = game._calculate_remaining_bag()
+    return game
+
+
 def _create_saved_game_6() -> Game:
-    """Game 6 vs mallenmelon. In progress. Turn 5, bag=67."""
+    """Game 6 vs mallenmelon. In progress. Turn 9, bag=51."""
     state = GameState(
         name="Game 6",
         board_moves=[
@@ -2237,17 +2266,21 @@ def _create_saved_game_6() -> Game:
             ('VIM', 7, 2, True),        # Me: VIM R7C2 H for 31
             ('DELISTS', 6, 3, True),    # Opp: DELISTS R6C3 H for 66 (bingo)
             ('HEP', 5, 4, True),        # Me: HEP R5C4 H for 34 (MC pick)
+            ('GIFT', 4, 1, True),       # Opp: GIFT R4C1 H for 43 (no blanks, verified)
+            ('TOXIC', 1, 2, False),     # Me: TOXIC R1C2 V for 28 (MC pick, dump X)
+            ('ATAP', 1, 1, True),       # Opp: ATAP R1C1 H for 24 (no blanks, verified)
+            ('SLEUTH', 8, 8, False),    # Me: SLEUTH R8C8 V for 22 (equity pick)
         ],
         blank_positions=[],
-        your_score=65,
-        opp_score=98,
-        your_rack="LXTOUCH",
+        your_score=115,
+        opp_score=165,
+        your_rack="SEYLAJE",
         bag=[],
         is_your_turn=False,
         opponent_name="mallenmelon",
         created_at="2026-02-12",
         updated_at="2026-02-12",
-        notes="Turn 5. Me 65, Opp 98. Bag 67. Opp's turn. Rack LXTOUCH. Drew X!"
+        notes="Turn 9. Me 115, Opp 165. Bag 51. Opp turn. Down 50. Rack SEYLAJE."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2255,7 +2288,7 @@ def _create_saved_game_6() -> Game:
 
 
 def _create_saved_game_7() -> Game:
-    """Game 7 vs eggsbenny. In progress. Turn 15, bag=27."""
+    """Game 7 vs eggsbenny. In progress. Turn 19, bag=10."""
     state = GameState(
         name="Game 7",
         board_moves=[
@@ -2272,18 +2305,22 @@ def _create_saved_game_7() -> Game:
             ('AXE', 4, 7, True),         # Opp: AXE R4C7 H for 44
             ('HAG', 5, 5, True),         # Me: HAG R5C5 H for 17
             ('DUPER', 14, 10, True),     # Opp: DUPER R14C10 H for 26 (blank E)
-            ('RETAILS', 9, 15, False),   # Me: RETAILS R9C15 V for 76 (bingo)
+            ('RETAILS', 8, 15, False),   # Me: RETAILS R8C15 V for 76 (bingo)
+            ('BAY', 13, 11, True),       # Opp: BAY R13C11 H for 33 (no blanks, verified)
+            ('VLEI', 12, 12, True),      # Me: VLEI R12C12 H for 39 (MC pick)
+            ('NOTED', 6, 2, True),       # Opp: NOTED R6C2 H for 17 (no blanks, verified)
+            ('WEENING', 1, 2, False),    # Me: WEENING R1C2 V for 44 (MC pick)
         ],
         blank_positions=[(14, 13, 'E')],  # Blank E in DUPER
-        your_score=335,
-        opp_score=174,
-        your_rack="ELEVENW",
+        your_score=418,
+        opp_score=224,
+        your_rack="AOWUHA?",
         bag=[],
         is_your_turn=False,
         opponent_name="eggsbenny",
         created_at="2026-02-12",
         updated_at="2026-02-12",
-        notes="Turn 15. Me 335, Opp 174. Bag 27. Opp's turn. 3 bingos (ESTRONE, UNLADEN, RETAILS). Rack ELEVENW."
+        notes="Turn 19. Me 418, Opp 224. Bag 10. Opp's turn. 3 bingos (ESTRONE, UNLADEN, RETAILS). Rack AOWUHA + blank."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2291,22 +2328,24 @@ def _create_saved_game_7() -> Game:
 
 
 def _create_saved_game_8() -> Game:
-    """Game 8 vs sophie. In progress. Turn 2, bag=81."""
+    """Game 8 vs sophie. In progress. Turn 4, bag=74."""
     state = GameState(
         name="Game 8",
         board_moves=[
             ('LYCEA', 8, 4, True),      # Me: LYCEA R8C4 H for 28 (opening, double-double)
+            ('ETHNIC', 3, 6, False),    # Opp: ETHNIC R3C6 V for 16 (no blanks, verified)
+            ('YUK', 8, 5, False),       # Me: YUK R8C5 V for 24 (MC pick, keep AERSS)
         ],
         blank_positions=[],
-        your_score=28,
-        opp_score=0,
-        your_rack="UKSAESR",
+        your_score=52,
+        opp_score=16,
+        your_rack="CESAESR",
         bag=[],
         is_your_turn=False,
         opponent_name="sophie",
         created_at="2026-02-12",
         updated_at="2026-02-12",
-        notes="Turn 2. Me 28, Opp 0. Bag 81. Opp's turn. Rack UKSAESR."
+        notes="Turn 4. Me 52, Opp 16. Bag 74. Opp's turn. Rack CESAESR. Drew C -- bingo potential."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2583,7 +2622,7 @@ class GameManager:
         # Registry: slot number -> factory function
         # Add/remove/reorder entries here as games come and go.
         _SAVED_GAME_REGISTRY: Dict[int, callable] = {
-            1: _create_saved_game_5,
+            1: _create_saved_game_9,
             2: _create_saved_game_6,
             3: _create_saved_game_7,
             4: _create_saved_game_8,
