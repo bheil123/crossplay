@@ -646,6 +646,7 @@ class Game:
                     'turnover_bonus': 0,
                     'dls_details': [],
                     'dd_desc': '',
+                    'positional_adj': 0,
                     'equity': move['prelim_equity'],
                     'worst_case': move['prelim_equity'],
                 })
@@ -681,6 +682,10 @@ class Game:
             if equity > best_equity:
                 best_equity = equity
             
+            # Net positional adjustment from Phase 2 (blocking, risk, heuristics)
+            # This will be carried into MC with dampening to avoid double-counting
+            positional_adj = blocking_bonus - expected_risk + dls_penalty + dd_bonus + turnover_bonus
+
             analyzed_moves.append({
                 **move,
                 'risk_str': risk_str,
@@ -693,6 +698,7 @@ class Game:
                 'turnover_bonus': turnover_bonus,
                 'dls_details': oh['dls_details'],
                 'dd_desc': oh['dd_desc'],
+                'positional_adj': positional_adj,
                 'equity': equity,
                 'worst_case': worst_case
             })
@@ -1036,20 +1042,29 @@ class Game:
             # Check for bingo threats BEFORE any move (baseline)
             baseline_bingo = self._find_opponent_bingo(unseen_str)
             
-            print(f"\n{'#':<3} {'Word':<12} {'Pos':<10} {'Pts':>4} "
-                  f"{'AvgOpp':>6} {'MaxOpp':>6} {'Std':>5} "
-                  f"{'%Beats':>6} {'Leave':>6} {'MC Eq':>7}")
-            print("-" * 78)
-            
+            # Check if any result has non-zero positional adjustment
+            has_pos_adj = any(m.get('pos_adj_dampened', 0) != 0 for m in results[:min(lookahead_n, 30)])
+
+            if has_pos_adj:
+                print(f"\n{'#':<3} {'Word':<12} {'Pos':<10} {'Pts':>4} "
+                      f"{'AvgOpp':>6} {'MaxOpp':>6} {'Std':>5} "
+                      f"{'%Beats':>6} {'Leave':>6} {'PosAdj':>6} {'MC Eq':>7}")
+                print("-" * 85)
+            else:
+                print(f"\n{'#':<3} {'Word':<12} {'Pos':<10} {'Pts':>4} "
+                      f"{'AvgOpp':>6} {'MaxOpp':>6} {'Std':>5} "
+                      f"{'%Beats':>6} {'Leave':>6} {'MC Eq':>7}")
+                print("-" * 78)
+
             # Track which moves block bingos
             blocking_moves = []
-            
+
             # Count exchange results for summary
             exchange_in_results = [m for m in results if m.get('is_exchange')]
-            
+
             for i, m in enumerate(results[:min(lookahead_n, 30)], 1):
                 is_exch = m.get('is_exchange', False)
-                
+
                 if is_exch:
                     pos = "EXCHANGE"
                     word_display = f"<-> dump {m.get('exchange_dump', '?')}"
@@ -1058,16 +1073,16 @@ class Game:
                 else:
                     pos = f"R{m['row']}C{m['col']} {m['direction']}"
                     word_display = m['word']
-                
+
                 # Check if this move blocks opponent's bingo
                 blocks_bingo = False
                 opp_avg = m['mc_avg_opp']
-                
+
                 if not is_exch and baseline_bingo and baseline_bingo['score'] >= 41:
                     if opp_avg < baseline_bingo['score'] - 20:
                         blocks_bingo = True
                         blocking_moves.append((m, baseline_bingo))
-                
+
                 # Markers
                 bingo_marker = ""
                 if is_exch:
@@ -1078,13 +1093,21 @@ class Game:
                         bingo_marker = "[!B]"
                     elif blocks_bingo:
                         bingo_marker = "[DB]"
-                
+
                 leave_display = m['leave'] if not is_exch else m['leave'][:8]
-                
-                print(f"{i:<3} {word_display:<12} {pos:<10} {m['score']:>4} "
-                      f"{m['mc_avg_opp']:>6.1f} {m['mc_max_opp']:>6} {m['mc_std_opp']:>5.1f} "
-                      f"{m['pct_opp_beats']:>5.1f}% {leave_display:>6} "
-                      f"{m['total_equity']:>+7.1f} {bingo_marker}")
+
+                if has_pos_adj:
+                    pos_adj = m.get('pos_adj_dampened', 0)
+                    pos_str = f"{pos_adj:>+5.1f}" if pos_adj != 0 else "    -"
+                    print(f"{i:<3} {word_display:<12} {pos:<10} {m['score']:>4} "
+                          f"{m['mc_avg_opp']:>6.1f} {m['mc_max_opp']:>6} {m['mc_std_opp']:>5.1f} "
+                          f"{m['pct_opp_beats']:>5.1f}% {leave_display:>6} {pos_str:>6} "
+                          f"{m['total_equity']:>+7.1f} {bingo_marker}")
+                else:
+                    print(f"{i:<3} {word_display:<12} {pos:<10} {m['score']:>4} "
+                          f"{m['mc_avg_opp']:>6.1f} {m['mc_max_opp']:>6} {m['mc_std_opp']:>5.1f} "
+                          f"{m['pct_opp_beats']:>5.1f}% {leave_display:>6} "
+                          f"{m['total_equity']:>+7.1f} {bingo_marker}")
             
             # Exchange recommendation if any exchange ranked highly
             best_exch_in_top = None
@@ -2298,7 +2321,7 @@ def _create_saved_game_6() -> Game:
             ('SLEUTH', 8, 8, False),    # Me: SLEUTH R8C8 V for 22 (equity pick)
             ('OUTWILED', 11, 7, True),  # Opp: OUTWILED R11C7 H for 64 (bingo, blank L at R11C12)
             ('JELLY', 8, 12, False),    # Me: JELLY R8C12 V for 42 (equity pick, through blank L)
-            ('AIRWISE', 1, 9, True),    # Opp: AIRWISE R1C9 H for 13 (no blanks)
+            ('AIRWISE', 1, 9, False),   # Opp: AIRWISE R1C9 V for 13 (plays through S at 6,9)
             ('TOE', 12, 8, True),       # Me: TOE R12C8 H for 11
             ('WHOEVER', 4, 9, True),    # Opp: WHOEVER R4C9 H for 54 (blank E at R4C14)
             ('AUREOLES', 1, 14, False), # Me: AUREOLES R1C14 V for 62 (bingo)
@@ -2320,41 +2343,23 @@ def _create_saved_game_6() -> Game:
 
 
 def _create_saved_game_7() -> Game:
-    """Game 7 vs eggsbenny. In progress. Turn 21, bag=4."""
+    """Game 10 vs eggsbenny. New game. Turn 2, bag=80."""
     state = GameState(
-        name="Game 7",
+        name="Game 10",
         board_moves=[
-            ('VALOR', 8, 8, True),      # Opp: VALOR R8C8 H for 26 (opening)
-            ('VIZIR', 8, 8, False),      # Me: VIZIR R8C8 V for 56 (double-double)
-            ('MOME', 11, 7, False),      # Opp: MOME R11C7 V for 15
-            ('GRODY', 6, 11, False),     # Me: GRODY R6C11 V for 28
-            ('AB', 10, 9, False),        # Opp: AB R10C9 V for 24
-            ('ESTRONE', 15, 6, True),    # Me: ESTRONE R15C6 H for 73 (bingo)
-            ('HI', 5, 12, False),        # Opp: HI R5C12 V for 9
-            ('OK', 4, 11, True),         # Me: OK R4C11 H for 29 (MC pick)
-            ('FISC', 6, 13, False),      # Opp: FISC R6C13 V for 30
-            ('UNLADEN', 3, 5, True),     # Me: UNLADEN R3C5 H for 56 (bingo)
-            ('AXE', 4, 7, True),         # Opp: AXE R4C7 H for 44
-            ('HAG', 5, 5, True),         # Me: HAG R5C5 H for 17
-            ('DUPER', 14, 10, True),     # Opp: DUPER R14C10 H for 26 (blank E)
-            ('RETAILS', 8, 15, False),   # Me: RETAILS R8C15 V for 76 (bingo)
-            ('BAY', 13, 11, True),       # Opp: BAY R13C11 H for 33 (no blanks, verified)
-            ('VLEI', 12, 12, True),      # Me: VLEI R12C12 H for 39 (MC pick)
-            ('NOTED', 6, 2, True),       # Opp: NOTED R6C2 H for 17 (no blanks, verified)
-            ('WEENING', 1, 2, False),    # Me: WEENING R1C2 V for 44 (MC pick)
-            ('OWES', 1, 1, True),        # Opp: OWES R1C1 H for 30 (no blanks)
-            ('AAH', 3, 1, False),        # Me: AAH R3C1 V for 27 (MC pick)
+            ('TIX', 8, 8, True),        # Opp: TIX R8C8 H for 18 (opening)
+            ('HAJ', 7, 9, True),         # Me: HAJ R7C9 H for 27 (MC pick, hooks HI+AX)
         ],
-        blank_positions=[(14, 13, 'E')],  # Blank E in DUPER
-        your_score=445,
-        opp_score=254,
-        your_rack="SWOUIJ?",
+        blank_positions=[],
+        your_score=27,
+        opp_score=18,
+        your_rack="USRFIE?",
         bag=[],
         is_your_turn=False,
         opponent_name="eggsbenny",
-        created_at="2026-02-12",
+        created_at="2026-02-14",
         updated_at="2026-02-14",
-        notes="Turn 21. Me 445, Opp 254. Bag 4. Opp's turn. 3 bingos (ESTRONE, UNLADEN, RETAILS). Rack SWOUIJ + blank."
+        notes="Game 10. Turn 2. Me 27, Opp 18. Bag 80. Opp's turn. Rack USRFIE + blank."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()

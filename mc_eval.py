@@ -50,6 +50,11 @@ for _ch, _val in TILE_VALUES.items():
 _MC_OA = ord('A')
 
 # Bonus grid: _MC_BONUS[r][c] = (letter_mult, word_mult)
+# Dampening factor for Phase 2 positional adjustments carried into MC.
+# MC avg_opp already captures ~30-50% of blocking/risk, so dampen to
+# avoid double-counting. 0.5 = conservative; tune via self-play.
+MC_POSITIONAL_DAMPEN = 0.5
+
 from .config import BONUS_SQUARES
 _MC_BONUS = [[(1, 1)] * 15 for _ in range(15)]
 for (_r1, _c1), _btype in BONUS_SQUARES.items():
@@ -396,11 +401,13 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         'mc_min_opp': min_opp,
         'mc_std_opp': round(std_opp, 1),
         'pct_opp_beats': round(pct_beats, 1),
-        # Equity
+        # Equity (with dampened Phase 2 positional adjustment)
         'mc_equity': round(mc_equity, 1),
         'leave': leave,
         'leave_value': round(leave_value, 1),
-        'total_equity': round(mc_equity + leave_value, 1),
+        'positional_adj': move.get('positional_adj', 0),
+        'pos_adj_dampened': round(move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
+        'total_equity': round(mc_equity + leave_value + move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
         # Detail
         'top_opp_responses': top_opp,
         'k_sims': n,
@@ -927,7 +934,9 @@ def _mc_eval_sequential(
             'mc_equity': round(mc_equity, 1),
             'leave': leave,
             'leave_value': round(leave_value, 1),
-            'total_equity': round(mc_equity + leave_value, 1),
+            'positional_adj': move.get('positional_adj', 0),
+            'pos_adj_dampened': round(move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
+            'total_equity': round(mc_equity + leave_value + move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
             'top_opp_responses': top_opp,
             'k_sims': n,
             'opp_best': round(avg_opp, 0),
@@ -1049,6 +1058,7 @@ def mc_evaluate_2ply(
             'direction': move['direction'],
             'score': move['score'],
             'tiles_used': move.get('tiles_used', move['word']),
+            'positional_adj': move.get('positional_adj', 0),
         }
         # Each worker gets a unique seed derived from the base seed
         worker_seed = (seed + i * 1000) if seed is not None else None
@@ -1104,7 +1114,8 @@ def mc_evaluate_2ply(
                 delta = corrected_avg - raw_avg
                 r['mc_avg_opp'] = round(corrected_avg, 1)
                 r['mc_equity'] = round(r['score'] - corrected_avg, 1)
-                r['total_equity'] = round(r['mc_equity'] + r['leave_value'], 1)
+                pos_adj = r.get('pos_adj_dampened', 0)
+                r['total_equity'] = round(r['mc_equity'] + r['leave_value'] + pos_adj, 1)
                 r['opp_best'] = round(corrected_avg, 0)
                 r['lookahead_equity'] = r['mc_equity']
 
