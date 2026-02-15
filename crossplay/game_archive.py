@@ -3,12 +3,12 @@ CROSSPLAY - Game Archive Module
 Enriched move history, persistent game archive (JSONL), and CSV export.
 
 Provides:
-  - enrich_move_history()    — Replay moves through scoring engine, compute full metadata
-  - archive_game()           — Append completed game to game_archive.jsonl
-  - load_archive()           — Read all archived game records
-  - export_archive_csv()     — One-row-per-game summary CSV
-  - export_archive_moves_csv() — One-row-per-move detail CSV
-  - backfill_saved_games()   — Backfill enriched data for saved games 2, 3, 4
+  - enrich_move_history()    -- Replay moves through scoring engine, compute full metadata
+  - archive_game()           -- Append completed game to game_archive.jsonl
+  - load_archive()           -- Read all archived game records
+  - export_archive_csv()     -- One-row-per-game summary CSV
+  - export_archive_moves_csv() -- One-row-per-move detail CSV
+  - backfill_saved_games()   -- Backfill enriched data for saved games 2, 3, 4
 """
 
 import json
@@ -43,7 +43,7 @@ def enrich_move_history(board_moves, blank_positions, first_player='opp'):
     Args:
         board_moves: List of (word, row, col, horizontal) tuples or enriched dicts.
         blank_positions: List of (row, col, letter) tuples for all blanks in the game.
-        first_player: 'me' or 'opp' — who played the first move.
+        first_player: 'me' or 'opp' -- who played the first move.
 
     Returns:
         List of enriched move dicts, one per move.

@@ -1144,6 +1144,7 @@ cdef void _ctx_try_record_best(BoardContext ctx,
         ctx.best_horiz = horiz
 
 
+
 # =========================================================================
 # extend_right for BoardContext — C arrays + pre-computed cross-checks
 # =========================================================================
@@ -1154,6 +1155,7 @@ cdef void _ctx_extend_right(BoardContext ctx,
                              int blanks_rem, int* blankbuf, int nblank,
                              int* rack, int rack_nletters,
                              int* rack_indices) except *:
+    """Recursive extend-right with tail-call optimization for existing tiles."""
     cdef const unsigned char* data = ctx.gdata
     cdef int existing, idx, child
     cdef unsigned int cc_mask
@@ -1163,86 +1165,89 @@ cdef void _ctx_extend_right(BoardContext ctx,
     cdef int c_offs[32]
     cdef int j
 
-    if row0 < 0 or row0 >= BOARD_SIZE or col0 < 0 or col0 >= BOARD_SIZE:
-        if _is_terminal(data, offset) and wlen >= 2:
-            _ctx_try_record_best(ctx, wordbuf, wlen, sr0, sc0,
-                                  horiz, blankbuf, nblank)
-        return
+    # Tail-call loop: follow existing tiles without recursion
+    while True:
+        if row0 < 0 or row0 >= BOARD_SIZE or col0 < 0 or col0 >= BOARD_SIZE:
+            if _is_terminal(data, offset) and wlen >= 2:
+                _ctx_try_record_best(ctx, wordbuf, wlen, sr0, sc0,
+                                      horiz, blankbuf, nblank)
+            return
 
-    existing = ctx.grid[row0][col0]
+        existing = ctx.grid[row0][col0]
 
-    if existing >= 0:
-        # Square has a tile -- must follow it
-        child = _ctx_get_child(ctx, offset, existing)
-        if child >= 0:
-            wordbuf[wlen] = existing
-            if horiz:
-                _ctx_extend_right(ctx, row0, col0 + 1, True, child,
-                                   wordbuf, wlen + 1, sr0, sc0,
-                                   blanks_rem, blankbuf, nblank,
-                                   rack, rack_nletters, rack_indices)
-            else:
-                _ctx_extend_right(ctx, row0 + 1, col0, False, child,
-                                   wordbuf, wlen + 1, sr0, sc0,
-                                   blanks_rem, blankbuf, nblank,
-                                   rack, rack_nletters, rack_indices)
-    else:
-        # Empty square -- use pre-computed cross-check bitmask
-        if horiz:
-            cc_mask = ctx.cross_h[row0][col0]
-        else:
-            cc_mask = ctx.cross_v[row0][col0]
-
-        if _is_terminal(data, offset) and wlen >= 2:
-            _ctx_try_record_best(ctx, wordbuf, wlen, sr0, sc0,
-                                  horiz, blankbuf, nblank)
-
-        # Try each rack letter
-        for j in range(rack_nletters):
-            idx = rack_indices[j]
-            if rack[idx] <= 0:
-                continue
-            if not (cc_mask & (1 << idx)):
-                continue
-            child = _ctx_get_child(ctx, offset, idx)
+        if existing >= 0:
+            # Square has a tile -- follow it (tail-call: loop instead of recurse)
+            child = _ctx_get_child(ctx, offset, existing)
             if child < 0:
-                continue
-
-            rack[idx] -= 1
-            wordbuf[wlen] = idx
+                return
+            wordbuf[wlen] = existing
+            wlen += 1
+            offset = child
             if horiz:
-                _ctx_extend_right(ctx, row0, col0 + 1, True, child,
+                col0 += 1
+            else:
+                row0 += 1
+            continue  # tail-call: loop back
+
+        # Empty square -- break out to branching logic below
+        break
+
+    # -- Empty square: branching (rack letters + blanks) --
+    if horiz:
+        cc_mask = ctx.cross_h[row0][col0]
+    else:
+        cc_mask = ctx.cross_v[row0][col0]
+
+    if _is_terminal(data, offset) and wlen >= 2:
+        _ctx_try_record_best(ctx, wordbuf, wlen, sr0, sc0,
+                              horiz, blankbuf, nblank)
+
+    # Try each rack letter
+    for j in range(rack_nletters):
+        idx = rack_indices[j]
+        if rack[idx] <= 0:
+            continue
+        if not (cc_mask & (1 << idx)):
+            continue
+        child = _ctx_get_child(ctx, offset, idx)
+        if child < 0:
+            continue
+
+        rack[idx] -= 1
+        wordbuf[wlen] = idx
+        if horiz:
+            _ctx_extend_right(ctx, row0, col0 + 1, True, child,
+                               wordbuf, wlen + 1, sr0, sc0,
+                               blanks_rem, blankbuf, nblank,
+                               rack, rack_nletters, rack_indices)
+        else:
+            _ctx_extend_right(ctx, row0 + 1, col0, False, child,
+                               wordbuf, wlen + 1, sr0, sc0,
+                               blanks_rem, blankbuf, nblank,
+                               rack, rack_nletters, rack_indices)
+        rack[idx] += 1
+
+    # Try blank tiles
+    if blanks_rem > 0:
+        n_children = _get_children(data, offset, c_idxs, c_offs)
+        for j in range(n_children):
+            ci = c_idxs[j]
+            if ci == DELIM_IDX:
+                continue
+            if not (cc_mask & (1 << ci)):
+                continue
+            wordbuf[wlen] = ci
+            blankbuf[nblank] = wlen
+            if horiz:
+                _ctx_extend_right(ctx, row0, col0 + 1, True, c_offs[j],
                                    wordbuf, wlen + 1, sr0, sc0,
-                                   blanks_rem, blankbuf, nblank,
+                                   blanks_rem - 1, blankbuf, nblank + 1,
                                    rack, rack_nletters, rack_indices)
             else:
-                _ctx_extend_right(ctx, row0 + 1, col0, False, child,
+                _ctx_extend_right(ctx, row0 + 1, col0, False, c_offs[j],
                                    wordbuf, wlen + 1, sr0, sc0,
-                                   blanks_rem, blankbuf, nblank,
+                                   blanks_rem - 1, blankbuf, nblank + 1,
                                    rack, rack_nletters, rack_indices)
-            rack[idx] += 1
-
-        # Try blank tiles
-        if blanks_rem > 0:
-            n_children = _get_children(data, offset, c_idxs, c_offs)
-            for j in range(n_children):
-                ci = c_idxs[j]
-                if ci == DELIM_IDX:
-                    continue
-                if not (cc_mask & (1 << ci)):
-                    continue
-                wordbuf[wlen] = ci
-                blankbuf[nblank] = wlen
-                if horiz:
-                    _ctx_extend_right(ctx, row0, col0 + 1, True, c_offs[j],
-                                       wordbuf, wlen + 1, sr0, sc0,
-                                       blanks_rem - 1, blankbuf, nblank + 1,
-                                       rack, rack_nletters, rack_indices)
-                else:
-                    _ctx_extend_right(ctx, row0 + 1, col0, False, c_offs[j],
-                                       wordbuf, wlen + 1, sr0, sc0,
-                                       blanks_rem - 1, blankbuf, nblank + 1,
-                                       rack, rack_nletters, rack_indices)
 
 
 # =========================================================================

@@ -162,41 +162,47 @@ A pre-commit hook enforces this rule.
 
 ## MC performance profile and optimization ideas
 
-Current: 10 workers (ProcessPoolExecutor), Cython engine, ~2,852 sims/s
-dense, ~835 sims/s very dense. Near-perfect linear scaling (no GIL --
+Current: 10 workers (ProcessPoolExecutor), Cython engine, ~2,824 sims/s
+dense, ~789 sims/s very dense. Near-perfect linear scaling (no GIL --
 separate processes). CPUs are at ~100% utilization during MC phase.
 
-**Time breakdown per simulation (dense board, ~2.6ms):**
+**Tail-call optimization (v13.2):** `_ctx_extend_right()` uses a `while`
+loop to follow existing board tiles without recursion. When the next
+square already has a tile, the function updates its local variables
+(offset, wlen, row/col) and loops back instead of making a recursive
+call. Only empty squares (which require branching over rack letters and
+blanks) still recurse. This eliminates 40-60% of recursive calls on
+dense boards. Measured improvement: +21% dense, +31% sparse, +13% vdense.
+A full explicit-stack conversion was attempted but regressed performance
+due to struct overhead exceeding Cython's efficient C-to-C calling.
+
+**Time breakdown per simulation (dense board, ~2.1ms):**
 
 | Component              | Time     | %    | Language |
 |------------------------|----------|------|----------|
-| GADDAG traversal       | 2,400 us | 92%  | C        |
-| Word validation        | 100 us   | 4%   | Python   |
-| Cross-check lookups    | 85 us    | 3%   | C        |
+| GADDAG traversal       | 1,900 us | 90%  | C        |
+| Word validation        | 100 us   | 5%   | Python   |
+| Cross-check lookups    | 85 us    | 4%   | C        |
 | Rack parsing           | 5 us     | 0.2% | C        |
 | random.sample + join   | 2 us     | 0.1% | Python   |
 | Result recording       | 4 us     | 0.2% | Python   |
 
 The Cython fast path is already 96% C code. A pure C/Rust rewrite of the
-move finder would only eliminate the 4% Python word-validation callbacks,
+move finder would only eliminate the 5% Python word-validation callbacks,
 yielding ~5-8% speedup -- not worth the effort.
 
 **Future optimization ideas (each could yield 20-50%):**
 
-1. **Iterative GADDAG traversal** -- replace recursive `_ctx_extend_right()`
-   with explicit stack. Saves ~30-50 function calls per sim. Estimated
-   20-30% savings from reduced call overhead and better cache locality.
-
-2. **Anchor pre-filtering** -- currently searches all ~80 anchors per sim.
+1. **Anchor pre-filtering** -- currently searches all ~80 anchors per sim.
    Pre-rank top 10-15 most productive anchors for a given board state and
    skip the rest. Estimated 40-60% savings on sparse/mid-game boards.
 
-3. **MC early stopping** -- if after K/2 sims the equity confidence interval
+2. **MC early stopping** -- if after K/2 sims the equity confidence interval
    is tight enough (e.g., top-2 candidates separated by >2 std devs), stop
    early. Lowest-effort path to ~30-50% effective speedup. Does not require
    any C/Cython changes.
 
-4. **SIMD batch rack processing** -- process 4-8 opponent racks through the
+3. **SIMD batch rack processing** -- process 4-8 opponent racks through the
    GADDAG simultaneously using vectorized operations. Could give 3-4x on
    traversal but requires complete architectural redesign.
 
