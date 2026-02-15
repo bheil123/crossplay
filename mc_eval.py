@@ -1,5 +1,5 @@
 """
-CROSSPLAY V7 - Monte Carlo 2-Ply Evaluation Engine
+CROSSPLAY V13 - Monte Carlo 2-Ply Evaluation Engine
 
 Proper MC simulation for move evaluation:
     1-ply generates all moves, ranks top N by equity.

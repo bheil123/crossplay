@@ -1,5 +1,5 @@
 """
-CROSSPLAY V7 - Scoring Module
+CROSSPLAY V13 - Scoring Module
 Calculate scores for words and moves.
 All positions are 1-indexed.
 """
@@ -302,7 +302,7 @@ if __name__ == "__main__":
     score, crosswords = calculate_move_score(board, "HELLO", 8, 4, True)
     print(f"HELLO at R8 C4: {score} pts")
     print(f"  H(3) + E(1) + L(2) + L(2) + O(1) = 9")
-    print(f"  With 2W at R8 C4: 9 × 2 = 18")
+    print(f"  With 2W at R8 C4: 9 x 2 = 18")
     print()
     
     # Place the word

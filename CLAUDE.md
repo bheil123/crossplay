@@ -1,4 +1,4 @@
-# CLAUDE.md — Crossplay v13.1 "GitHub Ready"
+# CLAUDE.md -- Crossplay V13
 
 ## What is this project?
 

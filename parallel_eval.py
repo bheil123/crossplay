@@ -1,5 +1,5 @@
 """
-CROSSPLAY V7 - Parallel 2-Ply Evaluation Engine
+CROSSPLAY V13 - Parallel 2-Ply Evaluation Engine
 
 Drop-in replacement for the sequential 2-ply loop in lookahead.py.
 Uses ProcessPoolExecutor to evaluate candidate moves in parallel,
@@ -322,7 +322,7 @@ def evaluate_with_lookahead_parallel(
 
     except Exception as e:
         # Fall back to sequential on any parallel failure
-        print(f"  (Parallel eval failed: {e} — falling back to sequential)")
+        print(f"  (Parallel eval failed: {e} -- falling back to sequential)")
         return _eval_sequential(
             board, candidates, opp_tiles_limited, your_rack, board_blanks, gaddag
         )

@@ -1,5 +1,5 @@
 """
-CROSSPLAY v13.1 - MC Calibration Module
+CROSSPLAY V13.2 - MC Calibration Module
 
 Auto-measures MC throughput on the current hardware and computes optimal
 N×K parameters for each game phase. Replaces hardcoded N×K tables.

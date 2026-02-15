@@ -1,6 +1,6 @@
 # cython: language_level=3, boundscheck=False, wraparound=False
 """
-CROSSPLAY v12.1 - C-accelerated GADDAG move finder.
+CROSSPLAY V13 - C-accelerated GADDAG move finder.
 
 Hot-path data structures are C-level:
   - Word buffer: char[15] + int length (no Python list append/pop)

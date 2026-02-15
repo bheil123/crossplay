@@ -1,13 +1,16 @@
-# Crossplay v13.1 "GitHub Ready"
+# Crossplay V13.2
 
-A Scrabble variant engine with Monte Carlo AI evaluation.
+A Crossplay (Scrabble variant) engine with Monte Carlo AI evaluation.
+See `VERSIONING.md` for version numbering rules.
 
-## What's New in v13.1
+## What's New in v13.2
 
-- Generic saved game registry (slot-based, no hardcoded game/opponent names)
-- Post-validation layer for C-accelerated move finder (catches invalid cross-words)
-- Bug fixes: `top_n` scope error, float format in blocking analysis
-- GitHub-ready structure: `.gitignore`, `CLAUDE.md`, setup guide
+- Unified version numbering across all modules (was V7-V13.1 mixed)
+- Phase 2 positional adjustments carried into MC ranking (blocking/risk)
+- MC blank correction factor for multi-blank boards
+- Endgame final_turns_remaining fix
+- VALID_TWO_LETTER dictionary corrections (DI/OU removed, TE added)
+- Version governance via VERSIONING.md
 
 ## Quick Start
 

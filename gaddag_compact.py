@@ -1,5 +1,5 @@
 """
-CROSSPLAY V7 - Compact GADDAG Data Structure
+CROSSPLAY V13 - Compact GADDAG Data Structure
 
 Packs the entire GADDAG trie into a flat bytearray for:
 - ~27 MB on disk (vs 106 MB pickle)

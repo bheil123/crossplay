@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CROSSPLAY V13.1 "GitHub Ready" - Game Manager
+CROSSPLAY V13.2 - Game Manager
 
 Highlights:
   - Cython-accelerated GADDAG move generation (gaddag_accel.so)
@@ -2272,7 +2272,7 @@ def _create_saved_game_5() -> Game:
 
 
 def _create_saved_game_9() -> Game:
-    """Game 9 vs charski. In progress. Turn 23, bag=9."""
+    """Game 9 vs charski. In progress. Turn 24, bag=4."""
     state = GameState(
         name="Game 9",
         board_moves=[
@@ -2298,17 +2298,18 @@ def _create_saved_game_9() -> Game:
             ('BEIGE', 1, 12, False),    # Opp: BEIGE R1C12 V for 33 (no blanks)
             ('PYTHON', 2, 14, False),   # Me: PYTHON R2C14 V for 37 (MC pick)
             ('TIX', 2, 2, False),       # Opp: TIX R2C2 V for 29 (no blanks)
+            ('REGARD', 14, 2, True),    # Me: REGARD R14C2 H for 28 (MC pick)
         ],
         blank_positions=[(12, 10, 'S')],  # Blank S in DUNITES
-        your_score=416,
+        your_score=444,
         opp_score=233,
-        your_rack="LESRRDA",
+        your_rack="LOSMSID",
         bag=[],
-        is_your_turn=True,
+        is_your_turn=False,
         opponent_name="charski",
         created_at="2026-02-12",
         updated_at="2026-02-14",
-        notes="Turn 23. Me 416, Opp 233. Bag 9. My turn. Rack LESRRDA. Up 183."
+        notes="Turn 24. Me 444, Opp 233. Bag 4. Opp turn. Rack LOSMSID. Up 211."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2352,7 +2353,7 @@ def _create_saved_game_6() -> Game:
 
 
 def _create_saved_game_7() -> Game:
-    """Game 10 vs eggsbenny. In progress. Turn 6, bag=61."""
+    """Game 10 vs eggsbenny. In progress. Turn 8, bag=58."""
     state = GameState(
         name="Game 10",
         board_moves=[
@@ -2362,17 +2363,19 @@ def _create_saved_game_7() -> Game:
             ('FURIES', 4, 12, False),   # Me: FURIES R4C12 V for 51 (MC pick)
             ('FORE', 4, 12, True),       # Opp: FORE R4C12 H for 21 (hooks F from FURIES)
             ('PERISHER', 2, 14, False),  # Me: PERISHER R2C14 V for 78 (bingo, blank=I)
+            ('DEY', 3, 13, True),        # Opp: DEY R3C13 H for 15 (plays through E from PERISHER)
+            ('PE', 2, 14, True),         # Me: PE R2C14 H for 10 (MC pick, keep bingo rack)
         ],
         blank_positions=[(5, 14, 'I')],
-        your_score=156,
-        opp_score=61,
-        your_rack="SEBUETA",
+        your_score=166,
+        opp_score=76,
+        your_rack="SYBUETA",
         bag=[],
         is_your_turn=False,
         opponent_name="eggsbenny",
         created_at="2026-02-14",
-        updated_at="2026-02-14",
-        notes="Game 10. Turn 6. Me 156, Opp 61. Bag 61. Opp's turn. Rack SEBUETA. Bingo PERISHER!"
+        updated_at="2026-02-15",
+        notes="Game 10. Turn 8. Me 166, Opp 76. Bag 58. Opp turn. Rack SYBUETA. Up 90."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2380,24 +2383,28 @@ def _create_saved_game_7() -> Game:
 
 
 def _create_saved_game_8() -> Game:
-    """Game 8 vs sophie. In progress. Turn 4, bag=74."""
+    """Game 8 vs sophie. In progress. Turn 8, bag=56."""
     state = GameState(
         name="Game 8",
         board_moves=[
             ('LYCEA', 8, 4, True),      # Me: LYCEA R8C4 H for 28 (opening, double-double)
             ('ETHNIC', 3, 6, False),    # Opp: ETHNIC R3C6 V for 16 (no blanks, verified)
             ('YUK', 8, 5, False),       # Me: YUK R8C5 V for 24 (MC pick, keep AERSS)
+            ('TAXI', 4, 6, True),       # Opp: TAXI R4C6 H for 22 (plays through T from ETHNIC)
+            ('CREASES', 11, 1, True),   # Me: CREASES R11C1 H for 65 (bingo!)
+            ('AWARE', 11, 4, False),    # Opp: AWARE R11C4 V for 39 (blank E at R15C4)
+            ('CEDED', 11, 1, False),    # Me: CEDED R11C1 V for 39 (MC pick, hooks C from CREASES)
         ],
-        blank_positions=[],
-        your_score=52,
-        opp_score=16,
-        your_rack="CESAESR",
+        blank_positions=[(15, 4, 'E')],
+        your_score=156,
+        opp_score=77,
+        your_rack="OGOALMU",
         bag=[],
         is_your_turn=False,
         opponent_name="sophie",
         created_at="2026-02-12",
-        updated_at="2026-02-12",
-        notes="Turn 4. Me 52, Opp 16. Bag 74. Opp's turn. Rack CESAESR. Drew C -- bingo potential."
+        updated_at="2026-02-15",
+        notes="Turn 8. Me 156, Opp 77. Bag 56. Opp turn. Rack OGOALMU. Up 79."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2838,7 +2845,7 @@ class GameManager:
     def run(self):
         """Main menu loop."""
         print("\n" + "="*60)
-        print("CROSSPLAY V7 - GAME MANAGER")
+        print("CROSSPLAY V13 - GAME MANAGER")
         print("="*60)
         
         while True:
@@ -2847,7 +2854,7 @@ class GameManager:
             print("-"*40)
             print("1. Assisted Games (vs human opponents)")
             print("2. Play vs Claude AI")
-            print("3. Simulate V7 vs V7")
+            print("3. Simulate AI vs AI")
             print("4. Quit")
             
             try:

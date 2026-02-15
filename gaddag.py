@@ -1,5 +1,5 @@
 """
-CROSSPLAY V7 - GADDAG Data Structure
+CROSSPLAY V13 - GADDAG Data Structure
 A GADDAG for fast Scrabble move generation.
 
 Based on Steven A. Gordon's 1994 paper "A Faster Scrabble Move Generation Algorithm"

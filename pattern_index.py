@@ -1,5 +1,5 @@
 """
-CROSSPLAY V7 - Pattern Index Module
+CROSSPLAY V13 - Pattern Index Module
 
 Pre-computed index for fast word pattern lookups.
 Used by risk analyzer to quickly find words matching board constraints.

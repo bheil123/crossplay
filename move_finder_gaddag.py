@@ -1,5 +1,5 @@
 """
-CROSSPLAY V7 - GADDAG Move Finder
+CROSSPLAY V13 - GADDAG Move Finder
 Fast move generation using GADDAG traversal.
 
 Based on Gordon's algorithm from "A Faster Scrabble Move Generation Algorithm"
