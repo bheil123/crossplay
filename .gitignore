@@ -1,0 +1,42 @@
+# Generated / cached data (rebuilt automatically on first run)
+gaddag_compact.bin
+.mc_calibration.json
+.benchmark_baseline.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.so
+!gaddag_accel.cpython-312-x86_64-linux-gnu.so
+*.pyd.disabled
+
+# Cython build artifacts
+*.c
+*.html
+build/
+
+# Game saves (local to each machine)
+/crossplay_saves/
+
+# Game archive (local play history)
+game_archive.jsonl
+game_archive_summary.csv
+game_archive_moves.csv
+
+# Claude Code local settings
+.claude/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
