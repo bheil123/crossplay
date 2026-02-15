@@ -2272,7 +2272,7 @@ def _create_saved_game_5() -> Game:
 
 
 def _create_saved_game_9() -> Game:
-    """Game 9 vs charski. In progress. Turn 14, bag=42."""
+    """Game 9 vs charski. In progress. Turn 23, bag=9."""
     state = GameState(
         name="Game 9",
         board_moves=[
@@ -2289,17 +2289,26 @@ def _create_saved_game_9() -> Game:
             ('KEN', 9, 2, True),        # Me: KEN R9C2 H for 26
             ('ET', 8, 12, False),       # Opp: ET R8C12 V for 13 (no blanks)
             ('DUNITES', 12, 4, True),   # Me: DUNITES R12C4 H for 68 (bingo, blank S)
+            ('DIGS', 12, 4, False),     # Opp: DIGS R12C4 V for 24 (no blanks)
+            ('AW', 11, 5, True),        # Me: AW R11C5 H for 42 (MC pick)
+            ('HO', 7, 2, True),         # Opp: HO R7C2 H for 15 (no blanks)
+            ('AZOTE', 4, 1, False),     # Me: AZOTE R4C1 V for 50 (MC pick)
+            ('LIFE', 6, 13, False),     # Opp: LIFE R6C13 V for 20 (no blanks)
+            ('RUGATE', 4, 10, True),    # Me: RUGATE R4C10 H for 42 (MC pick, through R from FROW)
+            ('BEIGE', 1, 12, False),    # Opp: BEIGE R1C12 V for 33 (no blanks)
+            ('PYTHON', 2, 14, False),   # Me: PYTHON R2C14 V for 37 (MC pick)
+            ('TIX', 2, 2, False),       # Opp: TIX R2C2 V for 29 (no blanks)
         ],
         blank_positions=[(12, 10, 'S')],  # Blank S in DUNITES
-        your_score=245,
-        opp_score=112,
-        your_rack="AAEONUW",
+        your_score=416,
+        opp_score=233,
+        your_rack="LESRRDA",
         bag=[],
-        is_your_turn=False,
+        is_your_turn=True,
         opponent_name="charski",
         created_at="2026-02-12",
         updated_at="2026-02-14",
-        notes="Turn 14. Me 245, Opp 112. Bag 42. Opp turn. Rack AAEONUW. Up 133."
+        notes="Turn 23. Me 416, Opp 233. Bag 9. My turn. Rack LESRRDA. Up 183."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2343,23 +2352,27 @@ def _create_saved_game_6() -> Game:
 
 
 def _create_saved_game_7() -> Game:
-    """Game 10 vs eggsbenny. New game. Turn 2, bag=80."""
+    """Game 10 vs eggsbenny. In progress. Turn 6, bag=61."""
     state = GameState(
         name="Game 10",
         board_moves=[
             ('TIX', 8, 8, True),        # Opp: TIX R8C8 H for 18 (opening)
             ('HAJ', 7, 9, True),         # Me: HAJ R7C9 H for 27 (MC pick, hooks HI+AX)
+            ('SEW', 9, 9, True),         # Opp: SEW R9C9 H for 22
+            ('FURIES', 4, 12, False),   # Me: FURIES R4C12 V for 51 (MC pick)
+            ('FORE', 4, 12, True),       # Opp: FORE R4C12 H for 21 (hooks F from FURIES)
+            ('PERISHER', 2, 14, False),  # Me: PERISHER R2C14 V for 78 (bingo, blank=I)
         ],
-        blank_positions=[],
-        your_score=27,
-        opp_score=18,
-        your_rack="USRFIE?",
+        blank_positions=[(5, 14, 'I')],
+        your_score=156,
+        opp_score=61,
+        your_rack="SEBUETA",
         bag=[],
         is_your_turn=False,
         opponent_name="eggsbenny",
         created_at="2026-02-14",
         updated_at="2026-02-14",
-        notes="Game 10. Turn 2. Me 27, Opp 18. Bag 80. Opp's turn. Rack USRFIE + blank."
+        notes="Game 10. Turn 6. Me 156, Opp 61. Bag 61. Opp's turn. Rack SEBUETA. Bingo PERISHER!"
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()

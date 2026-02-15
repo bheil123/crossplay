@@ -159,6 +159,46 @@ Use ASCII alternatives: `->`, `[OK]`, `[X]`, `#`, `-`, `*`, `!`, etc.
 
 A pre-commit hook enforces this rule.
 
+## MC performance profile and optimization ideas
+
+Current: 10 workers (ProcessPoolExecutor), Cython engine, ~2,852 sims/s
+dense, ~835 sims/s very dense. Near-perfect linear scaling (no GIL --
+separate processes). CPUs are at ~100% utilization during MC phase.
+
+**Time breakdown per simulation (dense board, ~2.6ms):**
+
+| Component              | Time     | %    | Language |
+|------------------------|----------|------|----------|
+| GADDAG traversal       | 2,400 us | 92%  | C        |
+| Word validation        | 100 us   | 4%   | Python   |
+| Cross-check lookups    | 85 us    | 3%   | C        |
+| Rack parsing           | 5 us     | 0.2% | C        |
+| random.sample + join   | 2 us     | 0.1% | Python   |
+| Result recording       | 4 us     | 0.2% | Python   |
+
+The Cython fast path is already 96% C code. A pure C/Rust rewrite of the
+move finder would only eliminate the 4% Python word-validation callbacks,
+yielding ~5-8% speedup -- not worth the effort.
+
+**Future optimization ideas (each could yield 20-50%):**
+
+1. **Iterative GADDAG traversal** -- replace recursive `_ctx_extend_right()`
+   with explicit stack. Saves ~30-50 function calls per sim. Estimated
+   20-30% savings from reduced call overhead and better cache locality.
+
+2. **Anchor pre-filtering** -- currently searches all ~80 anchors per sim.
+   Pre-rank top 10-15 most productive anchors for a given board state and
+   skip the rest. Estimated 40-60% savings on sparse/mid-game boards.
+
+3. **MC early stopping** -- if after K/2 sims the equity confidence interval
+   is tight enough (e.g., top-2 candidates separated by >2 std devs), stop
+   early. Lowest-effort path to ~30-50% effective speedup. Does not require
+   any C/Cython changes.
+
+4. **SIMD batch rack processing** -- process 4-8 opponent racks through the
+   GADDAG simultaneously using vectorized operations. Could give 3-4x on
+   traversal but requires complete architectural redesign.
+
 ## Common tasks
 
 **Add a new saved game:** Add a `_create_saved_game_N()` function and register
