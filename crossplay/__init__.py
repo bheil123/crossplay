@@ -7,7 +7,7 @@ See CLAUDE.md for architecture overview and coding conventions.
 Entry point: game_manager.GameManager
 """
 
-__version__ = "14.0.0"
+__version__ = "14.1.0"
 __author__ = "Claude"
 
 # Import main classes for convenience

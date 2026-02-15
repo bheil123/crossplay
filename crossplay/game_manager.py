@@ -130,6 +130,8 @@ class Game:
         self.gaddag, self.dictionary = get_resources()
         self.blocked_cache = BlockedSquareCache()
         self._threats_cache = None  # Cached existing threats (invalidated after moves)
+        self._cached_baseline_risk = 0.0   # Board-wide baseline risk (EV of top existing threat)
+        self._cached_baseline_threats = [] # Board-wide threat list for Phase 2 context
         self.auto_save = False      # Enable auto-save after each move
         self.save_filename = None   # Consistent filename for auto-save
         
@@ -376,6 +378,10 @@ class Game:
             
             # Cache results
             self._threats_cache = (risk_str, expected_dmg, max_dmg, threats)
+
+        # Cache baseline risk for use in Phase 2 per-move analysis
+        self._cached_baseline_risk = expected_dmg
+        self._cached_baseline_threats = threats
         
         print(f"\n{'='*70}")
         print(f"EXISTING THREATS ON BOARD")
@@ -693,7 +699,8 @@ class Game:
                 'dd_desc': oh['dd_desc'],
                 'positional_adj': positional_adj,
                 'equity': equity,
-                'worst_case': worst_case
+                'worst_case': worst_case,
+                'baseline_risk': self._cached_baseline_risk,
             })
         
         if skipped_count > 0:
@@ -2267,7 +2274,7 @@ def _create_saved_game_5() -> Game:
 
 
 def _create_saved_game_9() -> Game:
-    """Game 9 vs charski. In progress. Turn 24, bag=4."""
+    """Game 9 vs charski. COMPLETED. 480-308 WIN (+172)."""
     state = GameState(
         name="Game 9",
         board_moves=[
@@ -2294,17 +2301,21 @@ def _create_saved_game_9() -> Game:
             ('PYTHON', 2, 14, False),   # Me: PYTHON R2C14 V for 37 (MC pick)
             ('TIX', 2, 2, False),       # Opp: TIX R2C2 V for 29 (no blanks)
             ('REGARD', 14, 2, True),    # Me: REGARD R14C2 H for 28 (MC pick)
+            ('ENGLUT', 15, 7, True),    # Opp: ENGLUT R15C7 H for 32 (blank N)
+            ('DOSSIL', 9, 14, False),   # Me: DOSSIL R9C14 V for 36 (1-ply endgame pick)
+            ('VEST', 12, 12, True),     # Opp: VEST R12C12 H for 42 (final move)
         ],
-        blank_positions=[(12, 10, 'S')],  # Blank S in DUNITES
-        your_score=444,
-        opp_score=233,
-        your_rack="LOSMSID",
+        blank_positions=[(12, 10, 'S'), (15, 8, 'N')],  # Blank S in DUNITES, blank N in ENGLUT
+        your_score=480,
+        opp_score=308,
+        your_rack="",
         bag=[],
         is_your_turn=False,
         opponent_name="charski",
         created_at="2026-02-12",
-        updated_at="2026-02-14",
-        notes="Turn 24. Me 444, Opp 233. Bag 4. Opp turn. Rack LOSMSID. Up 211."
+        updated_at="2026-02-15",
+        notes="COMPLETED. 480-308 WIN (+172). 28 turns. DOSSIL closed it out.",
+        final_turns_remaining=0,
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2348,7 +2359,7 @@ def _create_saved_game_6() -> Game:
 
 
 def _create_saved_game_7() -> Game:
-    """Game 10 vs eggsbenny. In progress. Turn 8, bag=58."""
+    """Game 10 vs eggsbenny. In progress. Turn 10, bag=53."""
     state = GameState(
         name="Game 10",
         board_moves=[
@@ -2360,17 +2371,18 @@ def _create_saved_game_7() -> Game:
             ('PERISHER', 2, 14, False),  # Me: PERISHER R2C14 V for 78 (bingo, blank=I)
             ('DEY', 3, 13, True),        # Opp: DEY R3C13 H for 15 (plays through E from PERISHER)
             ('PE', 2, 14, True),         # Me: PE R2C14 H for 10 (MC pick, keep bingo rack)
+            ('FERAL', 8, 15, False),    # Opp: FERAL R8C15 V for 50 (3W at R12C15, 2L at R8C15)
         ],
         blank_positions=[(5, 14, 'I')],
         your_score=166,
-        opp_score=76,
+        opp_score=126,
         your_rack="SYBUETA",
         bag=[],
-        is_your_turn=False,
+        is_your_turn=True,
         opponent_name="eggsbenny",
         created_at="2026-02-14",
         updated_at="2026-02-15",
-        notes="Game 10. Turn 8. Me 166, Opp 76. Bag 58. Opp turn. Rack SYBUETA. Up 90."
+        notes="Game 10. Turn 10. Me 166, Opp 126. Bag 53. My turn. Rack SYBUETA. Up 40."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()

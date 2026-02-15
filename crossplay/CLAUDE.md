@@ -103,6 +103,11 @@ First run builds GADDAG (~48s) and runs MC calibration (~3s). Both are cached.
   `GameState.name` and `opponent_name`
 - **Accuracy analysis** in `ACCURACY.md` — documents all factors impacting
   move evaluation accuracy, improvement roadmap, and equity formula breakdown
+- **Baseline risk** — board-wide threat analysis (`analyze_existing_threats()`)
+  is cached at the start of `analyze()` and added to each move dict as
+  `baseline_risk`. Surfaces pre-existing board vulnerabilities (open bonus
+  squares from earlier moves) that per-move risk analysis doesn't scan.
+  Constant across all moves, so informational only — doesn't change rankings.
 
 ## Data files (committed, do not regenerate)
 

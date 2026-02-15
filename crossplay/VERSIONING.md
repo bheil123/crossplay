@@ -68,6 +68,7 @@ version changes.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 14.1.0 | 2026-02 | Baseline risk, game state updates (charski WIN, eggsbenny FERAL) |
 | 14.0.0 | 2026-02 | Flattened repo structure (crossplay_v9 -> crossplay), major version bump |
 | 13.2.0 | 2025-06 | Unified versioning, MC positional adjustments, blank correction |
 | 13.1.0 | 2025-05 | GitHub ready: .gitignore, CLAUDE.md, saved game registry |

@@ -426,6 +426,7 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         'total_equity': round(total_eq, 1),
         'expected_risk': round(exp_risk, 1),
         'risk_adj_equity': round(total_eq - exp_risk, 1),
+        'baseline_risk': round(move.get('baseline_risk', 0), 1),
         # Detail
         'top_opp_responses': top_opp,
         'k_sims': n,
@@ -645,6 +646,7 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
         'total_equity': round(mc_equity + avg_new_leave, 1),
         'expected_risk': 0,
         'risk_adj_equity': round(mc_equity + avg_new_leave, 1),
+        'baseline_risk': round(move.get('baseline_risk', 0), 1),
         # Detail
         'top_opp_responses': top_opp,
         'k_sims': n,
@@ -992,6 +994,7 @@ def _mc_eval_sequential(
             'total_equity': round(total_eq, 1),
             'expected_risk': round(exp_risk, 1),
             'risk_adj_equity': round(total_eq - exp_risk, 1),
+            'baseline_risk': round(move.get('baseline_risk', 0), 1),
             'top_opp_responses': top_opp,
             'k_sims': n,
             'opp_best': round(avg_opp, 0),
@@ -1115,6 +1118,7 @@ def mc_evaluate_2ply(
             'tiles_used': move.get('tiles_used', move['word']),
             'positional_adj': move.get('positional_adj', 0),
             'expected_risk': move.get('expected_risk', 0),
+            'baseline_risk': move.get('baseline_risk', 0),
         }
         # Each worker gets a unique seed derived from the base seed
         worker_seed = (seed + i * 1000) if seed is not None else None
