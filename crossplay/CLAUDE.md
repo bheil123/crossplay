@@ -93,11 +93,16 @@ First run builds GADDAG (~48s) and runs MC calibration (~3s). Both are cached.
   every 10 sims, min 100). Actual sims per candidate: 150-530 avg.
 - **MC phase: 2-7s** (was 21-27s before early stopping). Turn time is now
   dominated by risk analysis (3s) and 3-ply (0-6s), not MC.
+- **Risk-adjusted equity** (`risk_adj_equity`): `total_equity - expected_risk`.
+  Shows conservative estimate with full (undampened) threat analysis weight.
+  Displayed as `RiskEq` column in MC output when any candidate has nonzero risk.
 - **Post-validation** in `move_finder_c.py` — all C-generated moves have
   main-axis words and cross-words re-validated in Python as a safety net
 - **Saved games** use a generic registry pattern in `_init_default_games()` —
   factory functions named `_create_saved_game_N()`, identity comes from
   `GameState.name` and `opponent_name`
+- **Accuracy analysis** in `ACCURACY.md` — documents all factors impacting
+  move evaluation accuracy, improvement roadmap, and equity formula breakdown
 
 ## Data files (committed, do not regenerate)
 

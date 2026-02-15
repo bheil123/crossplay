@@ -1029,19 +1029,22 @@ class Game:
             # Check for bingo threats BEFORE any move (baseline)
             baseline_bingo = self._find_opponent_bingo(unseen_str)
             
-            # Check if any result has non-zero positional adjustment
+            # Check if any result has non-zero positional adjustment or risk
             has_pos_adj = any(m.get('pos_adj_dampened', 0) != 0 for m in results[:min(lookahead_n, 30)])
+            has_risk = any(m.get('expected_risk', 0) > 0 for m in results[:min(lookahead_n, 30)])
 
             if has_pos_adj:
                 print(f"\n{'#':<3} {'Word':<12} {'Pos':<10} {'Pts':>4} "
                       f"{'AvgOpp':>6} {'MaxOpp':>6} {'Std':>5} "
-                      f"{'%Beats':>6} {'Leave':>6} {'PosAdj':>6} {'MC Eq':>7}")
-                print("-" * 85)
+                      f"{'%Beats':>6} {'Leave':>6} {'PosAdj':>6} {'MC Eq':>7}"
+                      + (f" {'RiskEq':>7}" if has_risk else ""))
+                print("-" * (85 + (8 if has_risk else 0)))
             else:
                 print(f"\n{'#':<3} {'Word':<12} {'Pos':<10} {'Pts':>4} "
                       f"{'AvgOpp':>6} {'MaxOpp':>6} {'Std':>5} "
-                      f"{'%Beats':>6} {'Leave':>6} {'MC Eq':>7}")
-                print("-" * 78)
+                      f"{'%Beats':>6} {'Leave':>6} {'MC Eq':>7}"
+                      + (f" {'RiskEq':>7}" if has_risk else ""))
+                print("-" * (78 + (8 if has_risk else 0)))
 
             # Track which moves block bingos
             blocking_moves = []
@@ -1083,18 +1086,23 @@ class Game:
 
                 leave_display = m['leave'] if not is_exch else m['leave'][:8]
 
+                risk_eq_str = ""
+                if has_risk:
+                    risk_eq = m.get('risk_adj_equity', m['total_equity'])
+                    risk_eq_str = f" {risk_eq:>+7.1f}"
+
                 if has_pos_adj:
                     pos_adj = m.get('pos_adj_dampened', 0)
                     pos_str = f"{pos_adj:>+5.1f}" if pos_adj != 0 else "    -"
                     print(f"{i:<3} {word_display:<12} {pos:<10} {m['score']:>4} "
                           f"{m['mc_avg_opp']:>6.1f} {m['mc_max_opp']:>6} {m['mc_std_opp']:>5.1f} "
                           f"{m['pct_opp_beats']:>5.1f}% {leave_display:>6} {pos_str:>6} "
-                          f"{m['total_equity']:>+7.1f} {bingo_marker}")
+                          f"{m['total_equity']:>+7.1f}{risk_eq_str} {bingo_marker}")
                 else:
                     print(f"{i:<3} {word_display:<12} {pos:<10} {m['score']:>4} "
                           f"{m['mc_avg_opp']:>6.1f} {m['mc_max_opp']:>6} {m['mc_std_opp']:>5.1f} "
                           f"{m['pct_opp_beats']:>5.1f}% {leave_display:>6} "
-                          f"{m['total_equity']:>+7.1f} {bingo_marker}")
+                          f"{m['total_equity']:>+7.1f}{risk_eq_str} {bingo_marker}")
             
             # Exchange recommendation if any exchange ranked highly
             best_exch_in_top = None

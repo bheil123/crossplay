@@ -402,6 +402,8 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
     leave_value = evaluate_leave(leave)
 
     mc_equity = move['score'] - avg_opp
+    total_eq = mc_equity + leave_value + move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN
+    exp_risk = move.get('expected_risk', 0)
 
     return {
         'word': move['word'],
@@ -421,7 +423,9 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         'leave_value': round(leave_value, 1),
         'positional_adj': move.get('positional_adj', 0),
         'pos_adj_dampened': round(move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
-        'total_equity': round(mc_equity + leave_value + move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
+        'total_equity': round(total_eq, 1),
+        'expected_risk': round(exp_risk, 1),
+        'risk_adj_equity': round(total_eq - exp_risk, 1),
         # Detail
         'top_opp_responses': top_opp,
         'k_sims': n,
@@ -639,6 +643,8 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
         'leave': f'>{keep_str}+{len(dump_tiles)}',
         'leave_value': round(avg_new_leave, 1),
         'total_equity': round(mc_equity + avg_new_leave, 1),
+        'expected_risk': 0,
+        'risk_adj_equity': round(mc_equity + avg_new_leave, 1),
         # Detail
         'top_opp_responses': top_opp,
         'k_sims': n,
@@ -964,6 +970,8 @@ def _mc_eval_sequential(
         leave = _get_leave(your_rack, tiles_used)
         leave_value = evaluate_leave(leave)
         mc_equity = move['score'] - avg_opp
+        total_eq = mc_equity + leave_value + move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN
+        exp_risk = move.get('expected_risk', 0)
 
         results.append({
             'word': move['word'],
@@ -981,7 +989,9 @@ def _mc_eval_sequential(
             'leave_value': round(leave_value, 1),
             'positional_adj': move.get('positional_adj', 0),
             'pos_adj_dampened': round(move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
-            'total_equity': round(mc_equity + leave_value + move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
+            'total_equity': round(total_eq, 1),
+            'expected_risk': round(exp_risk, 1),
+            'risk_adj_equity': round(total_eq - exp_risk, 1),
             'top_opp_responses': top_opp,
             'k_sims': n,
             'opp_best': round(avg_opp, 0),
@@ -1104,6 +1114,7 @@ def mc_evaluate_2ply(
             'score': move['score'],
             'tiles_used': move.get('tiles_used', move['word']),
             'positional_adj': move.get('positional_adj', 0),
+            'expected_risk': move.get('expected_risk', 0),
         }
         # Each worker gets a unique seed derived from the base seed
         worker_seed = (seed + i * 1000) if seed is not None else None
@@ -1161,6 +1172,7 @@ def mc_evaluate_2ply(
                 r['mc_equity'] = round(r['score'] - corrected_avg, 1)
                 pos_adj = r.get('pos_adj_dampened', 0)
                 r['total_equity'] = round(r['mc_equity'] + r['leave_value'] + pos_adj, 1)
+                r['risk_adj_equity'] = round(r['total_equity'] - r.get('expected_risk', 0), 1)
                 r['opp_best'] = round(corrected_avg, 0)
                 r['lookahead_equity'] = r['mc_equity']
 
