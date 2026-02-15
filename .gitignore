@@ -37,6 +37,10 @@ game_archive_moves.csv
 *.swo
 *~
 
+# Scratch / temp files
+_cmds.txt
+tmp_diff.txt
+
 # OS
 .DS_Store
 Thumbs.db
