@@ -433,19 +433,14 @@ class Game:
     
     def analyze(self, rack: str = None, top_n: int = 15, lookahead_n: int = None):
         """Analyze best moves for rack with full risk/leave analysis.
-        
+
         Args:
             rack: Tile rack to analyze (uses saved rack if not provided)
             top_n: Number of moves to show in main analysis (default 15)
-            lookahead_n: Number of candidates for 2-ply evaluation
-                         If None (default), scales automatically:
-                         - 50+ unseen:  N=4  (early game)
-                         - 35-49 unseen: N=5  (early-mid)
-                         - 22-34 unseen: N=6  (mid game)
-                         - 18-21 unseen: N=6
-                         - 14-17 unseen: N=8  
-                         - 10-13 unseen: N=10
-                         - 7-9 unseen:   N=12 (near endgame)
+            lookahead_n: Number of candidates for 2-ply evaluation.
+                         If None (default), uses N=40 (all within equity
+                         spread). MC early stopping controls actual sim
+                         count per candidate (~150-530 avg vs K=2000 cap).
         """
         rack = rack or self.state.your_rack
         if not rack:
@@ -986,15 +981,9 @@ class Game:
         # Adaptive N×K based on calibrated throughput
         blanks_unseen = blank_count
         
-        # Determine MC time budget (shares 30s with risk:3s and optional 3-ply)
-        if bag_size <= 5:
-            mc_budget = 26.0   # 3s risk + 26s MC + 1s 3-ply
-        elif bag_size <= 12:
-            mc_budget = 21.0   # 3s risk + 21s MC + 6s 3-ply
-        elif bag_size <= 19:
-            mc_budget = 24.0   # 3s risk + 24s MC + 3s 3-ply
-        else:
-            mc_budget = 27.0   # 3s risk + 27s MC
+        # MC time budget -- with early stopping, MC typically finishes in 2-8s
+        # regardless of K. Budget is a safety cap, not a planning target.
+        mc_budget = 27.0
         
         if lookahead_n is None:
             from .mc_calibrate import compute_adaptive_n

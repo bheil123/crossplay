@@ -316,6 +316,14 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
     effective_k = k_sims
     _t_sim_start = time.perf_counter()
 
+    # Early stopping: if avg_opp has converged (SE < threshold), stop early.
+    # Running stats for O(1) SE computation (no list re-scan).
+    _ES_MIN_SIMS = 100       # minimum sims before checking convergence
+    _ES_CHECK_EVERY = 10     # check every N sims (amortize overhead)
+    _ES_SE_THRESHOLD = 1.0   # stop when SE of mean < 1 pt (95% CI +/-2 pts)
+    _running_sum = 0.0
+    _running_sum_sq = 0.0
+
     sim_i = 0
     while sim_i < effective_k:
         # After probe sims, check if we need to reduce K
@@ -326,6 +334,14 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
                 max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
                 if max_k < effective_k:
                     effective_k = max_k
+
+        # Early stopping convergence check
+        if (sim_i >= _ES_MIN_SIMS and sim_i % _ES_CHECK_EVERY == 0):
+            _variance = (_running_sum_sq / sim_i) - (_running_sum / sim_i) ** 2
+            if _variance > 0:
+                _se = (_variance / sim_i) ** 0.5
+                if _se < _ES_SE_THRESHOLD:
+                    break  # converged -- more sims won't change avg_opp meaningfully
 
         # Sample random opponent rack
         opp_rack_list = random.sample(unseen_pool, rack_size)
@@ -342,11 +358,14 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
 
         if opp_score > 0:
             opp_scores.append(opp_score)
+            _running_sum += opp_score
+            _running_sum_sq += opp_score * opp_score
             key = (opp_word, opp_row, opp_col, opp_dir)
             if key not in opp_responses or opp_score > opp_responses[key]:
                 opp_responses[key] = opp_score
         else:
             opp_scores.append(0)
+            # 0 contributes to sum but not sum_sq (already 0)
         sim_i += 1
 
     # Undo our move (not strictly necessary since board is local, but clean)
@@ -501,6 +520,13 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
     effective_k = k_sims
     _t_sim_start = time.perf_counter()
 
+    # Early stopping (same as _mc_eval_single_candidate)
+    _ES_MIN_SIMS = 100
+    _ES_CHECK_EVERY = 10
+    _ES_SE_THRESHOLD = 1.0
+    _running_sum = 0.0
+    _running_sum_sq = 0.0
+
     sim_i = 0
     while sim_i < effective_k:
         if sim_i == _PROBE_COUNT and not _use_cython_fast:
@@ -510,6 +536,14 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
                 max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
                 if max_k < effective_k:
                     effective_k = max_k
+
+        # Early stopping convergence check
+        if (sim_i >= _ES_MIN_SIMS and sim_i % _ES_CHECK_EVERY == 0):
+            _variance = (_running_sum_sq / sim_i) - (_running_sum / sim_i) ** 2
+            if _variance > 0:
+                _se = (_variance / sim_i) ** 0.5
+                if _se < _ES_SE_THRESHOLD:
+                    break
 
         # 1. Sample opponent rack from unseen pool
         opp_rack_list = random.sample(unseen_pool, rack_size)
@@ -526,6 +560,8 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
 
         if opp_score > 0:
             opp_scores.append(opp_score)
+            _running_sum += opp_score
+            _running_sum_sq += opp_score * opp_score
             key = (opp_word, opp_row, opp_col, opp_dir)
             if key not in opp_responses or opp_score > opp_responses[key]:
                 opp_responses[key] = opp_score
@@ -852,6 +888,13 @@ def _mc_eval_sequential(
         effective_k = k_sims
         _t_cand_start = time.perf_counter()
 
+        # Early stopping (same as parallel path)
+        _ES_MIN_SIMS = 100
+        _ES_CHECK_EVERY = 10
+        _ES_SE_THRESHOLD = 1.0
+        _running_sum = 0.0
+        _running_sum_sq = 0.0
+
         sim_i = 0
         while sim_i < effective_k:
             if sim_i == _PROBE_COUNT and not _use_cython_fast:
@@ -861,6 +904,14 @@ def _mc_eval_sequential(
                     max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
                     if max_k < effective_k:
                         effective_k = max_k
+
+            # Early stopping convergence check
+            if (sim_i >= _ES_MIN_SIMS and sim_i % _ES_CHECK_EVERY == 0):
+                _variance = (_running_sum_sq / sim_i) - (_running_sum / sim_i) ** 2
+                if _variance > 0:
+                    _se = (_variance / sim_i) ** 0.5
+                    if _se < _ES_SE_THRESHOLD:
+                        break
 
             opp_rack_list = random.sample(unseen_pool, rack_size)
             opp_rack = ''.join(opp_rack_list)
@@ -874,6 +925,8 @@ def _mc_eval_sequential(
                     cross_cache=_cross_cache, dictionary=_dict_seq)
             if opp_score > 0:
                 opp_scores.append(opp_score)
+                _running_sum += opp_score
+                _running_sum_sq += opp_score * opp_score
                 key = (opp_word, opp_row, opp_col, opp_dir)
                 if key not in opp_responses or opp_score > opp_responses[key]:
                     opp_responses[key] = opp_score

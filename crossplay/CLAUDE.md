@@ -86,14 +86,13 @@ First run builds GADDAG (~48s) and runs MC calibration (~3s). Both are cached.
 
 ## Key design decisions
 
-- **MIN_N = 25** for MC evaluation (based on Maven/Quackle research — enough
-  candidates to catch moves that look weak in static eval but have strong
-  leave synergy)
-- **K ∈ [100, 2000]** — below 100, MC variance too high; above 2000,
-  diminishing returns
-- **Adaptive N×K** — auto-calibrated per hardware, equity-spread-based N,
-  K fills remaining time budget
-- **30-second turn budget** — split: 3s risk analysis, 21-27s MC, 0-6s 3-ply
+- **N=40 flat** for MC evaluation (early stopping makes per-candidate cost
+  self-limiting at ~150-530 sims, so N=40 only costs 3-7s more than N=25
+  in most cases while providing better equity spread coverage).
+- **K=2000 ceiling** with convergence-based early stopping (SE < 1.0, check
+  every 10 sims, min 100). Actual sims per candidate: 150-530 avg.
+- **MC phase: 2-7s** (was 21-27s before early stopping). Turn time is now
+  dominated by risk analysis (3s) and 3-ply (0-6s), not MC.
 - **Post-validation** in `move_finder_c.py` — all C-generated moves have
   main-axis words and cross-words re-validated in Python as a safety net
 - **Saved games** use a generic registry pattern in `_init_default_games()` —
@@ -191,20 +190,77 @@ The Cython fast path is already 96% C code. A pure C/Rust rewrite of the
 move finder would only eliminate the 5% Python word-validation callbacks,
 yielding ~5-8% speedup -- not worth the effort.
 
-**Future optimization ideas (each could yield 20-50%):**
+**Future software optimization ideas (each could yield 20-50%):**
 
-1. **Anchor pre-filtering** -- currently searches all ~80 anchors per sim.
-   Pre-rank top 10-15 most productive anchors for a given board state and
-   skip the rest. Estimated 40-60% savings on sparse/mid-game boards.
+1. **Faster `_ctx_get_child()` lookup** -- currently a linear scan through
+   sorted children (up to 27 entries per node). This is the innermost hot
+   function called ~600-800x per simulation. **Tested and rejected:**
+   (a) Level 3 cache (`level3[27][27][27]`, 77KB) -- regressed 15-20% due
+   to increased BoardContext size hurting cache locality and init cost.
+   (b) Binary search for nodes with 4+ children -- regressed 2-5% due to
+   branch prediction penalties outweighing saved comparisons (86% of nodes
+   have 0-3 children, so the threshold check adds overhead to the common
+   case). The linear scan with early exit is already optimal for this data
+   distribution. Every production Scrabble engine (Quackle, Maven, Macondo,
+   MAGPIE, wolges) uses the same linear scan approach.
 
-2. **MC early stopping** -- if after K/2 sims the equity confidence interval
-   is tight enough (e.g., top-2 candidates separated by >2 std devs), stop
-   early. Lowest-effort path to ~30-50% effective speedup. Does not require
-   any C/Cython changes.
+2. **Anchor pre-filtering** -- **Analyzed and rejected.** Skipping "low
+   productivity" anchors in the MC opponent-response search risks missing
+   the opponent's actual best move. An anchor's value is rack-dependent --
+   an anchor that's usually dead could be the best play for a specific
+   random rack. Underestimating opponent threats inflates equity, making
+   dangerous moves look safe. This defeats the purpose of MC evaluation.
 
-3. **SIMD batch rack processing** -- process 4-8 opponent racks through the
+3. **MC early stopping** -- **Implemented.** Each candidate's simulation
+   loop tracks running sum/sum-of-squares for O(1) SE computation. After
+   100 minimum sims, checks every 10 sims if SE < 1.0 (95% CI +/-2 pts).
+   Self-calibrating: converged candidates stop early, close ones run full K.
+   Density analysis (K=1000, 15 candidates, check_every=10):
+
+   | Game phase | Unseen tiles | Sim reduction | Avg K per candidate |
+   |------------|-------------|---------------|---------------------|
+   | Early      | 82          | 69%           | 305                 |
+   | Early-mid  | 65          | 72%           | 281                 |
+   | Mid        | 52          | 73%           | 273                 |
+   | Mid-late   | 39          | 84%           | 157                 |
+   | Late       | 24          | 85%           | 149                 |
+   | Very late  | 18          | 83%           | 175                 |
+
+   99% confidence (SE < 0.76) was tested and rejected: costs ~75% more
+   sims across all densities with zero ranking changes vs 95%. The freed
+   sim budget is better spent on more candidates (higher N).
+   Implementation: `mc_eval.py` in `_mc_eval_single_candidate` and
+   `_mc_eval_exchange_candidate`.
+
+4. **SIMD batch rack processing** -- process 4-8 opponent racks through the
    GADDAG simultaneously using vectorized operations. Could give 3-4x on
    traversal but requires complete architectural redesign.
+
+**Hardware upgrade path (estimated 3-4x total MC throughput):**
+
+Current dev hardware: i7-8700 (6C/12T, 12MB L3, DDR4-2133, ~2,824
+dense sims/s). The 28MB GADDAG data does not fit in the 12MB L3 cache,
+causing frequent DRAM fetches (~75ns) on `_ctx_get_child()` lookups.
+
+Recommended upgrade: AMD Ryzen 9 9950X3D (~$699) + AM5 motherboard
+(~$270) + 64GB DDR5-6000 (~$170) + cooler (~$35) = ~$1,175 total.
+
+| Factor          | i7-8700          | 9950X3D            | Impact              |
+|-----------------|------------------|--------------------|---------------------|
+| L3 cache        | 12MB             | 128MB (3D V-Cache) | GADDAG fits in L3   |
+| Cores/threads   | 6C/12T (10w MC)  | 16C/32T (20w+ MC)  | 2x parallel workers |
+| IPC + clock     | Coffee Lake 4.6G | Zen 5 5.7G         | ~80% faster/core    |
+| Memory          | DDR4-2133 34GB/s | DDR5-6000 90GB/s   | 2.5x bandwidth      |
+
+The L3 cache is the biggest single factor: fitting the full GADDAG in
+cache eliminates the main bottleneck and could ~2x per-worker throughput
+alone. Combined with more cores and higher IPC, estimated ~9,000-12,000
+dense sims/s (vs current ~2,824). Budget alternative: Ryzen 7 9800X3D
+($449, 8C/16T, 96MB L3) saves $250 but fewer MC workers.
+
+GPU/CUDA would not help -- GADDAG traversal is serial, branch-heavy
+pointer-chasing through a trie, fundamentally incompatible with GPU
+SIMD architecture.
 
 ## Common tasks
 

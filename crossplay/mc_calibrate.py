@@ -28,9 +28,9 @@ MAX_K = 2000          # Diminishing returns above this (Maven/Quackle rarely exc
 MIN_N_PYTHON = 15     # With Python MC path (~80-150 sims/sec), 15 candidates
                       # gives K~200-400 (better per-candidate confidence) while
                       # still covering the competitive equity window
-MIN_N_CYTHON = 25     # With Cython fast path, budget allows 25 candidates
-                      # (Maven/Quackle research: 25 catches moves that look
-                      # weak in static eval but have strong leave synergy)
+MIN_N_CYTHON = 40     # With Cython fast path + early stopping, N=40 costs
+                      # only 3-7s more than N=25 in most cases. Better equity
+                      # spread coverage catches more non-obvious strong moves.
 EQUITY_SPREAD = 15.0  # Include candidates within this equity of best
 CALIBRATION_SECS = 3  # Time budget for benchmark
 
@@ -380,33 +380,33 @@ def get_mc_params(bag_size, n_candidates, mc_budget_secs,
     return n, k
 
 
-def compute_adaptive_n(candidates, mc_budget_secs, bag_size, 
+def compute_adaptive_n(candidates, mc_budget_secs, bag_size,
                        top_n_display=15, equity_spread=None):
     """Given actual candidates with prelim_equity, compute N and K.
-    
-    This is the main entry point for the adaptive system. It examines
-    the equity spread of candidates and decides how many to evaluate.
-    
+
+    With MC early stopping (convergence-based), K is effectively a ceiling
+    that most candidates never reach. N=40 is flat across all game phases
+    (early stopping makes per-candidate cost self-limiting, so N=40 only
+    costs 3-7s more than N=25). K=MAX_K since early stopping controls
+    actual sim count per candidate.
+
     Args:
         candidates: list of move dicts with 'equity' or 'prelim_equity' key
-        mc_budget_secs: seconds available for MC
+        mc_budget_secs: seconds available for MC (less relevant with early stopping)
         bag_size: tiles in bag
         top_n_display: minimum N for display
         equity_spread: equity window (default EQUITY_SPREAD)
-        
+
     Returns:
         (N, K, reason_str) tuple
     """
     if equity_spread is None:
         equity_spread = EQUITY_SPREAD
-    
+
     min_n = _get_min_n()
 
     if not candidates:
         return min_n, MIN_K, "no candidates"
-
-    sps = estimate_throughput(bag_size)
-    total_budget = sps * mc_budget_secs
 
     # Find best equity
     best_eq = max(m.get('equity', m.get('prelim_equity', 0)) for m in candidates)
@@ -416,24 +416,18 @@ def compute_adaptive_n(candidates, mc_budget_secs, bag_size,
                       if (best_eq - m.get('equity', m.get('prelim_equity', 0)))
                       <= equity_spread)
 
-    # N: at least top_n_display, at most what budget allows with MIN_K
-    max_n = int(total_budget / MIN_K)
-    n = max(min_n, min(n_in_spread, max_n, len(candidates)))
+    # N: at least min_n (40 for Cython, 15 for Python), capped at min_n
+    # to avoid evaluating hundreds of candidates on boards with tight spreads.
+    # Early stopping makes per-candidate cost self-limiting (~150-530 sims).
+    n = min(min_n, len(candidates))
     n = max(n, min(top_n_display, len(candidates)))
-    
-    # K: fill budget
-    k = int(total_budget / n) if n > 0 else MIN_K
-    k = max(MIN_K, min(MAX_K, k))
-    
+
+    # K=MAX_K -- early stopping handles actual convergence
+    k = MAX_K
+
     # Build reason string
-    reason = f"{n_in_spread} within {equity_spread:.0f}eq"
-    if n < n_in_spread:
-        reason += f", capped to {n} by budget"
-    if k == MIN_K:
-        reason += ", K at floor"
-    elif k == MAX_K:
-        reason += ", K at cap"
-    
+    reason = f"N={n} ({n_in_spread} within {equity_spread:.0f}eq), K={k} (early-stop)"
+
     return n, k, reason
 
 

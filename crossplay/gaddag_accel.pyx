@@ -754,6 +754,7 @@ cdef inline int _ctx_get_child(BoardContext ctx, int offset, int char_idx):
     return _get_child(ctx.gdata, offset, char_idx)
 
 
+
 # =========================================================================
 # Pre-compute cross-checks as bitmasks
 # =========================================================================

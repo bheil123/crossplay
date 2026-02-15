@@ -133,10 +133,10 @@ def run_benchmark():
     nw_sparse = cal["sps_sparse_nw"]
     nw_dense = cal["sps_dense_nw"]
     nw_vdense = cal["sps_vdense_nw"]
-    print("--- N=25 K=2000 estimated wall time ---")
-    print(f"  Sparse:  {25 * 2000 / nw_sparse:.0f}s")
-    print(f"  Dense:   {25 * 2000 / nw_dense:.0f}s")
-    print(f"  VDense:  {25 * 2000 / nw_vdense:.0f}s")
+    print("--- N=40 K=2000 estimated wall time ---")
+    print(f"  Sparse:  {40 * 2000 / nw_sparse:.0f}s")
+    print(f"  Dense:   {40 * 2000 / nw_dense:.0f}s")
+    print(f"  VDense:  {40 * 2000 / nw_vdense:.0f}s")
     print()
 
     # Save
