@@ -646,7 +646,7 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
         'total_equity': round(mc_equity + avg_new_leave, 1),
         'expected_risk': 0,
         'risk_adj_equity': round(mc_equity + avg_new_leave, 1),
-        'baseline_risk': round(move.get('baseline_risk', 0), 1),
+        'baseline_risk': round(exchange_info.get('baseline_risk', 0), 1),
         # Detail
         'top_opp_responses': top_opp,
         'k_sims': n,
