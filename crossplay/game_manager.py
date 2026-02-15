@@ -2359,7 +2359,7 @@ def _create_saved_game_6() -> Game:
 
 
 def _create_saved_game_7() -> Game:
-    """Game 10 vs eggsbenny. In progress. Turn 10, bag=53."""
+    """Game 10 vs eggsbenny. In progress. Turn 12, bag=49."""
     state = GameState(
         name="Game 10",
         board_moves=[
@@ -2372,17 +2372,18 @@ def _create_saved_game_7() -> Game:
             ('DEY', 3, 13, True),        # Opp: DEY R3C13 H for 15 (plays through E from PERISHER)
             ('PE', 2, 14, True),         # Me: PE R2C14 H for 10 (MC pick, keep bingo rack)
             ('FERAL', 8, 15, False),    # Opp: FERAL R8C15 V for 50 (3W at R12C15, 2L at R8C15)
+            ('BAYS', 11, 14, False),    # Me: BAYS R11C14 V for 28 (MC pick, blocks 2W@R14C14)
         ],
         blank_positions=[(5, 14, 'I')],
-        your_score=166,
+        your_score=194,
         opp_score=126,
-        your_rack="SYBUETA",
+        your_rack="CHATEEU",
         bag=[],
-        is_your_turn=True,
+        is_your_turn=False,
         opponent_name="eggsbenny",
         created_at="2026-02-14",
         updated_at="2026-02-15",
-        notes="Game 10. Turn 10. Me 166, Opp 126. Bag 53. My turn. Rack SYBUETA. Up 40."
+        notes="Game 10. Turn 12. Me 194, Opp 126. Bag 49. Opp turn. Rack CHATEEU. Up 68."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
