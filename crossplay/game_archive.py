@@ -292,106 +292,15 @@ def export_archive_moves_csv(archive_path=None, output_path=None):
 
 
 def backfill_saved_games():
-    """Backfill enriched move history for saved games 2, 3, and 4.
+    """Legacy backfill function -- no longer used.
 
-    Replays each game through the scoring engine, validates computed scores
-    against stated scores, and archives completed games.
-
-    Game 1 uses single-tile placements (degenerate format), skip.
-
-    Returns:
-        Dict mapping game name to backfill results.
+    The factory functions this relied on were removed in V15.
+    Game data now lives in crossplay/games/ (see game_library.py).
     """
-    # Import here to avoid circular dependency (game_manager imports game_archive)
-    # We import the factory functions directly
-    import importlib
-    gm = importlib.import_module('.game_manager', package=__package__)
-
-    # Game configs: (factory_func, first_player, expected_my, expected_opp)
-    games_to_backfill = [
-        (gm._create_saved_game_3, 'opp', 424, 364),  # Opp opened with PIVOT
-        (gm._create_saved_game_4, 'me',  468, 322),  # Me opened with LOGON
-    ]
-
-    results = {}
-
-    for factory, first_player, expected_my, expected_opp in games_to_backfill:
-        game = factory()
-        state = game.state
-        name = state.name
-        print(f"\n{'='*60}")
-        print(f"BACKFILLING: {name} vs {state.opponent_name}")
-        print(f"{'='*60}")
-
-        enriched = enrich_move_history(
-            state.board_moves,
-            state.blank_positions,
-            first_player=first_player
-        )
-
-        # Get final cumulative scores from last move
-        if enriched:
-            final_my = enriched[-1]['cumulative'][0]
-            final_opp = enriched[-1]['cumulative'][1]
-        else:
-            final_my = final_opp = 0
-
-        score_match = (final_my == expected_my and final_opp == expected_opp)
-
-        print(f"  Moves: {len(enriched)}")
-        print(f"  Computed: {final_my}-{final_opp}")
-        print(f"  Expected: {expected_my}-{expected_opp}")
-        print(f"  Match: {'YES' if score_match else 'NO <<<'}")
-
-        if not score_match:
-            # Show per-move breakdown for debugging
-            print(f"\n  Per-move breakdown:")
-            for i, m in enumerate(enriched):
-                flag = ''
-                print(f"    {i+1:2d}. {m['player']:3s} {m['word']:12s} "
-                      f"R{m['row']}C{m['col']} {m['dir']} "
-                      f"= {m['score']:3d}  bag={m['bag']:2d}  "
-                      f"cum=[{m['cumulative'][0]},{m['cumulative'][1]}] "
-                      f"{'BLANK:'+str(m['blanks']) if m['blanks'] else ''} "
-                      f"{m['note']}")
-
-        # Archive completed games
-        if game.is_complete():
-            archive_game(state, enriched)
-            print(f"  Archived: YES")
-        else:
-            print(f"  Archived: NO (game in progress)")
-
-        results[name] = {
-            'enriched': enriched,
-            'computed_my': final_my,
-            'computed_opp': final_opp,
-            'expected_my': expected_my,
-            'expected_opp': expected_opp,
-            'score_match': score_match,
-            'archived': game.is_complete(),
-        }
-
-    # Summary
-    print(f"\n{'='*60}")
-    print("BACKFILL SUMMARY")
-    print(f"{'='*60}")
-    all_match = True
-    for name, res in results.items():
-        status = 'PASS' if res['score_match'] else 'FAIL'
-        if not res['score_match']:
-            all_match = False
-        archived = 'archived' if res['archived'] else 'in progress'
-        print(f"  {name}: {res['computed_my']}-{res['computed_opp']} "
-              f"(expected {res['expected_my']}-{res['expected_opp']}) "
-              f"[{status}] [{archived}]")
-
-    if all_match:
-        print("\nAll scores match.")
-    else:
-        print("\nSome scores did not match -- see per-move breakdown above.")
-
-    return results
+    print("[WARN] backfill_saved_games() is deprecated.")
+    print("  Factory functions were removed in V15.")
+    print("  Use game_library.py for game persistence.")
+    return {}
 
 
 if __name__ == '__main__':

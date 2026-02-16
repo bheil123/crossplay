@@ -38,7 +38,7 @@ def run_benchmark():
     print()
 
     # 2. Single-worker per-game benchmarks
-    from .game_manager import _create_saved_game_5, _create_saved_game_6
+    from .game_library import load_active
     from .move_finder_opt import find_best_score_opt
     from .gaddag import get_gaddag
     from .dictionary import get_dictionary
@@ -78,11 +78,17 @@ def run_benchmark():
 
     game_results = {}
 
-    for label, game_fn in [
-        ("Game 5 (endgame)", _create_saved_game_5),
-        ("Game 6 (early)", _create_saved_game_6),
-    ]:
-        game = game_fn()
+    # Load games from library for benchmarking
+    bench_games = [
+        ("eggsbenny_001 (dense)", load_active("eggsbenny_001")),
+        ("mallenmelon_001 (dense)", load_active("mallenmelon_001")),
+    ]
+    # Filter out games not found in library
+    bench_games = [(l, g) for l, g in bench_games if g is not None]
+    if not bench_games:
+        print("[WARN] No benchmark games found in library. Skipping per-game benchmarks.")
+
+    for label, game in bench_games:
         grid = game.board._grid
         bb_set = {(r - 1, c - 1) for r, c, _ in game.state.blank_positions}
         rack = game.state.your_rack

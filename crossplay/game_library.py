@@ -329,58 +329,21 @@ def get_opponent_stats() -> Dict[str, dict]:
 def migrate_factories() -> dict:
     """One-time migration: create JSON files from factory functions.
 
-    Reads the factory registry in game_manager.py, saves each game
-    to games/active/, and creates games/index.json.
+    NOTE: Factory functions were removed in V15 after the initial migration.
+    This function now only creates an empty index if none exists.
+    The original migration created games/active/*.json files from the
+    hardcoded factory functions that previously lived in game_manager.py.
 
     Returns:
         The new index dict.
     """
-    from .game_manager import (
-        _create_saved_game_5,
-        _create_saved_game_6,
-        _create_saved_game_7,
-        _create_saved_game_8,
-        _create_saved_game_9,
-    )
-
     _ensure_dirs()
     index = load_index()
 
-    # Map: factory -> (opponent, slot, is_completed)
-    factories = [
-        (_create_saved_game_9, 1),   # canjam - slot 1
-        (_create_saved_game_6, 2),   # mallenmelon - slot 2
-        (_create_saved_game_7, 3),   # eggsbenny - slot 3
-        (_create_saved_game_8, 4),   # sophie - slot 4
-        (_create_saved_game_5, None),  # garnetgirl - completed, no slot
-    ]
-
-    print("\n[MIGRATE] Migrating factory functions to game library...")
-
-    for factory, slot in factories:
-        try:
-            game = factory()
-            opponent = game.state.opponent_name.lower()
-            game_id = get_game_id(opponent, index)
-            game.game_id = game_id
-
-            if game.is_complete():
-                # Archive completed games directly
-                archive_completed(game_id, game)
-                print(f"  [ARCHIVE] {game_id}: {game.state.name} vs {opponent} (completed)")
-            else:
-                # Save active games
-                save_active(game_id, game)
-                if slot is not None:
-                    index.setdefault('slots', {})[str(slot)] = game_id
-                print(f"  [ACTIVE] {game_id} -> Slot {slot}: {game.state.name} vs {opponent}")
-
-        except Exception as e:
-            print(f"  [ERROR] Factory failed: {e}")
+    print("\n[MIGRATE] Factory functions were removed in V15.")
+    print("  If games/active/ is empty, restore game JSON files from git.")
 
     save_index(index)
-    print(f"[MIGRATE] Done. {len(factories)} games migrated.")
-    print(f"  Index saved to {INDEX_PATH}")
     return index
 
 
