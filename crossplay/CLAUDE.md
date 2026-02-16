@@ -220,9 +220,24 @@ A pre-commit hook enforces this rule.
 
 ## MC performance profile and optimization ideas
 
-Current: 10 workers (ProcessPoolExecutor), Cython engine, ~2,824 sims/s
-dense, ~789 sims/s very dense. Near-perfect linear scaling (no GIL --
-separate processes). CPUs are at ~100% utilization during MC phase.
+**Benchmarked hardware:**
+
+| Metric           | i7-8700 (desktop)       | i7-1065G7 (laptop)      |
+|------------------|-------------------------|-------------------------|
+| CPU              | 6C/12T, 4.6GHz, 12MB L3 | 4C/8T, 1.3-3.9GHz, 8MB L3 |
+| RAM              | 34GB DDR4-2133          | 16GB LPDDR4             |
+| MC workers       | 10                      | 6                       |
+| Sparse (1w)      | 476 sims/s              | 476 sims/s              |
+| Dense (1w)       | 282 sims/s              | 186 sims/s              |
+| VDense (1w)      | 79 sims/s               | 60 sims/s               |
+| Sparse (Nw)      | 2,856 sims/s            | 2,856 sims/s            |
+| Dense (Nw)       | 2,824 sims/s            | 1,116 sims/s            |
+| VDense (Nw)      | 789 sims/s              | 361 sims/s              |
+
+Sparse boards perform identically per-worker (Ice Lake IPC compensates for
+lower clock). Dense/VDense hit cache harder -- laptop's 8MB L3 vs 12MB L3
+plus fewer workers yields ~40-46% of desktop multi-worker throughput.
+Near-perfect linear scaling (no GIL -- separate processes).
 
 **Tail-call optimization (v13.2):** `_ctx_extend_right()` uses a `while`
 loop to follow existing board tiles without recursion. When the next
@@ -297,9 +312,11 @@ yielding ~5-8% speedup -- not worth the effort.
 
 **Hardware upgrade path (estimated 3-4x total MC throughput):**
 
-Current dev hardware: i7-8700 (6C/12T, 12MB L3, DDR4-2133, ~2,824
-dense sims/s). The 28MB GADDAG data does not fit in the 12MB L3 cache,
-causing frequent DRAM fetches (~75ns) on `_ctx_get_child()` lookups.
+Current dev hardware: i7-8700 desktop (6C/12T, 12MB L3, DDR4-2133,
+~2,824 dense sims/s) and i7-1065G7 laptop (4C/8T, 8MB L3, LPDDR4,
+~1,116 dense sims/s). The 28MB GADDAG data does not fit in either
+machine's L3 cache, causing frequent DRAM fetches (~75ns) on
+`_ctx_get_child()` lookups.
 
 Recommended upgrade: AMD Ryzen 9 9950X3D (~$699) + AM5 motherboard
 (~$270) + 64GB DDR5-6000 (~$170) + cooler (~$35) = ~$1,175 total.
