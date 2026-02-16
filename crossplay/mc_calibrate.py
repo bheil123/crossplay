@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14.0 - MC Calibration Module
+CROSSPLAY V15.0 - MC Calibration Module
 
 Auto-measures MC throughput on the current hardware and computes optimal
 N×K parameters for each game phase. Replaces hardcoded N×K tables.
@@ -216,7 +216,7 @@ def _run_benchmark():
     t_vdense = time.perf_counter() - t0
     sps_vdense = n_vdense / t_vdense
 
-    n_workers = min(10, multiprocessing.cpu_count())
+    n_workers = min(10, max(2, multiprocessing.cpu_count() - 2))
 
     return {
         'sps_sparse_1w': round(sps_sparse, 1),
@@ -435,7 +435,7 @@ def get_env_info() -> dict:
     """Gather environment info for reporting."""
     import sys
     total_cores = os.cpu_count() or 1
-    n_workers = min(10, total_cores)
+    n_workers = min(10, max(2, total_cores - 2))
     
     # Try to get CPU model name
     cpu_model = platform.processor() or "unknown"

@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Dictionary Module
+CROSSPLAY V15 - Dictionary Module
 Word validation and lookup with optional enhanced features.
 """
 

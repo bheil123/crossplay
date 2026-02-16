@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Parallel 2-Ply Evaluation Engine
+CROSSPLAY V15 - Parallel 2-Ply Evaluation Engine
 
 Drop-in replacement for the sequential 2-ply loop in lookahead.py.
 Uses ProcessPoolExecutor to evaluate candidate moves in parallel,
@@ -277,7 +277,8 @@ def evaluate_with_lookahead_parallel(
     # Determine worker count
     if max_workers is None:
         cpu = os.cpu_count() or 1
-        max_workers = min(cpu, 8)  # Cap at 8
+        max_workers = min(cpu - 2, 8)  # Leave 2 threads for main process
+        max_workers = max(max_workers, 2)  # At least 2 workers
 
     # Skip parallel overhead for tiny batches
     if len(candidates) <= 2 or max_workers <= 1:

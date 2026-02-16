@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Self-Play Game Loop for SuperLeaves Training
+CROSSPLAY V15 - Self-Play Game Loop for SuperLeaves Training
 
 Two greedy bots play a full game. Records (leave_key, equity_signal, weight)
 observations for every move where bag > 0.

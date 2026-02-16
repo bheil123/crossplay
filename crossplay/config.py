@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Configuration Constants
+CROSSPLAY V15 - Configuration Constants
 All magic numbers and configuration in one place.
 """
 
@@ -189,7 +189,7 @@ RACK_QUALITY_AMAZING: int = 5
 
 
 if __name__ == "__main__":
-    print("CROSSPLAY V14 CONFIGURATION")
+    print("CROSSPLAY V15 CONFIGURATION")
     print("=" * 50)
     print(f"Board size: {BOARD_SIZE}x{BOARD_SIZE}")
     print(f"Total tiles: {TOTAL_TILES}")

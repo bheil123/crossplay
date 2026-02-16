@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - SuperLeaves Training Pipeline
+CROSSPLAY V15 - SuperLeaves Training Pipeline
 
 Empirical leave value table trained via self-play.
 Replaces hand-tuned formula with ~921K lookup entries.

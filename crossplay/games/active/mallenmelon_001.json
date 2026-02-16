@@ -1,0 +1,142 @@
+{
+  "name": "Game 6",
+  "board_moves": [
+    [
+      "FEIGNS",
+      8,
+      3,
+      true
+    ],
+    [
+      "VIM",
+      7,
+      2,
+      true
+    ],
+    [
+      "DELISTS",
+      6,
+      3,
+      true
+    ],
+    [
+      "HEP",
+      5,
+      4,
+      true
+    ],
+    [
+      "GIFT",
+      4,
+      1,
+      true
+    ],
+    [
+      "TOXIC",
+      1,
+      2,
+      false
+    ],
+    [
+      "ATAP",
+      1,
+      1,
+      true
+    ],
+    [
+      "SLEUTH",
+      8,
+      8,
+      false
+    ],
+    [
+      "OUTWILED",
+      11,
+      7,
+      true
+    ],
+    [
+      "JELLY",
+      8,
+      12,
+      false
+    ],
+    [
+      "AIRWISE",
+      1,
+      9,
+      false
+    ],
+    [
+      "TOE",
+      12,
+      8,
+      true
+    ],
+    [
+      "WHOEVER",
+      4,
+      9,
+      true
+    ],
+    [
+      "AUREOLES",
+      1,
+      14,
+      false
+    ]
+  ],
+  "blank_positions": [
+    [
+      11,
+      12,
+      "L"
+    ],
+    [
+      4,
+      14,
+      "E"
+    ]
+  ],
+  "your_score": 230,
+  "opp_score": 296,
+  "your_rack": "ARAATUN",
+  "bag": [
+    "B",
+    "S",
+    "R",
+    "R",
+    "K",
+    "O",
+    "Z",
+    "Q",
+    "I",
+    "D",
+    "B",
+    "A",
+    "O",
+    "N",
+    "?",
+    "C",
+    "G",
+    "E",
+    "Y",
+    "E",
+    "D",
+    "M",
+    "N",
+    "O",
+    "N",
+    "A"
+  ],
+  "is_your_turn": false,
+  "opponent_name": "mallenmelon",
+  "created_at": "2026-02-12",
+  "updated_at": "2026-02-16T13:17:42.861036",
+  "notes": "Turn 15. Me 230, Opp 296. Bag 25. Opp turn. Down 66. Rack ARAATUN. 2 blanks on board (L in OUTWILED, E in WHOEVER).",
+  "final_turns_remaining": null,
+  "game_id": "mallenmelon_001",
+  "status": "active",
+  "spread": -66,
+  "move_count": 14
+}

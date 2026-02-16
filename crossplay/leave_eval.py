@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Leave Evaluation Module (Bingo-Aware)
+CROSSPLAY V15 - Leave Evaluation Module (Bingo-Aware)
 Evaluate the quality of tiles remaining after a play.
 
 V9 upgrade: Integrates precomputed bingo probability database.

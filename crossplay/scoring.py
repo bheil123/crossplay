@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Scoring Module
+CROSSPLAY V15 - Scoring Module
 Calculate scores for words and moves.
 All positions are 1-indexed.
 """

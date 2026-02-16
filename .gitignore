@@ -19,13 +19,17 @@ build/
 *.html
 build/
 
-# Game saves (local to each machine)
+# Game saves (legacy, replaced by crossplay/games/)
 /crossplay_saves/
 
-# Game archive (local play history)
-game_archive.jsonl
-game_archive_summary.csv
-game_archive_moves.csv
+# Game archive (legacy, replaced by crossplay/games/archive.jsonl)
+crossplay/game_archive.jsonl
+crossplay/game_archive_summary.csv
+crossplay/game_archive_moves.csv
+
+# Game library CSV exports (regenerated on demand)
+crossplay/games/archive_summary.csv
+crossplay/games/archive_moves.csv
 
 # Claude Code local settings
 .claude/

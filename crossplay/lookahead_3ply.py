@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - 3-Ply Lookahead Module
+CROSSPLAY V15 - 3-Ply Lookahead Module
 Deep analysis for endgame situations (bag ≤ 12, unseen ≤ 19).
 
 3-ply: Your move → Opponent's best → Your best response

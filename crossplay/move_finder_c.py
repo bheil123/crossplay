@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - C-accelerated Move Finder
+CROSSPLAY V15 - C-accelerated Move Finder
 
 Uses gaddag_accel.find_moves_c() for GADDAG traversal (the hot path),
 then scores moves in Python (only ~3% of total time).

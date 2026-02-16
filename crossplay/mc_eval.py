@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Monte Carlo 2-Ply Evaluation Engine
+CROSSPLAY V15 - Monte Carlo 2-Ply Evaluation Engine
 
 Proper MC simulation for move evaluation:
     1-ply generates all moves, ranks top N by equity.
@@ -1096,7 +1096,8 @@ def mc_evaluate_2ply(
     # Decide parallel vs sequential
     if max_workers is None:
         cpu = os.cpu_count() or 1
-        max_workers = min(cpu, 10)
+        max_workers = min(cpu - 2, 10)  # Leave 2 threads for main process
+        max_workers = max(max_workers, 2)  # At least 2 workers
 
     # Sequential for small batches or no board_moves
     if board_moves is None or len(candidates) <= 2 or max_workers <= 1:

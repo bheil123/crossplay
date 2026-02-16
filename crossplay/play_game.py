@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CROSSPLAY V14 - Play Against Claude
+CROSSPLAY V15 - Play Against Claude
 
 Interactive game where you play against Claude. Claude uses V7 engine for its moves
 and shows you analysis for your rack.
@@ -323,7 +323,7 @@ class CrossplayGame:
     def play(self):
         """Main game loop."""
         print("\n" + "="*60)
-        print("CROSSPLAY V14 - PLAY AGAINST CLAUDE")
+        print("CROSSPLAY V15 - PLAY AGAINST CLAUDE")
         print("="*60)
         print("\nCommands: play WORD ROW COL H/V | analyze | rack | board | score | exchange | pass | quit")
         print("\nExample: play HELLO 8 4 H")

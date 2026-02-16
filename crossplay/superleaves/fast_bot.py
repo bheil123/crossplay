@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Fast Greedy Bot for SuperLeaves Training
+CROSSPLAY V15 - Fast Greedy Bot for SuperLeaves Training
 
 Selects argmax(score + leave_value) from top moves.
 No MC, no risk analysis -- pure greedy for speed.

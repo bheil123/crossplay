@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14.0 - C-accelerated MC engine with adaptive evaluation.
+CROSSPLAY V15.0 - C-accelerated MC engine with adaptive evaluation.
 
 See VERSIONING.md for version numbering rules.
 See CLAUDE.md for architecture overview and coding conventions.
@@ -7,7 +7,7 @@ See CLAUDE.md for architecture overview and coding conventions.
 Entry point: game_manager.GameManager
 """
 
-__version__ = "14.1.0"
+__version__ = "15.0.0"
 __author__ = "Claude"
 
 # Import main classes for convenience

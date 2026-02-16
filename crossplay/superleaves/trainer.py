@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - SuperLeaves Trainer
+CROSSPLAY V15 - SuperLeaves Trainer
 
 Parallel self-play training with checkpointing and resume.
 

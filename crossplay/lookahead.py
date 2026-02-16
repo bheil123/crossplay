@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Lookahead Module
+CROSSPLAY V15 - Lookahead Module
 2-ply lookahead for better move evaluation.
 
 Uses incremental board updates for fast simulation.

@@ -1,0 +1,148 @@
+{
+  "name": "Game 10",
+  "board_moves": [
+    [
+      "TIX",
+      8,
+      8,
+      true
+    ],
+    [
+      "HAJ",
+      7,
+      9,
+      true
+    ],
+    [
+      "SEW",
+      9,
+      9,
+      true
+    ],
+    [
+      "FURIES",
+      4,
+      12,
+      false
+    ],
+    [
+      "FORE",
+      4,
+      12,
+      true
+    ],
+    [
+      "PERISHER",
+      2,
+      14,
+      false
+    ],
+    [
+      "DEY",
+      3,
+      13,
+      true
+    ],
+    [
+      "PE",
+      2,
+      14,
+      true
+    ],
+    [
+      "FERAL",
+      8,
+      15,
+      false
+    ],
+    [
+      "BAYS",
+      11,
+      14,
+      false
+    ],
+    [
+      "GOBO",
+      10,
+      13,
+      false
+    ],
+    [
+      "HUE",
+      13,
+      12,
+      false
+    ]
+  ],
+  "blank_positions": [
+    [
+      5,
+      14,
+      "I"
+    ]
+  ],
+  "your_score": 220,
+  "opp_score": 156,
+  "your_rack": "WEAIVTC",
+  "bag": [
+    "L",
+    "M",
+    "C",
+    "V",
+    "I",
+    "A",
+    "T",
+    "T",
+    "M",
+    "P",
+    "D",
+    "Z",
+    "E",
+    "K",
+    "T",
+    "I",
+    "A",
+    "G",
+    "A",
+    "T",
+    "L",
+    "S",
+    "?",
+    "A",
+    "D",
+    "D",
+    "I",
+    "?",
+    "O",
+    "R",
+    "N",
+    "U",
+    "E",
+    "I",
+    "N",
+    "O",
+    "O",
+    "E",
+    "Q",
+    "A",
+    "N",
+    "N",
+    "O",
+    "R",
+    "N",
+    "G",
+    "L",
+    "I",
+    "O"
+  ],
+  "is_your_turn": false,
+  "opponent_name": "eggsbenny",
+  "created_at": "2026-02-14",
+  "updated_at": "2026-02-16T13:17:42.861036",
+  "notes": "Game 10. Turn 14. Me 220, Opp 156. Bag 42. Opp turn. Rack WEAIVTC. Up 64.",
+  "final_turns_remaining": null,
+  "game_id": "eggsbenny_001",
+  "status": "active",
+  "spread": 64,
+  "move_count": 12
+}

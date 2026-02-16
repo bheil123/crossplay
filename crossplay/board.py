@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - Board Module
+CROSSPLAY V15 - Board Module
 Board representation and manipulation.
 All positions are 1-indexed externally, 0-indexed internally.
 """

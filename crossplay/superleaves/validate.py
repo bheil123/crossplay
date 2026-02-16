@@ -1,5 +1,5 @@
 """
-CROSSPLAY V14 - SuperLeaves Validation
+CROSSPLAY V15 - SuperLeaves Validation
 
 Head-to-head: SuperLeaves bot vs formula bot.
 Alternates first player. Reports win rate, avg score, spread.

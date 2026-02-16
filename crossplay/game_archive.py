@@ -21,11 +21,14 @@ from .board import Board
 from .scoring import calculate_move_score
 from .config import TILE_DISTRIBUTION, TILE_VALUES, RACK_SIZE, TOTAL_TILES
 
-# Archive file lives next to the code
+# Archive files live in games/ subdirectory (git-tracked)
 _MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
-ARCHIVE_PATH = os.path.join(_MODULE_DIR, 'game_archive.jsonl')
-SUMMARY_CSV_PATH = os.path.join(_MODULE_DIR, 'game_archive_summary.csv')
-MOVES_CSV_PATH = os.path.join(_MODULE_DIR, 'game_archive_moves.csv')
+GAMES_DIR = os.path.join(_MODULE_DIR, 'games')
+ARCHIVE_PATH = os.path.join(GAMES_DIR, 'archive.jsonl')
+SUMMARY_CSV_PATH = os.path.join(GAMES_DIR, 'archive_summary.csv')
+MOVES_CSV_PATH = os.path.join(GAMES_DIR, 'archive_moves.csv')
+# Legacy path (for migration)
+LEGACY_ARCHIVE_PATH = os.path.join(_MODULE_DIR, 'game_archive.jsonl')
 
 
 def _extract_move_tuple(move):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CROSSPLAY V14.0 - Game Manager
+CROSSPLAY V15.0 - Game Manager
 
 Highlights:
   - Cython-accelerated GADDAG move generation (gaddag_accel.so)
@@ -49,7 +49,7 @@ from .mc_eval import mc_evaluate_2ply
 # GAME STATE
 # =============================================================================
 
-SAVE_DIR = '/home/claude/crossplay_saves'
+SAVE_DIR = os.path.join(os.path.expanduser('~'), 'crossplay_saves')
 GADDAG = None  # Loaded on demand
 DICTIONARY = None
 
@@ -134,6 +134,8 @@ class Game:
         self._cached_baseline_threats = [] # Board-wide threat list for Phase 2 context
         self.auto_save = False      # Enable auto-save after each move
         self.save_filename = None   # Consistent filename for auto-save
+        self.game_id = None         # Library game ID (e.g., 'canjam_002')
+        self.last_analysis = None   # MC top 3 from most recent analyze()
         
         # Auto-calibrate MC throughput (cached, runs 3s benchmark once)
         from .mc_calibrate import calibrate
@@ -219,7 +221,10 @@ class Game:
     
     def _auto_save(self):
         """Save game if auto-save is enabled."""
-        if self.auto_save and self.save_filename:
+        if self.auto_save and self.game_id:
+            from . import game_library as lib
+            lib.save_active(self.game_id, self)
+        elif self.auto_save and self.save_filename:
             self.save(self.save_filename, quiet=True)
     
     def is_complete(self) -> bool:
@@ -1154,7 +1159,22 @@ class Game:
                     print(f"\n>> Different recommendations:")
                     print(f"   1-ply: {best_1ply}")
                     print(f"   MC 2-ply: {best_mc}")
-            
+
+            # Store engine recommendation for next play_move() call
+            if results:
+                self.last_analysis = {
+                    'top3': [
+                        {
+                            'word': r['word'],
+                            'score': r['score'],
+                            'equity': r.get('total_equity', 0),
+                            'risk_eq': r.get('risk_adj_equity', r.get('total_equity', 0)),
+                        }
+                        for r in results[:3]
+                        if not r.get('is_exchange', False)
+                    ]
+                }
+
             # Bingo blocking analysis
             if baseline_bingo and baseline_bingo['score'] >= 41:
                 self._show_bingo_blocking_analysis(rack, unseen_str, baseline_bingo, results)
@@ -1767,6 +1787,9 @@ class Game:
         """Play a move. Returns (success, score)."""
         word = word.upper()
 
+        # Capture rack BEFORE the move (for enriched record)
+        rack_before = self.state.your_rack if not is_opponent else None
+
         # Validate word
         if len(word) > 2 and not self.dictionary.is_valid(word):
             print(f"[X] '{word}' is not a valid word!")
@@ -1821,7 +1844,8 @@ class Game:
         # Place word on board
         self.board.place_word(word, row, col, horizontal)
 
-        # Update score
+        # Update score and track drawn tiles
+        drawn_tiles = None
         if is_opponent:
             self.state.opp_score += score
         else:
@@ -1836,6 +1860,7 @@ class Game:
                         rack_list.remove('?')
                 # Draw new tiles
                 new_tiles = self.draw_tiles(len(tiles_used))
+                drawn_tiles = ''.join(new_tiles)
                 rack_list.extend(new_tiles)
                 self.state.your_rack = ''.join(rack_list)
 
@@ -1850,6 +1875,16 @@ class Game:
         # Compute bag count (tiles visible to opponent: bag minus their rack)
         bag_count = max(0, len(self.bag) - RACK_SIZE)
 
+        # Build engine recommendation record (from last analyze())
+        engine_rec = None
+        if not is_opponent and self.last_analysis:
+            top_word = self.last_analysis['top3'][0]['word'] if self.last_analysis.get('top3') else None
+            engine_rec = {
+                'top3': self.last_analysis.get('top3', []),
+                'followed': (word.upper() == top_word.upper()) if top_word else None,
+            }
+            self.last_analysis = None  # Clear after use
+
         # Build enriched move record
         player = self.state.opponent_name if is_opponent else 'me'
         enriched = {
@@ -1862,7 +1897,11 @@ class Game:
             'bag': bag_count,
             'blanks': blank_word_indices,
             'cumulative': [self.state.your_score, self.state.opp_score],
+            'rack': rack_before,
+            'drawn': drawn_tiles,
             'note': 'bingo' if len(tiles_used) >= RACK_SIZE else '',
+            'timestamp': datetime.now().isoformat(),
+            'engine': engine_rec,
         }
         self.state.board_moves.append(enriched)
 
@@ -2108,7 +2147,11 @@ class Game:
             'bag': new_bag_count if new_bag_count is not None else bag_count,
             'blanks': detected_blanks,
             'cumulative': [self.state.your_score, self.state.opp_score],
+            'rack': None,       # Unknown for opponent
+            'drawn': None,      # Unknown for opponent
             'note': 'bingo' if len(new_tile_indices) >= RACK_SIZE else '',
+            'timestamp': datetime.now().isoformat(),
+            'engine': None,     # No engine analysis for opponent moves
         }
         self.state.board_moves.append(enriched)
 
@@ -2159,17 +2202,22 @@ class Game:
         self._check_archive()
     
     def _check_archive(self):
-        """Auto-archive the game when it's complete."""
-        if self.is_complete():
+        """Auto-archive the game when it's complete. Uses game library."""
+        if self.is_complete() and self.game_id:
+            try:
+                from . import game_library as lib
+                lib.archive_completed(self.game_id, self)
+            except Exception as e:
+                print(f"Warning: auto-archive failed: {e}")
+        elif self.is_complete():
+            # Legacy fallback for games without game_id
             try:
                 from .game_archive import enrich_move_history, archive_game
-                # If moves are already enriched dicts, archive directly
                 has_enriched = all(isinstance(m, dict) and m.get('score') is not None
                                   for m in self.state.board_moves)
                 if has_enriched:
                     archive_game(self.state, self.state.board_moves)
                 else:
-                    # Fallback: enrich from tuples (shouldn't happen in live play)
                     enriched = enrich_move_history(
                         self.state.board_moves,
                         self.state.blank_positions,
@@ -2183,6 +2231,7 @@ class Game:
         """Set your rack."""
         self.state.your_rack = rack.upper().replace(' ', '')
         print(f"--> Rack set to: [{' '.join(self.state.your_rack)}]")
+        self._auto_save()
     
     def save(self, filename: str = None, quiet: bool = False) -> str:
         """Save game to file.
@@ -2274,48 +2323,25 @@ def _create_saved_game_5() -> Game:
 
 
 def _create_saved_game_9() -> Game:
-    """Game 9 vs charski. COMPLETED. 480-308 WIN (+172)."""
+    """Game 11 vs canjam. In progress. Turn 5, bag=72."""
     state = GameState(
-        name="Game 9",
+        name="Game 11",
         board_moves=[
-            ('JARL', 6, 8, False),      # Me: JARL R6C8 V for 24 (opening, MC pick)
-            ('VARS', 10, 5, True),      # Opp: VARS R10C5 H for 38 (no blanks, verified; creates JARLS)
-            ('PINCER', 8, 3, True),     # Me: PINCER R8C3 H for 26 (MC pick, double-double + blocking)
-            ('HOB', 5, 9, False),       # Opp: HOB R5C9 V for 24 (no blanks, verified; xwords JO+AB)
-            ('FROW', 3, 10, False),     # Me: FROW R3C10 V for 35 (1-ply + equity pick, hooks HOBS)
-            ('DEAR', 7, 7, False),      # Opp: DEAR R7C7 V for 15 (no blanks, verified; xwords DAB+AL)
-            ('QI', 2, 9, False),        # Me: QI R2C9 V for 36 (equity pick, dump Q)
-            # Opp swapped tiles (turn 8)
-            ('SCRAN', 6, 11, False),    # Me: SCRAN R6C11 V for 30
-            ('MAY', 9, 10, False),      # Opp: MAY R9C10 V for 22 (no blanks)
-            ('KEN', 9, 2, True),        # Me: KEN R9C2 H for 26
-            ('ET', 8, 12, False),       # Opp: ET R8C12 V for 13 (no blanks)
-            ('DUNITES', 12, 4, True),   # Me: DUNITES R12C4 H for 68 (bingo, blank S)
-            ('DIGS', 12, 4, False),     # Opp: DIGS R12C4 V for 24 (no blanks)
-            ('AW', 11, 5, True),        # Me: AW R11C5 H for 42 (MC pick)
-            ('HO', 7, 2, True),         # Opp: HO R7C2 H for 15 (no blanks)
-            ('AZOTE', 4, 1, False),     # Me: AZOTE R4C1 V for 50 (MC pick)
-            ('LIFE', 6, 13, False),     # Opp: LIFE R6C13 V for 20 (no blanks)
-            ('RUGATE', 4, 10, True),    # Me: RUGATE R4C10 H for 42 (MC pick, through R from FROW)
-            ('BEIGE', 1, 12, False),    # Opp: BEIGE R1C12 V for 33 (no blanks)
-            ('PYTHON', 2, 14, False),   # Me: PYTHON R2C14 V for 37 (MC pick)
-            ('TIX', 2, 2, False),       # Opp: TIX R2C2 V for 29 (no blanks)
-            ('REGARD', 14, 2, True),    # Me: REGARD R14C2 H for 28 (MC pick)
-            ('ENGLUT', 15, 7, True),    # Opp: ENGLUT R15C7 H for 32 (blank N)
-            ('DOSSIL', 9, 14, False),   # Me: DOSSIL R9C14 V for 36 (1-ply endgame pick)
-            ('VEST', 12, 12, True),     # Opp: VEST R12C12 H for 42 (final move)
+            ('JINN', 6, 8, False),      # Opp: JINN R6C8 V for 23 (opening)
+            ('LIVEN', 8, 4, True),      # Me: LIVEN R8C4 H for 34 (MC pick, double-double)
+            ('DUH', 5, 8, True),        # Opp: DUH R5C8 H for 28
+            ('BLEB', 7, 2, True),       # Me: BLEB R7C2 H for 27 (MC pick, dumps both Bs)
         ],
-        blank_positions=[(12, 10, 'S'), (15, 8, 'N')],  # Blank S in DUNITES, blank N in ENGLUT
-        your_score=480,
-        opp_score=308,
-        your_rack="",
+        blank_positions=[],
+        your_score=61,
+        opp_score=51,
+        your_rack="HIRCRQI",
         bag=[],
         is_your_turn=False,
-        opponent_name="charski",
-        created_at="2026-02-12",
-        updated_at="2026-02-15",
-        notes="COMPLETED. 480-308 WIN (+172). 28 turns. DOSSIL closed it out.",
-        final_turns_remaining=0,
+        opponent_name="canjam",
+        created_at="2026-02-16",
+        updated_at="2026-02-16",
+        notes="Turn 5. Me 61, Opp 51. Bag 72. Opp turn. Rack HIRCRQI. Up 10."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2359,7 +2385,7 @@ def _create_saved_game_6() -> Game:
 
 
 def _create_saved_game_7() -> Game:
-    """Game 10 vs eggsbenny. In progress. Turn 12, bag=49."""
+    """Game 10 vs eggsbenny. In progress. Turn 14, bag=42."""
     state = GameState(
         name="Game 10",
         board_moves=[
@@ -2373,17 +2399,19 @@ def _create_saved_game_7() -> Game:
             ('PE', 2, 14, True),         # Me: PE R2C14 H for 10 (MC pick, keep bingo rack)
             ('FERAL', 8, 15, False),    # Opp: FERAL R8C15 V for 50 (3W at R12C15, 2L at R8C15)
             ('BAYS', 11, 14, False),    # Me: BAYS R11C14 V for 28 (MC pick, blocks 2W@R14C14)
+            ('GOBO', 10, 13, False),    # Opp: GOBO R10C13 V for 30
+            ('HUE', 13, 12, False),     # Me: HUE R13C12 V for 26
         ],
         blank_positions=[(5, 14, 'I')],
-        your_score=194,
-        opp_score=126,
-        your_rack="CHATEEU",
+        your_score=220,
+        opp_score=156,
+        your_rack="WEAIVTC",
         bag=[],
         is_your_turn=False,
         opponent_name="eggsbenny",
         created_at="2026-02-14",
-        updated_at="2026-02-15",
-        notes="Game 10. Turn 12. Me 194, Opp 126. Bag 49. Opp turn. Rack CHATEEU. Up 68."
+        updated_at="2026-02-16",
+        notes="Game 10. Turn 14. Me 220, Opp 156. Bag 42. Opp turn. Rack WEAIVTC. Up 64."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2391,7 +2419,7 @@ def _create_saved_game_7() -> Game:
 
 
 def _create_saved_game_8() -> Game:
-    """Game 8 vs sophie. In progress. Turn 8, bag=56."""
+    """Game 8 vs sophie. In progress. Turn 13, bag=42."""
     state = GameState(
         name="Game 8",
         board_moves=[
@@ -2402,17 +2430,21 @@ def _create_saved_game_8() -> Game:
             ('CREASES', 11, 1, True),   # Me: CREASES R11C1 H for 65 (bingo!)
             ('AWARE', 11, 4, False),    # Opp: AWARE R11C4 V for 39 (blank E at R15C4)
             ('CEDED', 11, 1, False),    # Me: CEDED R11C1 V for 39 (MC pick, hooks C from CREASES)
+            ('EF', 12, 2, False),       # Opp: EF R12C2 V for 23
+            ('MOGUL', 12, 6, True),     # Me: MOGUL R12C6 H for 30
+            ('HET', 13, 5, False),      # Opp: HET R13C5 V for 18
+            ('PONGO', 6, 4, True),      # Me: PONGO R6C4 H for 13 (MC pick)
         ],
         blank_positions=[(15, 4, 'E')],
-        your_score=156,
-        opp_score=77,
-        your_rack="OGOALMU",
+        your_score=199,
+        opp_score=118,
+        your_rack="SRTLAAN",
         bag=[],
         is_your_turn=False,
         opponent_name="sophie",
         created_at="2026-02-12",
-        updated_at="2026-02-15",
-        notes="Turn 8. Me 156, Opp 77. Bag 56. Opp turn. Rack OGOALMU. Up 79."
+        updated_at="2026-02-16",
+        notes="Turn 13. Me 199, Opp 118. Bag 42. Sophie turn. Rack SRTLAAN. Up 81."
     )
     game = Game(state)
     game.bag = game._calculate_remaining_bag()
@@ -2680,27 +2712,29 @@ class GameManager:
         self._init_default_games()
     
     def _init_default_games(self):
-        """Initialize game slots from saved game registry.
-        
-        Each slot maps to a factory function that returns a Game with
-        its full state. Game identity comes from GameState.name and
-        opponent_name, not from the factory function name.
+        """Initialize game slots from game library.
+
+        Loads slot assignments from games/index.json, then loads each
+        game from games/active/{game_id}.json. On first run, migrates
+        from factory functions automatically.
         """
-        # Registry: slot number -> factory function
-        # Add/remove/reorder entries here as games come and go.
-        _SAVED_GAME_REGISTRY: Dict[int, callable] = {
-            1: _create_saved_game_9,
-            2: _create_saved_game_6,
-            3: _create_saved_game_7,
-            4: _create_saved_game_8,
-        }
-        
+        from . import game_library as lib
+
+        index = lib.ensure_library_initialized()
+        slots = index.get('slots', {})
+
         print("Initializing game slots...")
-        for slot, factory in _SAVED_GAME_REGISTRY.items():
+        for slot_str, game_id in slots.items():
+            slot = int(slot_str)
             if slot > self.MAX_GAMES:
-                break
+                continue
             try:
-                game = factory()
+                game = lib.load_active(game_id)
+                if game is None:
+                    print(f"  Slot {slot}: {game_id} not found in library")
+                    continue
+                game.game_id = game_id
+                game.auto_save = True  # Auto-save enabled for library games
                 self.games[slot] = game
                 s = game.state
                 spread = s.your_score - s.opp_score
@@ -2711,9 +2745,9 @@ class GameManager:
                     status = "Your turn" if s.is_your_turn else f"{s.opponent_name}'s turn"
                 print(f"  Slot {slot}: {s.name} vs {s.opponent_name} "
                       f"({s.your_score}-{s.opp_score}, {'+' if spread >= 0 else ''}{spread}) "
-                      f"| {status}")
+                      f"| {status} [{game_id}]")
             except Exception as e:
-                print(f"  Slot {slot}: ! Failed to load: {e}")
+                print(f"  Slot {slot}: ! Failed to load {game_id}: {e}")
                 self.games[slot] = None
     
     def show_slots(self):
@@ -2755,9 +2789,15 @@ class GameManager:
         if slot < 1 or slot > self.MAX_GAMES:
             print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
             return
-        
+
+        from . import game_library as lib
+
+        # Allocate a game ID from the library
+        index = lib.load_index()
+        game_id = lib.get_game_id(opponent_name, index)
+
         state = GameState(
-            name=f"Game {slot}",
+            name=f"Game {game_id}",
             board_moves=[],
             blank_positions=[],
             your_score=0,
@@ -2769,9 +2809,18 @@ class GameManager:
             created_at=datetime.now().isoformat(),
             updated_at=datetime.now().isoformat(),
         )
-        self.games[slot] = Game(state)
+        game = Game(state)
+        game.game_id = game_id
+        game.auto_save = True
+
+        # Save to library
+        lib.save_active(game_id, game)
+        index['slots'][str(slot)] = game_id
+        lib.save_index(index)
+
+        self.games[slot] = game
         self.current_slot = slot
-        print(f"[OK] New game created in Slot {slot} vs {opponent_name}")
+        print(f"[OK] New game created in Slot {slot} vs {opponent_name} [{game_id}]")
     
     def reset_slot(self, slot: int):
         """Reset a game slot."""
@@ -2853,7 +2902,7 @@ class GameManager:
     def run(self):
         """Main menu loop."""
         print("\n" + "="*60)
-        print("CROSSPLAY V14 - GAME MANAGER")
+        print("CROSSPLAY V15 - GAME MANAGER")
         print("="*60)
         
         while True:
