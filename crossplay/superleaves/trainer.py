@@ -236,10 +236,17 @@ def train(num_games, workers, generation=1, resume_from=None,
         0.0, '', table_size
     )
 
+    # IMPORTANT: On Windows, ProcessPoolExecutor uses 'spawn' which pickles
+    # functions by module path. If this file runs as __main__, the module-level
+    # _init_worker/_play_batch get __module__='__main__' and workers can't find
+    # them. Fix: import from the actual module to ensure correct pickle path.
+    from crossplay.superleaves.trainer import _init_worker as init_fn
+    from crossplay.superleaves.trainer import _play_batch as batch_fn
+
     try:
         with ProcessPoolExecutor(
             max_workers=workers,
-            initializer=_init_worker,
+            initializer=init_fn,
             initargs=(worker_table_path,)
         ) as executor:
             # Submit initial batches to fill the pipeline
@@ -253,7 +260,7 @@ def train(num_games, workers, generation=1, resume_from=None,
                 bs = min(batch_size, games_remaining - submitted_games)
                 if bs <= 0:
                     break
-                fut = executor.submit(_play_batch, bs)
+                fut = executor.submit(batch_fn, bs)
                 futures[fut] = bs
                 submitted_games += bs
 
@@ -322,7 +329,7 @@ def train(num_games, workers, generation=1, resume_from=None,
                     if submitted_games < games_remaining:
                         bs = min(batch_size, games_remaining - submitted_games)
                         if bs > 0:
-                            new_fut = executor.submit(_play_batch, bs)
+                            new_fut = executor.submit(batch_fn, bs)
                             futures[new_fut] = bs
                             submitted_games += bs
 
