@@ -41,6 +41,10 @@ game_archive_moves.csv
 _cmds.txt
 tmp_diff.txt
 
+# SuperLeaves training (local artifacts)
+crossplay/superleaves/status.json
+crossplay/superleaves/*.pkl
+
 # OS
 .DS_Store
 Thumbs.db

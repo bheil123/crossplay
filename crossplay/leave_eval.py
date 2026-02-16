@@ -22,6 +22,26 @@ from .config import (
 VOWELS = set('AEIOU')
 CONSONANTS = set('BCDFGHJKLMNPQRSTVWXYZ')
 
+# --- SuperLeaves table (lazy-loaded) ---
+_SUPERLEAVES = None
+_SUPERLEAVES_CHECKED = False
+
+
+def _load_superleaves():
+    """Try to load trained SuperLeaves table (lazy, once)."""
+    global _SUPERLEAVES, _SUPERLEAVES_CHECKED
+    if _SUPERLEAVES_CHECKED:
+        return
+    _SUPERLEAVES_CHECKED = True
+    sl_path = os.path.join(os.path.dirname(__file__), 'superleaves',
+                           'deployed_leaves.pkl')
+    if os.path.exists(sl_path):
+        try:
+            from .superleaves.leave_table import LeaveTable
+            _SUPERLEAVES = LeaveTable.load(sl_path)
+        except Exception:
+            _SUPERLEAVES = None
+
 # --- Bingo probability database ---
 # Expected bingo score: 40pt bonus + ~37pt average word = ~77pts (Heuri research)
 EXPECTED_BINGO_SCORE = 77.0
@@ -142,6 +162,14 @@ def evaluate_leave(leave: str, bag_empty: bool = False) -> float:
     """
     if not leave:
         return 0.0
+
+    # SuperLeaves lookup (if trained table deployed)
+    if not bag_empty:
+        _load_superleaves()
+        if _SUPERLEAVES is not None:
+            leave_key = tuple(sorted(leave.upper()))
+            if leave_key in _SUPERLEAVES:
+                return _SUPERLEAVES.get(leave_key)
 
     base = _formula_evaluate(leave, bag_empty)
 

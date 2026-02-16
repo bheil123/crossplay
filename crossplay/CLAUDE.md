@@ -71,7 +71,13 @@ game_manager.py          ← Entry point, game loop, AI orchestration
   ├── lookahead_3ply.py  ← 3-ply exhaustive endgame
   ├── parallel_eval.py   ← Multi-worker parallel evaluation
   ├── tile_tracker.py    ← Tile bag and tracking
-  └── play_game.py       ← Game state management
+  ├── play_game.py       ← Game state management
+  └── superleaves/       ← SuperLeaves training pipeline
+      ├── leave_table.py ← LeaveTable class (sorted tuple -> float)
+      ├── fast_bot.py    ← Greedy bot for self-play
+      ├── self_play.py   ← Single-game self-play loop
+      ├── trainer.py     ← Parallel training orchestrator
+      └── validate.py    ← Head-to-head validation
 ```
 
 ## How to run
@@ -271,6 +277,30 @@ dense sims/s (vs current ~2,824). Budget alternative: Ryzen 7 9800X3D
 GPU/CUDA would not help -- GADDAG traversal is serial, branch-heavy
 pointer-chasing through a trie, fundamentally incompatible with GPU
 SIMD architecture.
+
+## SuperLeaves training
+
+On session start, check `crossplay/superleaves/status.json` for training
+status. If status is "running" or "paused", report progress and suggest
+resuming with `python -m crossplay.superleaves.trainer --resume --workers N`.
+
+Quick start:
+```bash
+# Smoke test (100K games, ~2-3 hours)
+python -m crossplay.superleaves.trainer --smoke-test --workers 4
+
+# Full generation (1M games)
+python -m crossplay.superleaves.trainer --workers 6
+
+# Resume interrupted training
+python -m crossplay.superleaves.trainer --resume --workers 6
+
+# Validate trained table vs formula
+python -m crossplay.superleaves.validate --table superleaves/gen1_100000.pkl --games 1000
+```
+
+Training runs in background and does not interfere with game play.
+Use `--workers N` to control CPU usage (lower N = more headroom).
 
 ## Common tasks
 
