@@ -49,12 +49,19 @@ def _init_worker(leave_table_path):
     """Load GADDAG and leave table once per worker process."""
     global _worker_gaddag, _worker_move_finder_cls, _worker_leave_table
     from ..gaddag import get_gaddag
-    from ..move_finder_gaddag import GADDAGMoveFinder
     from .leave_table import LeaveTable
 
     _worker_gaddag = get_gaddag()
-    _worker_move_finder_cls = GADDAGMoveFinder
     _worker_leave_table = LeaveTable.load(leave_table_path)
+
+    # Prefer Cython-accelerated move finder (~5-8x faster)
+    from ..move_finder_c import is_available as c_available
+    if c_available():
+        from ..move_finder_c import CMoveFinder
+        _worker_move_finder_cls = CMoveFinder
+    else:
+        from ..move_finder_gaddag import GADDAGMoveFinder
+        _worker_move_finder_cls = GADDAGMoveFinder
 
 
 def _play_batch(batch_size):

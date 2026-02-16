@@ -336,3 +336,21 @@ def find_all_moves_c(board, gaddag, rack_str: str,
             print(f"    {word} @ {pos}: {reason}", file=sys.stderr)
 
     return validated
+
+
+class CMoveFinder:
+    """Drop-in replacement for GADDAGMoveFinder using Cython acceleration.
+
+    Same interface: __init__(board, gaddag) + find_all_moves(rack_str).
+    Used by SuperLeaves trainer for ~5-8x faster self-play.
+    """
+
+    def __init__(self, board, gaddag=None):
+        self.board = board
+        if gaddag is None:
+            from .gaddag import get_gaddag
+            gaddag = gaddag or get_gaddag()
+        self.gaddag = gaddag
+
+    def find_all_moves(self, rack_str: str) -> List[Dict]:
+        return find_all_moves_c(self.board, self.gaddag, rack_str)
