@@ -1,4 +1,4 @@
-# CLAUDE.md -- Crossplay V15
+# CLAUDE.md -- Crossplay V16
 
 ## What is this project?
 
@@ -158,6 +158,31 @@ equity, plus whether the engine's top pick was followed).
   `baseline_risk`. Surfaces pre-existing board vulnerabilities (open bonus
   squares from earlier moves) that per-move risk analysis doesn't scan.
   Constant across all moves, so informational only -- doesn't change rankings.
+
+## V16 changes: move finder fix + auto-analyze
+
+**Move finder bug fix (all 3 implementations):**
+The GADDAG `_gen_left_part()` function had a guard `if partial_word == 0 and
+limit == 0:` that prevented trying to place the first letter AT an anchor
+square when there was empty space before it (limit > 0). This caused the
+engine to miss valid moves where the word starts at the anchor rather than
+extending left/up first. Example: ENRICHER at R3C14 V (57 pts, blank E) was
+missed in favor of RICH at R3C7 H (16 pts) -- a 41-point miss.
+
+Fixed in all three move finder implementations:
+- `move_finder_opt.py` -- Python fast path (CompactGADDAG), two occurrences
+- `move_finder_gaddag.py` -- Python slow path (tree GADDAG)
+- `gaddag_accel.pyx` -- Cython C extension, two occurrences (rebuilt .pyd)
+
+The fix removes `and limit == 0` from the guard condition. When limit > 0,
+both strategies are now tried: (1) extend left first, (2) start at anchor.
+
+**Auto-analyze after opponent moves:**
+`record_opponent_move()` now automatically runs `analyze()` after recording
+an opponent move (when a rack is set). This ensures the engine recommendation
+is always available before any move is played, preventing situations where a
+suboptimal move is recommended without engine backing. If no rack is set yet,
+threats are shown with a tip to set the rack.
 
 ## Data files (committed, do not regenerate)
 

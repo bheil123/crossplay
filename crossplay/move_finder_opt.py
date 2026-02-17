@@ -552,8 +552,10 @@ def find_all_moves_opt(board, gaddag, rack_str: str,
                                   wlen + 1, rack, limit - 1, blanks_rem - 1,
                                   blanks_used + [pos_idx])
 
-        # At root with limit=0: try placing first letter at anchor
-        if wlen == 0 and limit == 0:
+        # Try placing the first letter AT the anchor (not left of it).
+        # Must run whenever we haven't placed any left-part letters yet,
+        # REGARDLESS of limit.
+        if wlen == 0:
             cc = cross_check(anchor_r0, anchor_c0, horiz)
 
             for letter, idx in rack_letter_indices:

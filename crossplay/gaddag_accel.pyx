@@ -421,8 +421,12 @@ cdef void _gen_left_part(_SearchState st,
                                prefbuf, plen + 1, limit - 1,
                                blanks_rem - 1, blankbuf, nblank + 1)
 
-    # At root with limit=0: single letter at anchor then cross delimiter
-    if plen == 0 and limit == 0:
+    # Try placing the first letter AT the anchor (not left of it).
+    # Must run whenever we haven't placed any left-part letters yet,
+    # REGARDLESS of limit. When limit > 0, both strategies are valid:
+    #   1. Extend left first (handled above)
+    #   2. Start the word at the anchor (handled here)
+    if plen == 0:
         cc_mask = _cross_check_mask(st, anchor_r0, anchor_c0, horiz)
 
         for j in range(st.rack_nletters):
@@ -1341,8 +1345,12 @@ cdef void _ctx_gen_left_part(BoardContext ctx,
                                     blanks_rem - 1, blankbuf, nblank + 1,
                                     rack, rack_nletters, rack_indices)
 
-    # At root with limit=0: single letter at anchor then cross delimiter
-    if plen == 0 and limit == 0:
+    # Try placing the first letter AT the anchor (not left of it).
+    # Must run whenever we haven't placed any left-part letters yet,
+    # REGARDLESS of limit. When limit > 0, both strategies are valid:
+    #   1. Extend left first (handled above)
+    #   2. Start the word at the anchor (handled here)
+    if plen == 0:
         if horiz:
             cc_mask = ctx.cross_h[anchor_r0][anchor_c0]
         else:

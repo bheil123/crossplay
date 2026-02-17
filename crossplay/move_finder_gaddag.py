@@ -412,12 +412,14 @@ class GADDAGMoveFinder:
                         blanks_remaining - 1, new_blanks_used
                     )
         
-        # CRITICAL FIX: When at root with limit=0, we need to try placing
-        # the first letter AT the anchor (not left of it). This is different
-        # from "extending left" - it's starting the word at the anchor.
-        # The GADDAG path for this: letter + DELIMITER + suffix
-        # Only run this when we can't extend left (limit=0) and haven't placed anything yet
-        if len(partial_word) == 0 and limit == 0:
+        # Try placing the first letter AT the anchor (not left of it).
+        # This is different from "extending left" - it's starting the word
+        # at the anchor. The GADDAG path for this: letter + DELIMITER + suffix
+        # Must run whenever we haven't placed any left-part letters yet,
+        # REGARDLESS of limit. When limit > 0, both strategies are valid:
+        #   1. Extend left first (handled above)
+        #   2. Start the word at the anchor (handled here)
+        if len(partial_word) == 0:
             # We're at root with no room to go left, try each letter as word start
             cross_check = self._get_cross_check(anchor_row, anchor_col, horizontal)
             

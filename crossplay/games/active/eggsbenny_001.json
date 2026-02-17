@@ -1,78 +1,188 @@
 {
   "name": "Game 10",
   "board_moves": [
-    [
-      "TIX",
-      8,
-      8,
-      true
-    ],
-    [
-      "HAJ",
-      7,
-      9,
-      true
-    ],
-    [
-      "SEW",
-      9,
-      9,
-      true
-    ],
-    [
-      "FURIES",
-      4,
-      12,
-      false
-    ],
-    [
-      "FORE",
-      4,
-      12,
-      true
-    ],
-    [
-      "PERISHER",
-      2,
-      14,
-      false
-    ],
-    [
-      "DEY",
-      3,
-      13,
-      true
-    ],
-    [
-      "PE",
-      2,
-      14,
-      true
-    ],
-    [
-      "FERAL",
-      8,
-      15,
-      false
-    ],
-    [
-      "BAYS",
-      11,
-      14,
-      false
-    ],
-    [
-      "GOBO",
-      10,
-      13,
-      false
-    ],
-    [
-      "HUE",
-      13,
-      12,
-      false
-    ]
+    {
+      "word": "TIX",
+      "row": 8,
+      "col": 8,
+      "dir": "H",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "HAJ",
+      "row": 7,
+      "col": 9,
+      "dir": "H",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "SEW",
+      "row": 9,
+      "col": 9,
+      "dir": "H",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "FURIES",
+      "row": 4,
+      "col": 12,
+      "dir": "V",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "FORE",
+      "row": 4,
+      "col": 12,
+      "dir": "H",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "PERISHER",
+      "row": 2,
+      "col": 14,
+      "dir": "V",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "DEY",
+      "row": 3,
+      "col": 13,
+      "dir": "H",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "PE",
+      "row": 2,
+      "col": 14,
+      "dir": "H",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "FERAL",
+      "row": 8,
+      "col": 15,
+      "dir": "V",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "BAYS",
+      "row": 11,
+      "col": 14,
+      "dir": "V",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "GOBO",
+      "row": 10,
+      "col": 13,
+      "dir": "V",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "HUE",
+      "row": 13,
+      "col": 12,
+      "dir": "V",
+      "player": null,
+      "score": null,
+      "bag": null,
+      "blanks": [],
+      "cumulative": null,
+      "note": ""
+    },
+    {
+      "word": "ON",
+      "row": 14,
+      "col": 15,
+      "dir": "V",
+      "player": "opp",
+      "score": 6,
+      "bag": 42,
+      "blanks": [],
+      "cumulative": [
+        220,
+        162
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-16T19:46:34.646122",
+      "engine": null
+    },
+    {
+      "word": "VATIC",
+      "row": 6,
+      "col": 5,
+      "dir": "H",
+      "player": "me",
+      "score": 33,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        253,
+        162
+      ],
+      "rack": "WEAIVTC",
+      "drawn": "OILGN",
+      "note": "",
+      "timestamp": "2026-02-16T19:49:11.464781",
+      "engine": null
+    }
   ],
   "blank_positions": [
     [
@@ -81,9 +191,9 @@
       "I"
     ]
   ],
-  "your_score": 220,
-  "opp_score": 156,
-  "your_rack": "WEAIVTC",
+  "your_score": 253,
+  "opp_score": 162,
+  "your_rack": "WEANDDI",
   "bag": [
     "L",
     "M",
@@ -128,21 +238,16 @@
     "N",
     "N",
     "O",
-    "R",
-    "N",
-    "G",
-    "L",
-    "I",
-    "O"
+    "R"
   ],
   "is_your_turn": false,
   "opponent_name": "eggsbenny",
   "created_at": "2026-02-14",
-  "updated_at": "2026-02-16T13:17:42.861036",
+  "updated_at": "2026-02-16T21:42:59.847650",
   "notes": "Game 10. Turn 14. Me 220, Opp 156. Bag 42. Opp turn. Rack WEAIVTC. Up 64.",
   "final_turns_remaining": null,
   "game_id": "eggsbenny_001",
   "status": "active",
-  "spread": 64,
-  "move_count": 12
+  "spread": 81,
+  "move_count": 14
 }

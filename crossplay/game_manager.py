@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CROSSPLAY V15.0 - Game Manager
+CROSSPLAY V16.0 - Game Manager
 
 Highlights:
   - Cython-accelerated GADDAG move generation (gaddag_accel.so)
@@ -2176,23 +2176,36 @@ class Game:
         print(f"\n[NOTE] Recorded: {self.state.opponent_name} played {word} for {score} pts")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score}")
 
-        # Show existing threats (skip when opponent has no turns left)
+        # Auto-analyze after opponent move: always run full analysis so the
+        # engine recommendation is available before any move is played.
+        # The analyze() method already shows threats as its first step.
         ftr = self.state.final_turns_remaining
         if ftr is not None and ftr <= 0:
             print("\n[ENDGAME] Game over -- no turns remaining.")
-        elif ftr == 2 and self.state.is_your_turn:
-            # Opp just emptied bag, you play next, then opp gets final move
-            print("\n[ENDGAME] Bag just emptied -- you play next, then opponent gets final move.")
-            self.show_existing_threats(top_n=5)
-        elif ftr == 1 and self.state.is_your_turn:
-            print("\n[ENDGAME] Bag empty -- your final move (no opponent response). Use 'analyze' for 1-ply ranking.")
-        elif ftr == 1 and not self.state.is_your_turn:
-            print("\n[ENDGAME] Your final turn done -- opponent gets last move.")
-            self.show_existing_threats(top_n=5)
-        elif bag_after == 0:
-            print("\n[ENDGAME] Bag empty -- use 'analyze' for endgame solver.")
+        elif self.state.your_rack:
+            # We have a rack — run full analysis automatically
+            print("\n[AUTO-ANALYZE] Running engine analysis...")
+            try:
+                self.analyze()
+            except Exception as e:
+                print(f"[AUTO-ANALYZE] Analysis failed: {e}")
+                # Fall back to showing threats only
+                self.show_existing_threats(top_n=5)
         else:
-            self.show_existing_threats(top_n=5)
+            # No rack set yet — just show threats
+            if ftr == 2 and self.state.is_your_turn:
+                print("\n[ENDGAME] Bag just emptied -- you play next, then opponent gets final move.")
+                self.show_existing_threats(top_n=5)
+            elif ftr == 1 and self.state.is_your_turn:
+                print("\n[ENDGAME] Bag empty -- your final move (no opponent response).")
+            elif ftr == 1 and not self.state.is_your_turn:
+                print("\n[ENDGAME] Your final turn done -- opponent gets last move.")
+                self.show_existing_threats(top_n=5)
+            elif bag_after == 0:
+                print("\n[ENDGAME] Bag empty.")
+            else:
+                self.show_existing_threats(top_n=5)
+            print("\n[TIP] Set your rack with 'rack LETTERS' then 'analyze' for full engine analysis.")
 
         # Auto-save if enabled
         self._auto_save()
@@ -2678,7 +2691,7 @@ class GameManager:
     def run(self):
         """Main menu loop."""
         print("\n" + "="*60)
-        print("CROSSPLAY V15 - GAME MANAGER")
+        print("CROSSPLAY V16 - GAME MANAGER")
         print("="*60)
         
         while True:
