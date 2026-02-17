@@ -208,6 +208,44 @@
       "note": "",
       "timestamp": "2026-02-16T20:21:44.342603",
       "engine": null
+    },
+    {
+      "word": "MOT",
+      "row": 13,
+      "col": 6,
+      "dir": "H",
+      "player": "opp",
+      "score": 18,
+      "bag": 39,
+      "blanks": [],
+      "cumulative": [
+        236,
+        263
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T05:04:58.070532",
+      "engine": null
+    },
+    {
+      "word": "TURBANS",
+      "row": 6,
+      "col": 11,
+      "dir": "V",
+      "player": "me",
+      "score": 68,
+      "bag": 39,
+      "blanks": [],
+      "cumulative": [
+        304,
+        263
+      ],
+      "rack": "SRTUBAN",
+      "drawn": "BOIZIIE",
+      "note": "bingo",
+      "timestamp": "2026-02-17T05:10:54.294611",
+      "engine": null
     }
   ],
   "blank_positions": [
@@ -217,9 +255,9 @@
       "E"
     ]
   ],
-  "your_score": 236,
-  "opp_score": 245,
-  "your_rack": "SRTUBAN",
+  "your_score": 304,
+  "opp_score": 263,
+  "your_rack": "BOIZIIE",
   "bag": [
     "O",
     "U",
@@ -268,14 +306,14 @@
     "E",
     "Z"
   ],
-  "is_your_turn": false,
+  "is_your_turn": true,
   "opponent_name": "sophie",
   "created_at": "2026-02-12",
-  "updated_at": "2026-02-16T20:21:45.719393",
+  "updated_at": "2026-02-17T05:10:56.396635",
   "notes": "Turn 13. Me 199, Opp 118. Bag 42. Sophie turn. Rack SRTLAAN. Up 81.",
   "final_turns_remaining": null,
   "game_id": "sophie_001",
   "status": "active",
-  "spread": -9,
-  "move_count": 15
+  "spread": 41,
+  "move_count": 17
 }

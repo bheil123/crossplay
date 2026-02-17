@@ -68,6 +68,7 @@ version changes.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 16.1.0 | 2026-02 | `end` command for game completion (archive + clear slot), archive format cleanup |
 | 16.0.0 | 2026-02 | Move finder fix (missed words at anchors with limit>0), auto-analyze after opp moves |
 | 15.0.0 | 2026-02 | Game library persistence (JSON/JSONL), enriched moves, SuperLeaves trainer |
 | 14.1.0 | 2026-02 | Baseline risk, game state updates (charski WIN, eggsbenny FERAL) |

@@ -2637,12 +2637,74 @@ class GameManager:
         self.current_slot = slot
         print(f"[OK] New game created in Slot {slot} vs {opponent_name} [{game_id}]")
     
+    def end_game(self, slot: int = None, result: str = None,
+                 your_score: int = None, opp_score: int = None):
+        """Complete a game: update final scores, archive, and clear slot.
+
+        Args:
+            slot: Slot number (defaults to current_slot)
+            result: 'win', 'loss', or 'tie' (auto-detected from scores if omitted)
+            your_score: Final score (updates game state if provided)
+            opp_score: Final opponent score (updates game state if provided)
+        """
+        if slot is None:
+            slot = self.current_slot
+        if slot < 1 or slot > self.MAX_GAMES:
+            print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
+            return False
+
+        game = self.games.get(slot)
+        if not game:
+            print(f"[X] Slot {slot} is empty")
+            return False
+
+        game_id = game.game_id
+
+        # Update final scores if provided
+        if your_score is not None:
+            game.state.your_score = your_score
+        if opp_score is not None:
+            game.state.opp_score = opp_score
+
+        # Auto-detect result from scores
+        spread = game.state.your_score - game.state.opp_score
+        if result is None:
+            if spread > 0:
+                result = 'win'
+            elif spread < 0:
+                result = 'loss'
+            else:
+                result = 'tie'
+
+        game.state.is_your_turn = False
+        game.state.your_rack = ''
+
+        # Save final state then archive
+        from .game_library import save_active, archive_completed, load_index, save_index
+        save_active(game_id, game)
+
+        # Archive (appends to archive.jsonl, deletes active JSON)
+        archive_completed(game_id, game)
+
+        # Clear slot in index
+        index = load_index()
+        index['slots'][str(slot)] = None
+        save_index(index)
+
+        # Clear in-memory slot
+        self.games[slot] = None
+
+        print(f"[OK] Game over: {result.upper()} {game.state.your_score}-{game.state.opp_score} "
+              f"({'+' if spread >= 0 else ''}{spread}) vs {game.state.opponent_name}")
+        print(f"     Archived as {game_id}, Slot {slot} is now free")
+        return True
+
     def reset_slot(self, slot: int):
         """Reset a game slot."""
         if slot < 1 or slot > self.MAX_GAMES:
             print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
             return
-        
+
         self.games[slot] = None
         print(f"[OK] Slot {slot} reset")
     
@@ -2842,12 +2904,25 @@ class GameManager:
                 else:
                     print("No game in current slot")
             
+            elif action == 'end' and len(parts) >= 3:
+                # end YOUR_SCORE OPP_SCORE [RESULT]
+                # e.g.: end 501 346        -> auto-detects win
+                # e.g.: end 369 436 loss   -> explicit result
+                try:
+                    your_sc = int(parts[1])
+                    opp_sc = int(parts[2])
+                    result = parts[3].lower() if len(parts) >= 4 else None
+                    self.end_game(your_score=your_sc, opp_score=opp_sc, result=result)
+                except Exception as e:
+                    print(f"Error: {e}")
+                    print("Usage: end YOUR_SCORE OPP_SCORE [win/loss/tie]")
+
             elif action == 'save':
                 if game:
                     game.save()
                 else:
                     print("No game in current slot")
-            
+
             elif action == 'reset' and len(parts) >= 2:
                 try:
                     self.reset_slot(int(parts[1]))

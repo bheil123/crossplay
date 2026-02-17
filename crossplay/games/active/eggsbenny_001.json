@@ -242,6 +242,82 @@
         ],
         "followed": true
       }
+    },
+    {
+      "word": "DREW",
+      "row": 12,
+      "col": 8,
+      "dir": "H",
+      "player": "opp",
+      "score": 18,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        279,
+        211
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-16T22:10:53.889680",
+      "engine": null
+    },
+    {
+      "word": "DE",
+      "row": 10,
+      "col": 10,
+      "dir": "H",
+      "player": "me",
+      "score": 25,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        304,
+        211
+      ],
+      "rack": "PEULDI?",
+      "drawn": "NK",
+      "note": "",
+      "timestamp": "2026-02-16T22:16:40.784236",
+      "engine": null
+    },
+    {
+      "word": "QAT",
+      "row": 4,
+      "col": 7,
+      "dir": "V",
+      "player": "opp",
+      "score": 23,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        304,
+        234
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-16T22:18:19.806514",
+      "engine": null
+    },
+    {
+      "word": "KI",
+      "row": 3,
+      "col": 8,
+      "dir": "V",
+      "player": "me",
+      "score": 36,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        340,
+        234
+      ],
+      "rack": "PNULKI?",
+      "drawn": "RI",
+      "note": "",
+      "timestamp": "2026-02-16T22:36:42.360511",
+      "engine": null
     }
   ],
   "blank_positions": [
@@ -251,9 +327,9 @@
       "I"
     ]
   ],
-  "your_score": 279,
-  "opp_score": 193,
-  "your_rack": "PEULDI?",
+  "your_score": 340,
+  "opp_score": 234,
+  "your_rack": "PNULRI?",
   "bag": [
     "L",
     "M",
@@ -300,14 +376,14 @@
     "O",
     "R"
   ],
-  "is_your_turn": false,
+  "is_your_turn": true,
   "opponent_name": "eggsbenny",
   "created_at": "2026-02-14",
-  "updated_at": "2026-02-16T22:04:49.747460",
+  "updated_at": "2026-02-16T22:36:43.157763",
   "notes": "Game 10. Turn 14. Me 220, Opp 156. Bag 42. Opp turn. Rack WEAIVTC. Up 64.",
   "final_turns_remaining": null,
   "game_id": "eggsbenny_001",
   "status": "active",
-  "spread": 86,
-  "move_count": 16
+  "spread": 106,
+  "move_count": 20
 }

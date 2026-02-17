@@ -159,6 +159,18 @@ equity, plus whether the engine's top pick was followed).
   squares from earlier moves) that per-move risk analysis doesn't scan.
   Constant across all moves, so informational only -- doesn't change rankings.
 
+## V16.1 changes: end command for game completion
+
+**`end` command:**
+`end YOUR_SCORE OPP_SCORE [win/loss/tie]` -- completes the current game slot.
+Updates final scores, auto-detects result from spread (or uses explicit result),
+archives to `archive.jsonl` with proper fields, deletes active JSON, and clears
+the slot in `index.json`. This is now the enforced path for completing games --
+no more manual JSON editing or stale active files after games end.
+
+`GameManager.end_game(slot, result, your_score, opp_score)` is the programmatic
+API. Slot defaults to `current_slot`, result auto-detected if omitted.
+
 ## V16 changes: move finder fix + auto-analyze
 
 **Move finder bug fix (all 3 implementations):**
