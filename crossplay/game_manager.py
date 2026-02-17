@@ -1829,10 +1829,9 @@ class Game:
             print(f"[X] Invalid placement: {e}")
             return False, 0
 
-        # Bingo bonus (Crossplay uses 40, not Scrabble's 50)
+        # Bingo bonus -- already included in score from calculate_move_score()
         if len(tiles_used) == 7:
-            score += 40
-            print("[WIN] BINGO! +40 bonus!")
+            print("[WIN] BINGO! (40 bonus included in score)")
 
         # Compute bag count BEFORE placing the move (for final_turns tracking)
         _trk_pre = TileTracker()
@@ -2397,10 +2396,7 @@ def run_simulation(strategy1: Strategy, strategy2: Strategy, num_games: int = 10
                 # Place word
                 board.place_word(word, row, col, horizontal)
                 points = move['score']
-
-                # Bingo bonus (Crossplay uses 40)
-                if len(tiles_used) == 7:
-                    points += 40
+                # Bingo bonus already included in move['score']
 
                 # Update score
                 if turn % 2 == 1:
