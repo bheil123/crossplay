@@ -44,6 +44,7 @@ from .blocked_cache import BlockedSquareCache
 from .lookahead import evaluate_with_lookahead
 from .parallel_eval import evaluate_with_lookahead_parallel
 from .mc_eval import mc_evaluate_2ply
+from .nyt_filter import is_nyt_curated, nyt_warning
 
 # =============================================================================
 # GAME STATE
@@ -743,8 +744,11 @@ class Game:
                 indicator = "Safe"
             elif worst_case < 0:
                 indicator = "!"
-            
-            print(f"{i:<3} {word:<12} {pos:<12} {pts:>4} {risk_display:<20} {leave_value:>+6.1f} {move['dls_penalty']:>+5.1f} {move['dd_bonus']:>+4.1f} {move['turnover_bonus']:>+3.1f} {equity:>+6.0f} {worst_case:>+6.0f}  {indicator}")
+
+            # NYT curated word warning
+            nyt_tag = nyt_warning(word)
+
+            print(f"{i:<3} {word:<12} {pos:<12} {pts:>4} {risk_display:<20} {leave_value:>+6.1f} {move['dls_penalty']:>+5.1f} {move['dd_bonus']:>+4.1f} {move['turnover_bonus']:>+3.1f} {equity:>+6.0f} {worst_case:>+6.0f}  {indicator}{nyt_tag}")
         
         # Top 3 detailed view
         by_equity = analyzed_moves[:3]
@@ -760,7 +764,8 @@ class Game:
             direction = move['direction']
             pts = move['score']
             
-            print(f"\n{i}. {word} @ R{row} C{col} {direction}")
+            nyt_tag = nyt_warning(word)
+            print(f"\n{i}. {word} @ R{row} C{col} {direction}{nyt_tag}")
             print(f"   Score: {pts} | Leave: {move['leave']} ({move['leave_value']:+.1f}) | Risk: {move['expected_risk']:.1f}")
             
             # Show positional heuristics
@@ -1103,18 +1108,23 @@ class Game:
                     risk_eq = m.get('risk_adj_equity', m['total_equity'])
                     risk_eq_str = f" {risk_eq:>+7.1f}"
 
+                # NYT curated word warning
+                nyt_tag = ""
+                if not is_exch and is_nyt_curated(m['word']):
+                    nyt_tag = " [NYT?]"
+
                 if has_pos_adj:
                     pos_adj = m.get('pos_adj_dampened', 0)
                     pos_str = f"{pos_adj:>+5.1f}" if pos_adj != 0 else "    -"
                     print(f"{i:<3} {word_display:<12} {pos:<10} {m['score']:>4} "
                           f"{m['mc_avg_opp']:>6.1f} {m['mc_max_opp']:>6} {m['mc_std_opp']:>5.1f} "
                           f"{m['pct_opp_beats']:>5.1f}% {leave_display:>6} {pos_str:>6} "
-                          f"{m['total_equity']:>+7.1f}{risk_eq_str} {bingo_marker}")
+                          f"{m['total_equity']:>+7.1f}{risk_eq_str} {bingo_marker}{nyt_tag}")
                 else:
                     print(f"{i:<3} {word_display:<12} {pos:<10} {m['score']:>4} "
                           f"{m['mc_avg_opp']:>6.1f} {m['mc_max_opp']:>6} {m['mc_std_opp']:>5.1f} "
                           f"{m['pct_opp_beats']:>5.1f}% {leave_display:>6} "
-                          f"{m['total_equity']:>+7.1f}{risk_eq_str} {bingo_marker}")
+                          f"{m['total_equity']:>+7.1f}{risk_eq_str} {bingo_marker}{nyt_tag}")
             
             # Exchange recommendation if any exchange ranked highly
             best_exch_in_top = None
@@ -1152,13 +1162,13 @@ class Game:
             
             if best_1ply and best_mc:
                 if best_mc_is_exch:
-                    print(f"\n>> MC 2-ply recommends EXCHANGE over 1-ply pick: {best_1ply}")
+                    print(f"\n>> MC 2-ply recommends EXCHANGE over 1-ply pick: {best_1ply}{nyt_warning(best_1ply)}")
                 elif best_1ply == best_mc:
-                    print(f"\n[OK] 1-ply and MC 2-ply agree: {best_1ply}")
+                    print(f"\n[OK] 1-ply and MC 2-ply agree: {best_1ply}{nyt_warning(best_1ply)}")
                 else:
                     print(f"\n>> Different recommendations:")
-                    print(f"   1-ply: {best_1ply}")
-                    print(f"   MC 2-ply: {best_mc}")
+                    print(f"   1-ply: {best_1ply}{nyt_warning(best_1ply)}")
+                    print(f"   MC 2-ply: {best_mc}{nyt_warning(best_mc)}")
 
             # Store engine recommendation for next play_move() call
             if results:

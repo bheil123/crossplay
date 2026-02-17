@@ -1,0 +1,190 @@
+# NYT Curated Words - likely removed from Crossplay dictionary
+# These words exist in NASPA/TWL but are probably NOT in NYT Crossplay's
+# curated dictionary. The engine will warn when recommending these.
+#
+# Sources: NYT confirmed they remove "trademarks, obscenities, and common slurs"
+# from their version of the NASPA Word List 2023.
+#
+# Categories:
+#   [slur]      - Racial, ethnic, homophobic, or ableist slur
+#   [obscenity] - Profanity or vulgar sexual term
+#   [trademark] - Active brand name / registered trademark
+#
+# Confidence levels:
+#   HIGH   - Almost certainly removed (no benign alternate meaning)
+#   MEDIUM - Likely removed (has dual meaning but offensive sense dominates)
+#
+# Words rated LOW confidence (DAMN, HELL, CRAP, etc.) are NOT included
+# because NYT almost certainly keeps common mild terms.
+#
+# To update: add/remove words and restart the engine.
+# The engine loads this file at startup via nyt_filter.py.
+#
+# Last updated: 2026-02-17
+# Estimated count: ~158 words
+
+# === HIGH CONFIDENCE: slurs ===
+COON
+COONS
+FAGGOT
+FAGGOTED
+FAGGOTS
+GOOK
+GOOKS
+KRAUT
+KRAUTS
+MIDGET
+MIDGETS
+REDSKIN
+REDSKINS
+SAMBO
+SAMBOS
+SHEMALE
+SHEMALES
+SPAZ
+SPAZZ
+SPAZZED
+SPAZZES
+SPAZZING
+TRANNIES
+TRANNY
+
+# === HIGH CONFIDENCE: obscenities ===
+ASSHOLE
+ASSHOLES
+BIMBO
+BIMBOS
+BOLLOCKS
+CUNNILINGUS
+DILDO
+DILDOES
+DILDOS
+FELLATIO
+FUCK
+FUCKED
+FUCKER
+FUCKERS
+FUCKING
+FUCKS
+FUCKUP
+FUCKUPS
+MASTURBATE
+MASTURBATED
+MASTURBATES
+MASTURBATING
+MASTURBATION
+SHIT
+SHITS
+SHITTED
+SHITTIER
+SHITTIEST
+SHITTING
+SHITTY
+SKANK
+SKANKS
+SKANKY
+SLUT
+SLUTS
+SLUTTIER
+SLUTTIEST
+SLUTTISH
+SLUTTY
+SODOMITE
+SODOMITES
+SODOMIZE
+SODOMIZED
+SODOMIZES
+SODOMIZING
+SODOMY
+TOSSER
+TOSSERS
+TWAT
+TWATS
+WANKER
+WANKERS
+
+# === HIGH CONFIDENCE: trademarks ===
+BANDAID
+DUMPSTER
+DUMPSTERS
+FORMICA
+GOOGLE
+GOOGLED
+GOOGLES
+GOOGLING
+JACUZZI
+JACUZZIS
+JEEP
+JEEPS
+KLEENEX
+LYCRA
+NOVOCAIN
+NOVOCAINE
+ONESIE
+ONESIES
+PLEXIGLASS
+POPSICLE
+POPSICLES
+PYREX
+REALTOR
+REALTORS
+STYROFOAM
+TEFLON
+VASELINE
+VELCRO
+XEROX
+XEROXED
+XEROXES
+XEROXING
+
+# === MEDIUM CONFIDENCE: dual-meaning but likely removed ===
+ASS
+ASSES
+BITCH
+BITCHED
+BITCHES
+BITCHIER
+BITCHIEST
+BITCHILY
+BITCHING
+BITCHY
+COCK
+COCKED
+COCKING
+COCKS
+DICK
+DICKED
+DICKING
+DICKS
+DYKE
+DYKED
+DYKES
+DYKING
+FAG
+FAGGED
+FAGGING
+FAGS
+HOMO
+HOMOS
+PIMP
+PIMPED
+PIMPING
+PIMPS
+QUEER
+QUEERED
+QUEERER
+QUEEREST
+QUEERING
+QUEERLY
+QUEERNESS
+QUEERS
+RETARD
+RETARDED
+RETARDING
+RETARDS
+TIT
+TITS
+WHORE
+WHORED
+WHORES
+WHORING

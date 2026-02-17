@@ -75,6 +75,8 @@ game_manager.py          <- Entry point, game loop, AI orchestration
   |-- play_game.py       <- Game state management
   |-- game_library.py    <- Game library persistence (CRUD, archive, search)
   |-- game_archive.py    <- Enriched move history + CSV export
+  |-- nyt_filter.py      <- NYT curated word filter ([NYT?] warnings)
+  |-- nyt_curated_words.txt <- Flagged words list (slurs, obscenities, trademarks)
   |-- games/             <- Persistent game library (git-tracked)
   |   |-- index.json     <- Slot assignments + per-opponent counters
   |   |-- active/        <- In-progress games (individual JSON)
@@ -158,6 +160,38 @@ equity, plus whether the engine's top pick was followed).
   `baseline_risk`. Surfaces pre-existing board vulnerabilities (open bonus
   squares from earlier moves) that per-move risk analysis doesn't scan.
   Constant across all moves, so informational only -- doesn't change rankings.
+
+## NYT curated word filter
+
+NYT Crossplay uses a curated NASPA Word List 2023 that removes trademarks,
+obscenities, and common slurs. Our engine uses the full NASPA dictionary,
+so it may recommend words that Crossplay rejects.
+
+**Files:**
+- `nyt_curated_words.txt` -- plain text list of ~158 flagged words, editable
+- `nyt_filter.py` -- loads the list at startup, provides O(1) lookups
+
+**How it works:** When the engine displays move recommendations (1-ply table,
+MC table, detailed top-3, final recommendation), any word on the curated list
+gets a `[NYT?]` tag appended. This is a soft warning -- the word is valid in
+NASPA but probably not in Crossplay.
+
+**Categories:** slurs (38), obscenities (88), trademarks (32). Only HIGH and
+MEDIUM confidence words are included. Mild/common words like DAMN, HELL, CRAP
+are NOT flagged (NYT almost certainly keeps them).
+
+**Maintenance:** If Crossplay rejects a word not on the list, add it to
+`nyt_curated_words.txt`. If a flagged word is actually accepted, remove it.
+
+## V17 roadmap: bingo -> sweep terminology
+
+NYT Crossplay calls a 7-tile play a "sweep" (40 pts), not a "bingo" (50 pts).
+The codebase currently uses "bingo" throughout. Scope: 221 references across
+21 files, 14 variable/constant names to rename, Cython rebuild required.
+Estimated 2-3 hours. Deferred to V17 as a breaking terminology change.
+
+Key renames: `BINGO_BONUS` -> `SWEEP_BONUS`, `bingo_prob` -> `sweep_prob`,
+`is_bingo` -> `is_sweep`, `[!B]` marker -> `[!S]`, `[DB]` -> `[DS]`, etc.
 
 ## V16.1 changes: end command for game completion
 

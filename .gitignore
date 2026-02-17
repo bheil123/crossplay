@@ -31,8 +31,9 @@ crossplay/game_archive_moves.csv
 crossplay/games/archive_summary.csv
 crossplay/games/archive_moves.csv
 
-# Claude Code local settings
-.claude/
+# Claude Code local settings (except settings we want portable)
+.claude/*
+!.claude/settings.local.json
 
 # IDE
 .vscode/
