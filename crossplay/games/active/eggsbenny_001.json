@@ -182,6 +182,66 @@
       "note": "",
       "timestamp": "2026-02-16T19:49:11.464781",
       "engine": null
+    },
+    {
+      "word": "ZA",
+      "row": 5,
+      "col": 6,
+      "dir": "V",
+      "player": "opp",
+      "score": 31,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        253,
+        193
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-16T21:58:38.278327",
+      "engine": null
+    },
+    {
+      "word": "WAND",
+      "row": 12,
+      "col": 11,
+      "dir": "V",
+      "player": "me",
+      "score": 26,
+      "bag": 30,
+      "blanks": [],
+      "cumulative": [
+        279,
+        193
+      ],
+      "rack": "WEANDDI",
+      "drawn": "PEUL?",
+      "note": "",
+      "timestamp": "2026-02-16T22:04:49.747460",
+      "engine": {
+        "top3": [
+          {
+            "word": "WAND",
+            "score": 26,
+            "equity": 8.7,
+            "risk_eq": 5.5
+          },
+          {
+            "word": "DE",
+            "score": 25,
+            "equity": 5.2,
+            "risk_eq": 1.4
+          },
+          {
+            "word": "AND",
+            "score": 21,
+            "equity": 0.3,
+            "risk_eq": 0.3
+          }
+        ],
+        "followed": true
+      }
     }
   ],
   "blank_positions": [
@@ -191,9 +251,9 @@
       "I"
     ]
   ],
-  "your_score": 253,
-  "opp_score": 162,
-  "your_rack": "WEANDDI",
+  "your_score": 279,
+  "opp_score": 193,
+  "your_rack": "PEULDI?",
   "bag": [
     "L",
     "M",
@@ -243,11 +303,11 @@
   "is_your_turn": false,
   "opponent_name": "eggsbenny",
   "created_at": "2026-02-14",
-  "updated_at": "2026-02-16T21:42:59.847650",
+  "updated_at": "2026-02-16T22:04:49.747460",
   "notes": "Game 10. Turn 14. Me 220, Opp 156. Bag 42. Opp turn. Rack WEAIVTC. Up 64.",
   "final_turns_remaining": null,
   "game_id": "eggsbenny_001",
   "status": "active",
-  "spread": 81,
-  "move_count": 14
+  "spread": 86,
+  "move_count": 16
 }

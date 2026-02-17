@@ -1783,8 +1783,17 @@ class Game:
         return -1
     
     def play_move(self, word: str, row: int, col: int, horizontal: bool,
-                  is_opponent: bool = False, rack: str = None) -> Tuple[bool, int]:
-        """Play a move. Returns (success, score)."""
+                  is_opponent: bool = False, rack: str = None,
+                  new_rack: str = None) -> Tuple[bool, int]:
+        """Play a move. Returns (success, score).
+
+        Args:
+            rack: Pre-move rack for tile validation. If None, skips validation.
+            new_rack: Post-move rack (after drawing). If provided, the rack is
+                set to this value after the move instead of simulating a draw.
+                This supports the assisted-play workflow where the user reports
+                their new rack after playing on the real board.
+        """
         word = word.upper()
 
         # Capture rack BEFORE the move (for enriched record)
@@ -1850,7 +1859,24 @@ class Game:
         else:
             self.state.your_score += score
             # Update rack
-            if self.state.your_rack:
+            if new_rack is not None:
+                # User provided post-draw rack directly (assisted play workflow)
+                # Infer drawn tiles by comparing old rack (minus used) to new rack
+                if self.state.your_rack:
+                    old_remaining = list(self.state.your_rack)
+                    for t in tiles_used:
+                        if t in old_remaining:
+                            old_remaining.remove(t)
+                        elif '?' in old_remaining:
+                            old_remaining.remove('?')
+                    # drawn = new_rack minus old_remaining
+                    new_list = list(new_rack)
+                    for t in old_remaining:
+                        if t in new_list:
+                            new_list.remove(t)
+                    drawn_tiles = ''.join(new_list)
+                self.state.your_rack = new_rack
+            elif self.state.your_rack:
                 rack_list = list(self.state.your_rack)
                 for t in tiles_used:
                     if t in rack_list:
@@ -2788,7 +2814,14 @@ class GameManager:
                         row = int(parts[2])
                         col = int(parts[3])
                         horiz = parts[4].upper() == 'H'
-                        game.play_move(word, row, col, horiz, rack=game.state.your_rack)
+                        # Optional 6th arg: new rack after drawing
+                        post_rack = parts[5].upper() if len(parts) >= 6 else None
+                        if post_rack:
+                            # User provided post-draw rack: skip tile validation,
+                            # set rack directly (assisted play workflow)
+                            game.play_move(word, row, col, horiz, new_rack=post_rack)
+                        else:
+                            game.play_move(word, row, col, horiz, rack=game.state.your_rack)
                         game.state.is_your_turn = False
                     except Exception as e:
                         print(f"Error: {e}")

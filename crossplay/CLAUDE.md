@@ -184,6 +184,15 @@ is always available before any move is played, preventing situations where a
 suboptimal move is recommended without engine backing. If no rack is set yet,
 threats are shown with a tip to set the rack.
 
+**Play command with post-draw rack:**
+`play WORD R C H/V [NEW_RACK]` -- optional 6th argument is the post-draw
+rack. When provided, `play_move()` skips tile validation against the current
+rack and sets the rack directly. This handles the assisted-play workflow
+where the user already played on the real board and reports the move with
+their new rack. Drawn tiles are inferred by comparing old rack (minus tiles
+used) to the new rack. Without the 6th arg, the old behavior (validate
+against current rack, simulate draw) is preserved.
+
 ## Data files (committed, do not regenerate)
 
 | File | Size | Purpose |
