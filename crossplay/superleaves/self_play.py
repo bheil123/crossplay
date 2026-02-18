@@ -14,7 +14,7 @@ Gen2 improvements:
 import random
 from ..board import Board
 from ..config import TILE_DISTRIBUTION, RACK_SIZE
-from .fast_bot import select_best_move, compute_tiles_used, compute_leave
+from .fast_bot import select_best_move, compute_leave
 
 
 def play_one_game(gaddag, move_finder_cls, leave_table):

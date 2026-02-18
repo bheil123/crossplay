@@ -355,6 +355,32 @@ class Board:
             self._grid[r][c] = None
 
 
+def tiles_used(board: Board, word: str, row: int, col: int, horizontal: bool) -> list:
+    """Determine which rack tiles a move consumes.
+
+    Iterates the word positions and returns letters that land on empty
+    squares (i.e. tiles that must come from the rack).  Letters that
+    overlap existing board tiles are skipped.
+
+    Args:
+        board: Board instance (1-indexed get_tile).
+        word: The word being played (uppercase).
+        row: Starting row (1-indexed).
+        col: Starting column (1-indexed).
+        horizontal: True for horizontal, False for vertical.
+
+    Returns:
+        List of uppercase letters consumed from the rack.
+    """
+    used = []
+    for i, letter in enumerate(word):
+        r = row if horizontal else row + i
+        c = col + i if horizontal else col
+        if not board.get_tile(r, c):
+            used.append(letter)
+    return used
+
+
 if __name__ == "__main__":
     # Test the board
     board = Board()

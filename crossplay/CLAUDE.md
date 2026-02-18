@@ -62,7 +62,7 @@ game_manager.py          <- Entry point, game loop, AI orchestration
   |-- gaddag_accel.pyx   <- Cython source
   |-- gaddag.py          <- GADDAG trie, auto-build/cache from dictionary
   |-- gaddag_compact.py  <- Compact binary GADDAG format
-  |-- board.py           <- Board representation (15x15 grid)
+  |-- board.py           <- Board representation + tiles_used() utility
   |-- scoring.py         <- Move scoring with bonuses and crosswords
   |-- config.py          <- ALL constants: tile values, distribution, bonuses
   |-- dictionary.py      <- Word validation (196K words)
@@ -326,7 +326,10 @@ parallel workers to avoid Python-C call overhead across process boundaries.
   **0-indexed** internally in `board._grid` and move finders
 - Blanks are tracked as `(row, col, letter)` tuples in `blank_positions`
 - Move dicts use `'direction': 'H'` or `'V'`, plus `'row'`/`'col'` (1-indexed)
-- The `_tiles_used()` method computes which rack tiles a move consumes
+- `board.tiles_used(board, word, row, col, horizontal)` is the canonical
+  utility for computing which rack tiles a move consumes (returns `list`).
+  `game_manager._tiles_used()` and `play_game._tiles_used()` are thin
+  wrappers that return `str` via `''.join()`
 - `GameState.final_turns_remaining` tracks endgame final turns in assisted
   mode: `None` = mid-game (bag not empty), `1` = one final turn left for
   whoever's turn it is, `0` = game over. When `== 1` and it's your turn,

@@ -6,29 +6,7 @@ No MC, no risk analysis -- pure greedy for speed.
 """
 
 from ..config import RACK_SIZE
-
-
-def compute_tiles_used(board, move):
-    """Determine which rack tiles a move consumes.
-
-    Args:
-        board: Board instance (1-indexed get_tile)
-        move: move dict with word, row, col, direction
-
-    Returns:
-        list of letters used from rack
-    """
-    word = move['word']
-    row, col = move['row'], move['col']
-    horiz = move['direction'] == 'H'
-
-    used = []
-    for i, letter in enumerate(word):
-        r = row if horiz else row + i
-        c = col + i if horiz else col
-        if not board.get_tile(r, c):
-            used.append(letter)
-    return used
+from ..board import tiles_used as compute_tiles_used
 
 
 def compute_leave(rack_list, tiles_used):
@@ -77,7 +55,10 @@ def select_best_move(board, moves, rack_list, leave_table, bag_size,
     candidates = moves[:top_k]
 
     for move in candidates:
-        tiles_used = compute_tiles_used(board, move)
+        tiles_used = compute_tiles_used(
+            board, move['word'], move['row'], move['col'],
+            move['direction'] == 'H'
+        )
         leave_key = compute_leave(rack_list, tiles_used)
 
         # move['score'] already includes bingo bonus from find_all_moves

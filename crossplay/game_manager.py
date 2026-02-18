@@ -32,7 +32,7 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
 
-from .board import Board
+from .board import Board, tiles_used as _board_tiles_used
 from .move_finder_gaddag import GADDAGMoveFinder
 from .gaddag import get_gaddag
 from .scoring import calculate_move_score
@@ -1860,17 +1860,10 @@ class Game:
     
     def _tiles_used(self, move: dict, rack: str = None) -> str:
         """Determine which rack tiles a move uses."""
-        word = move['word']
-        row, col = move['row'], move['col']
-        horiz = move['direction'] == 'H'
-        
-        used = []
-        for i, letter in enumerate(word):
-            r = row if horiz else row + i
-            c = col + i if horiz else col
-            if not self.board.get_tile(r, c):
-                used.append(letter)
-        return ''.join(used)
+        return ''.join(_board_tiles_used(
+            self.board, move['word'], move['row'], move['col'],
+            move['direction'] == 'H'
+        ))
     
     def _get_new_tile_word_indices(self, move: dict) -> List[int]:
         """Get list of word indices that correspond to new tiles placed."""
