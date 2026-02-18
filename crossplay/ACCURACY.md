@@ -225,6 +225,83 @@ the conservative view where risk is fully counted, not half-counted.
 
 ---
 
+## NYT CrossBot comparison (canjam_003)
+
+Game replayed through the crossplay engine and compared against NYT
+CrossBot analyzer recommendations. Final score: You 372 - Camjam 378
+(loss by 6). 11 of your turns analyzed.
+
+### Summary table
+
+```
+Turn  You Played  NYT Best   Crossplay #1  NYT vs CP  Notes
+----  ----------  --------   ------------  ---------  -----
+ 1    PILAW(28)   PILAF(26)  PILAW(28)     disagree   NYT prefers leave, CP prefers score
+ 3    FOVEOLE(22) HOOF(27)   HOOF(27)      agree      Both say HOOF; you missed it
+ 5    HAKU(57)    HAKU(57)   HAKU(57)      agree      All three agree
+ 7    RHO(14)     ROIL(17)   ROIL(17)      agree      Both say ROIL; you played safe
+ 9    SIDH(21)    HAVIOR(28) SHOD(21)      3-way      NYT=HAVIOR, CP=SHOD, you=SIDH
+11    BAAL(30)    BEAL(30)   OBOL(30)      3-way      Same score, different leave preferences
+13    IRATE(39)   TRAY(44)   IRATE(39)     disagree   KEY: CP agrees with you, not NYT
+15    PYRROLS(62) PYRROLS(62) PRAY(47)     disagree   CP says PRAY by MC; NYT/you say PYRROLS
+17    STRONGER(55) STRONGER(55) STRONGER(55) agree    All three agree
+19    FRITTS(27)  FRITTS(27) FRITTS(27)    agree      All three agree (near-endgame)
+21    EN(17)      EN(21)     EN@R3C8V(17)  disagree   CP endgame solver proves R3C8V is best
+```
+
+Agreement rate: Crossplay agrees with NYT on 5/11, disagrees on 6/11.
+
+### Key findings
+
+**Finding 1: Turn 21 (EN) — Crossplay endgame solver is correct.**
+NYT says EN at R8C3H for 21 pts. Crossplay's exact 2-ply endgame solver
+(bag=0, opponent rack known: ADGSTV?) shows EN at R3C8V (17 pts) is
+better: net -15 vs -22. The 4-point raw score difference is overwhelmed
+by opponent's response (GAEN 32 vs DAVY 43). This is a case where exact
+endgame search beats greedy scoring.
+
+**Finding 2: Turn 13 (IRATE vs TRAY) — leave-value dependent.**
+NYT prefers TRAY (44 pts, leave EIO) over IRATE (39 pts, leave YO).
+Crossplay's MC 2-ply ranks IRATE #1 (equity -1.5) vs TRAY #5 (equity
+-6.6). The gap is +5.1 equity points — driven by leave valuation.
+SuperLeaves Gen2 training is narrowing this gap (OY-EIO spread went from
++11.36 deployed to +4.75 at Gen2-170K). This finding may flip with
+more training.
+
+**Finding 3: Turn 15 (PYRROLS vs PRAY) — risk/reward tradeoff.**
+Both you and NYT chose PYRROLS (62 pts, sweep bonus). Crossplay MC
+ranks PRAY #1 (equity +21.4) vs PYRROLS #4 (equity +12.8). PRAY scores
+15 less but keeps SOR leave and gives opponent only 29.9 avg response
+vs 46.3 for PYRROLS. The sweep bonus doesn't compensate for the opened
+board. This is a legitimate disagreement about risk tolerance.
+
+**Finding 4: Turn 9 (SIDH vs HAVIOR vs SHOD) — three-way split.**
+NYT says HAVIOR (28 pts), you played SIDH (21 pts, ranked #5 by CP),
+CP says SHOD (21 pts). HAVIOR ranks #20 in MC at equity -23.3, far
+below SHOD at -14.0. HAVIOR scores 7 more but draws a massive avg opp
+response (45.2 vs 37.0) and has high variance (std 24.1). NYT appears
+to overweight raw score here.
+
+### What this reveals about accuracy
+
+1. **Endgame solver is the strongest component.** Turn 21 is the only
+   case where we can prove correctness (deterministic, full information).
+   The solver got it right when NYT's greedy approach didn't.
+
+2. **Leave evaluation drives mid-game disagreements.** Turns 13 and 15
+   both hinge on how much credit to give good leaves. SuperLeaves
+   training will likely shift some of these rankings.
+
+3. **MC opponent modeling catches risk.** Turns 9 and 15 show the MC
+   correctly penalizing high-score moves that open the board. NYT
+   appears to use a simpler model that rewards raw score more.
+
+4. **Opening moves are noise.** Turn 1 (PILAW vs PILAF, 2-point
+   difference) and Turn 11 (BAAL vs BEAL vs OBOL, same score) are
+   within noise of any evaluation method.
+
+---
+
 ## SuperLeaves training plan
 
 ### What are SuperLeaves?
