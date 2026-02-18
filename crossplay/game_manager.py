@@ -985,14 +985,20 @@ class Game:
         unseen_str = ''.join(unseen_tiles)
         total_unseen = sum(unseen.values())
         
-        # Skip MC when bag <= 5 — exhaustive risk + 3-ply give exact results,
-        # and MC just resamples the same small rack pool (<=428 unique racks)
+        # Routing based on bag size:
+        #   bag == 0: deterministic 2-ply (opp rack known exactly)
+        #   bag 1-7:  hybrid near-endgame (exhaustive for bag-emptying moves)
+        #   bag 8+:   Monte Carlo 2-ply sampling
         bag_size = total_unseen - 7  # unseen minus opponent rack
         if bag_size == 0:
             # Bag empty: opponent rack is known exactly — use deterministic 2-ply
             self._show_endgame_2ply(rack, unseen_str, total_unseen)
             return
-        if bag_size <= 5:
+        if 1 <= bag_size <= 7:
+            # Near-endgame: hybrid evaluation. Bag-emptying moves get exact
+            # 3-ply enumeration over all C(unseen,7) opponent racks.
+            # Non-emptying moves keep 1-ply equity.
+            self._show_near_endgame(rack, unseen_str, total_unseen, top_moves)
             return
 
         # Adaptive N×K based on calibrated throughput
@@ -1537,6 +1543,101 @@ class Game:
 
         except Exception as e:
             print(f"Endgame 2-ply error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _show_near_endgame(self, rack: str, unseen_str: str, total_unseen: int, top_moves: list):
+        """Show hybrid near-endgame analysis for bag 1-7.
+
+        Bag-emptying moves get exact 3-ply evaluation (exhaustive enumeration
+        over all possible opponent rack assignments). Non-emptying moves keep
+        their 1-ply equity. This correctly captures the structural advantage
+        of emptying the bag.
+        """
+        from .lookahead_3ply import evaluate_near_endgame
+
+        bag_size = total_unseen - 7
+
+        print(f"\n{'='*70}")
+        print(f"NEAR-ENDGAME HYBRID (bag: {bag_size}, unseen: {total_unseen})")
+        print(f"  Exhaust moves: exact 3-ply over all opponent racks")
+        print(f"  Non-exhaust moves: 1-ply equity (score + leave)")
+        print("=" * 70)
+
+        try:
+            t_start = time.time()
+            results = evaluate_near_endgame(
+                self.board,
+                your_rack=rack,
+                unseen_tiles=unseen_str,
+                candidates=top_moves,
+                gaddag=self.gaddag,
+                board_blanks=self.state.blank_positions,
+                top_n=25,
+            )
+            t_elapsed = time.time() - t_start
+
+            if not results:
+                print("No near-endgame results available.")
+                return
+
+            meta = results[0].get('_meta', {})
+            n_exhaust = meta.get('exhaust_evaluated', 0)
+            n_1ply = meta.get('oneply_evaluated', 0)
+            solver_time = meta.get('elapsed_s', round(t_elapsed, 2))
+            bcf = meta.get('blank_correction', 1.0)
+
+            print(f"  {n_exhaust} exhaust + {n_1ply} non-exhaust candidates | "
+                  f"{solver_time}s | blank_corr={bcf}")
+            print()
+
+            # Table header
+            print(f"{'#':<3} {'Word':<12} {'Pos':<12} {'Pts':>4} "
+                  f"{'Type':<7} {'AvgOpp':>6} {'MaxOpp':>6} {'YourResp':>8} "
+                  f"{'Net Eq':>7} {'Racks':>6}")
+            print("-" * 80)
+
+            for i, r in enumerate(results[:20], 1):
+                pos = f"R{r['row']}C{r['col']} {r['direction']}"
+                etype = r['eval_type']
+                tag = "EXH" if etype == 'exhaust' else "1PL"
+
+                if etype == 'exhaust':
+                    print(f"{i:<3} {r['word']:<12} {pos:<12} {r['score']:>4} "
+                          f"{tag:<7} {r['opp_avg']:>6.1f} {r['opp_max']:>6} "
+                          f"{r['your_resp_avg']:>8.1f} {r['net_equity']:>+7.1f} "
+                          f"{r['n_racks']:>6}")
+                else:
+                    # 1-ply: show leave value instead of opp/resp
+                    lv = r.get('leave_value', 0.0)
+                    leave = r.get('leave', '')
+                    print(f"{i:<3} {r['word']:<12} {pos:<12} {r['score']:>4} "
+                          f"{tag:<7} {'':>6} {'':>6} "
+                          f"{'lv=' + str(lv):>8} {r['net_equity']:>+7.1f} "
+                          f"{'':>6}")
+
+            # Best move summary
+            best = results[0]
+            print(f"\n  Best: {best['word']} @ R{best['row']}C{best['col']} "
+                  f"{best['direction']} ({best['score']} pts)")
+            if best['eval_type'] == 'exhaust':
+                print(f"    Exhaustive 3-ply: score {best['score']} "
+                      f"- avg_opp {best['opp_avg']:.1f} "
+                      f"+ avg_resp {best['your_resp_avg']:.1f} "
+                      f"= net {best['net_equity']:+.1f}")
+                print(f"    Evaluated {best['n_racks']} opponent rack assignments")
+                if best['top_opp_responses']:
+                    print(f"    Top opp responses:")
+                    for resp in best['top_opp_responses'][:3]:
+                        print(f"      {resp['word']}: {resp['count']}x "
+                              f"(max {resp['max_score']} pts)")
+            else:
+                print(f"    1-ply: score {best['score']} + "
+                      f"leave {best['leave_value']:+.1f} "
+                      f"= {best['net_equity']:+.1f}")
+
+        except Exception as e:
+            print(f"Near-endgame error: {e}")
             import traceback
             traceback.print_exc()
 

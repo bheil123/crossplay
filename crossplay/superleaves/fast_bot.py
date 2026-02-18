@@ -52,7 +52,7 @@ def compute_leave(rack_list, tiles_used):
 
 
 def select_best_move(board, moves, rack_list, leave_table, bag_size,
-                     top_k=15):
+                     top_k=30):
     """Select the best move by greedy score + leave evaluation.
 
     Args:

@@ -1,4 +1,4 @@
-# CLAUDE.md -- Crossplay V16
+# CLAUDE.md -- Crossplay V17
 
 ## What is this project?
 
@@ -183,7 +183,32 @@ are NOT flagged (NYT almost certainly keeps them).
 **Maintenance:** If Crossplay rejects a word not on the list, add it to
 `nyt_curated_words.txt`. If a flagged word is actually accepted, remove it.
 
-## V17 roadmap: bingo -> sweep terminology
+## V17 changes: near-endgame evaluator + gen2 training
+
+**Near-endgame hybrid evaluator (`evaluate_near_endgame()` in `lookahead_3ply.py`):**
+When bag has 1-7 tiles, bag-emptying moves get exhaustive 3-ply evaluation over
+all C(unseen, 7) opponent rack combinations (8-3432 combos, all tractable). Non-emptying
+moves keep 1-ply equity. This captures the structural advantage of knowing the
+opponent's exact rack when you empty the bag. Two-pass approach: instant 1-ply
+candidates first, then exhaust candidates under time budget. Routing in
+`game_manager.py._show_2ply_analysis()` triggers when `1 <= bag_size <= 7`.
+
+**Gen2 training signal improvements (`self_play.py`):**
+- Equity-based signal: `signal = move_equity - top_score_equity` (not game-mean)
+- Outcome-weighted: `outcome_mult = 1.0 + 0.3 * clamp(spread / 150, -1, 1)`
+- Expanded `top_k=30` in `fast_bot.py` (was 15)
+
+**Cross-generation training (`trainer.py --init-from`):**
+`--init-from gen1_350000.pkl` loads a previous generation's table as starting point
+for the next generation (starts at 0 games, not resume).
+
+**Gen1 results:** 350K games, 921K leave entries. Validated at parity with formula
+(498-501 over 1000 games, +2.9 avg spread). Deployed as `deployed_leaves.pkl`.
+
+**Gen2 status:** Training 700K games with 4 workers, initialized from gen1.
+Check `superleaves/status.json` for progress.
+
+## V18 roadmap: bingo -> sweep terminology
 
 NYT Crossplay calls a 7-tile play a "sweep" (40 pts), not a "bingo" (50 pts).
 The codebase currently uses "bingo" throughout. Scope: 221 references across
@@ -429,15 +454,22 @@ Quick start:
 # Smoke test (100K games, ~2-3 hours)
 python -m crossplay.superleaves.trainer --smoke-test --workers 4
 
-# Full generation (1M games)
-python -m crossplay.superleaves.trainer --workers 6
+# Full gen1 (350K games, ~22 hours with 4 workers)
+python -m crossplay.superleaves.trainer --workers 4 --games 350000
+
+# Gen2 from gen1 (700K games, equity-based signal)
+python -m crossplay.superleaves.trainer --generation 2 --workers 4 --games 700000 --init-from gen1_350000.pkl
 
 # Resume interrupted training
-python -m crossplay.superleaves.trainer --resume --workers 6
+python -m crossplay.superleaves.trainer --resume --generation 2 --workers 4
 
 # Validate trained table vs formula
-python -m crossplay.superleaves.validate --table superleaves/gen1_100000.pkl --games 1000
+python -m crossplay.superleaves.validate --table superleaves/gen1_350000.pkl --games 1000
 ```
+
+**Deployment:** Copy a checkpoint to `deployed_leaves.pkl` in the superleaves
+directory. `leave_eval.py` lazy-loads this file and uses trained values before
+falling back to formula. Gen1 is currently deployed.
 
 Training runs in background and does not interfere with game play.
 Uses `Board()` directly (no `Game` class), so it does not trigger game

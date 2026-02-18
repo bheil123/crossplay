@@ -206,6 +206,82 @@
       "note": "",
       "timestamp": "2026-02-16T22:59:48.271687",
       "engine": null
+    },
+    {
+      "word": "HOD",
+      "row": 13,
+      "col": 8,
+      "dir": "H",
+      "player": "opp",
+      "score": 18,
+      "bag": 12,
+      "blanks": [],
+      "cumulative": [
+        247,
+        359
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T10:59:45.428377",
+      "engine": null
+    },
+    {
+      "word": "AGOG",
+      "row": 1,
+      "col": 1,
+      "dir": "V",
+      "player": "opp",
+      "score": 24,
+      "bag": 19,
+      "blanks": [],
+      "cumulative": [
+        247,
+        383
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T17:05:11.650752",
+      "engine": null
+    },
+    {
+      "word": "AGOG",
+      "row": 1,
+      "col": 1,
+      "dir": "V",
+      "player": "opp",
+      "score": 24,
+      "bag": 19,
+      "blanks": [],
+      "cumulative": [
+        247,
+        407
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T17:15:29.697913",
+      "engine": null
+    },
+    {
+      "word": "CONTRAS",
+      "row": 14,
+      "col": 2,
+      "dir": "H",
+      "player": "me",
+      "score": 73,
+      "bag": 19,
+      "blanks": [],
+      "cumulative": [
+        333,
+        383
+      ],
+      "rack": "ARSOTCN",
+      "drawn": "RKBYBEI",
+      "note": "",
+      "timestamp": "2026-02-17T17:45:07.302326",
+      "engine": null
     }
   ],
   "blank_positions": [
@@ -220,29 +296,22 @@
       "E"
     ]
   ],
-  "your_score": 247,
-  "opp_score": 341,
-  "your_rack": "ARSOTUN",
+  "your_score": 333,
+  "opp_score": 383,
+  "your_rack": "RKBYBEI",
   "bag": [
-    "B",
     "S",
     "R",
-    "R",
-    "K",
     "O",
     "Z",
     "Q",
-    "I",
     "D",
-    "B",
     "A",
     "O",
     "N",
     "?",
     "C",
     "G",
-    "E",
-    "Y",
     "E",
     "D",
     "M",
@@ -254,11 +323,11 @@
   "is_your_turn": true,
   "opponent_name": "mallenmelon",
   "created_at": "2026-02-12",
-  "updated_at": "2026-02-16T22:59:49.835096",
+  "updated_at": "2026-02-17T17:45:07.302326",
   "notes": "Turn 15. Me 230, Opp 296. Bag 25. Opp turn. Down 66. Rack ARAATUN. 2 blanks on board (L in OUTWILED, E in WHOEVER).",
   "final_turns_remaining": null,
   "game_id": "mallenmelon_001",
   "status": "active",
-  "spread": -94,
-  "move_count": 16
+  "spread": -50,
+  "move_count": 20
 }

@@ -1,17 +1,22 @@
-# Crossplay V14.0
+# Crossplay V17.0
 
-A Crossplay (Scrabble variant) engine with Monte Carlo AI evaluation.
+A Crossplay (Scrabble variant) engine with Monte Carlo AI evaluation,
+trained SuperLeaves, and near-endgame hybrid evaluation.
 See `VERSIONING.md` for version numbering rules.
 
-## What's New in v14.0
+## What's New in V17.0
 
-- Flattened repo structure: package directory renamed from `crossplay_v9` to `crossplay`
-- Unified version numbering across all modules
-- Phase 2 positional adjustments carried into MC ranking (blocking/risk)
-- MC blank correction factor for multi-blank boards
-- Endgame final_turns_remaining fix
-- VALID_TWO_LETTER dictionary corrections (DI/OU removed, TE added)
-- Version governance via VERSIONING.md
+- **Near-endgame hybrid evaluator** (bag 1-7): exhaustive 3-ply for bag-emptying
+  moves with deterministic opponent rack enumeration; 1-ply equity for non-emptying
+  moves. Handles the structural advantage of knowing opponent's rack when you empty the bag.
+- **SuperLeaves gen1 trained and deployed** (350K self-play games): replaces formula-based
+  leave evaluation with EMA-trained values for 921K leave patterns. Gen1 validated at
+  parity with formula (498-501 over 1000 games, +2.9 avg spread).
+- **Gen2 training pipeline** with improved signal: equity-based signal
+  (`move_equity - top_score_equity`), outcome-weighted scaling, expanded top_k=30.
+  Supports `--init-from` for cross-generation bootstrapping.
+- **Parallel self-play training**: 4-worker parallel training with checkpointing,
+  resume, and live status reporting via `status.json`.
 
 ## Quick Start
 

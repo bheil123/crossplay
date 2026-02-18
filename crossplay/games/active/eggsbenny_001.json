@@ -318,6 +318,120 @@
       "note": "",
       "timestamp": "2026-02-16T22:36:42.360511",
       "engine": null
+    },
+    {
+      "word": "ZAG",
+      "row": 5,
+      "col": 6,
+      "dir": "V",
+      "player": "opp",
+      "score": 15,
+      "bag": 20,
+      "blanks": [],
+      "cumulative": [
+        340,
+        249
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T10:54:52.242761",
+      "engine": null
+    },
+    {
+      "word": "PURLINS",
+      "row": 2,
+      "col": 2,
+      "dir": "H",
+      "player": "me",
+      "score": 74,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        414,
+        249
+      ],
+      "rack": "PNULRI?",
+      "drawn": "METIOT?",
+      "note": "bingo",
+      "timestamp": "2026-02-17T10:58:41.833921",
+      "engine": null
+    },
+    {
+      "word": "CONE",
+      "row": 1,
+      "col": 1,
+      "dir": "H",
+      "player": "opp",
+      "score": 49,
+      "bag": 9,
+      "blanks": [],
+      "cumulative": [
+        411,
+        298
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T13:19:58.780545",
+      "engine": null
+    },
+    {
+      "word": "LAMA",
+      "row": 13,
+      "col": 5,
+      "dir": "H",
+      "player": "opp",
+      "score": 12,
+      "bag": 3,
+      "blanks": [],
+      "cumulative": [
+        411,
+        210
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T14:07:19.256838",
+      "engine": null
+    },
+    {
+      "word": "EGOTISM",
+      "row": 14,
+      "col": 1,
+      "dir": "H",
+      "player": "me",
+      "score": 93,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        504,
+        310
+      ],
+      "rack": "MGEIOT?",
+      "drawn": "OIS",
+      "note": "bingo",
+      "timestamp": "2026-02-17T14:53:19.202658",
+      "engine": null
+    },
+    {
+      "word": "VALET",
+      "row": 11,
+      "col": 1,
+      "dir": "V",
+      "player": "opp",
+      "score": 39,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        507,
+        349
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T14:53:19.524841",
+      "engine": null
     }
   ],
   "blank_positions": [
@@ -327,9 +441,9 @@
       "I"
     ]
   ],
-  "your_score": 340,
-  "opp_score": 234,
-  "your_rack": "PNULRI?",
+  "your_score": 507,
+  "opp_score": 349,
+  "your_rack": "OIS",
   "bag": [
     "L",
     "M",
@@ -379,11 +493,11 @@
   "is_your_turn": true,
   "opponent_name": "eggsbenny",
   "created_at": "2026-02-14",
-  "updated_at": "2026-02-16T22:36:43.157763",
+  "updated_at": "2026-02-17T14:53:19.527824",
   "notes": "Game 10. Turn 14. Me 220, Opp 156. Bag 42. Opp turn. Rack WEAIVTC. Up 64.",
-  "final_turns_remaining": null,
+  "final_turns_remaining": 2,
   "game_id": "eggsbenny_001",
   "status": "active",
-  "spread": 106,
-  "move_count": 20
+  "spread": 158,
+  "move_count": 26
 }

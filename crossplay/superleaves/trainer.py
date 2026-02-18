@@ -180,7 +180,7 @@ def find_latest_checkpoint(generation=None):
 
 def train(num_games, workers, generation=1, resume_from=None,
           resume_games=0, batch_size=100, checkpoint_every=10000,
-          report_every=1000, is_smoke_test=False):
+          report_every=1000, is_smoke_test=False, init_from=None):
     """Run training for one generation.
 
     Args:
@@ -193,6 +193,9 @@ def train(num_games, workers, generation=1, resume_from=None,
         checkpoint_every: save checkpoint every N games
         report_every: print progress every N games
         is_smoke_test: if True, status shows "smoke_test"
+        init_from: path to a previous generation's checkpoint to use as
+                   starting point (e.g., gen1 table for gen2 training).
+                   Unlike resume, this starts at 0 games completed.
     """
     from .leave_table import LeaveTable
 
@@ -201,6 +204,10 @@ def train(num_games, workers, generation=1, resume_from=None,
         print(f"Resuming from checkpoint: {resume_from}")
         print(f"  Games already completed: {resume_games:,}")
         table = LeaveTable.load(resume_from)
+    elif init_from:
+        print(f"Initializing from previous generation: {init_from}")
+        table = LeaveTable.load(init_from)
+        print(f"  Loaded {len(table):,} leave entries as starting point")
     else:
         print("Bootstrapping leave table from formula...")
         table = LeaveTable()
@@ -415,6 +422,9 @@ def main():
                         help='Quick 100K game smoke test')
     parser.add_argument('--resume', action='store_true',
                         help='Resume from latest checkpoint')
+    parser.add_argument('--init-from', type=str, default=None,
+                        help='Initialize from a previous generation checkpoint '
+                             '(e.g., gen1_350000.pkl for gen2 training)')
     parser.add_argument('--batch-size', type=int, default=100,
                         help='Games per worker batch (default: 100)')
     parser.add_argument('--checkpoint-every', type=int, default=10000,
@@ -450,6 +460,13 @@ def main():
         else:
             print("No checkpoint found, starting fresh.")
 
+    # Resolve --init-from path (support bare filenames in superleaves dir)
+    init_from = args.init_from
+    if init_from and not os.path.isabs(init_from):
+        candidate = os.path.join(_superleaves_dir(), init_from)
+        if os.path.exists(candidate):
+            init_from = candidate
+
     train(
         num_games=num_games,
         workers=args.workers,
@@ -459,7 +476,8 @@ def main():
         batch_size=args.batch_size,
         checkpoint_every=args.checkpoint_every,
         report_every=args.report_every,
-        is_smoke_test=is_smoke
+        is_smoke_test=is_smoke,
+        init_from=init_from
     )
 
 

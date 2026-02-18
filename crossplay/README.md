@@ -1,17 +1,16 @@
-# Crossplay V14.0
+# Crossplay V17.0
 
-A Crossplay (Scrabble variant) engine with Monte Carlo AI evaluation.
+A Crossplay (Scrabble variant) engine with Monte Carlo AI evaluation,
+trained SuperLeaves, and near-endgame hybrid evaluation.
 See `VERSIONING.md` for version numbering rules.
 
-## What's New in v14.0
+## What's New in V17.0
 
-- Flattened repo structure: package directory renamed from `crossplay_v9` to `crossplay`
-- Unified version numbering across all modules
-- Phase 2 positional adjustments carried into MC ranking (blocking/risk)
-- MC blank correction factor for multi-blank boards
-- Endgame final_turns_remaining fix
-- VALID_TWO_LETTER dictionary corrections (DI/OU removed, TE added)
-- Version governance via VERSIONING.md
+- **Near-endgame hybrid evaluator** (bag 1-7): exhaustive 3-ply for bag-emptying
+  moves, 1-ply equity for non-emptying moves
+- **SuperLeaves gen1 deployed** (350K games, 921K leave patterns)
+- **Gen2 training** with equity-based signal, outcome weighting, cross-generation bootstrapping
+- **Parallel self-play training** with checkpointing and live status
 
 ## Quick Start
 
@@ -65,7 +64,7 @@ python3 setup_accel.py build_ext --inplace
 | `leave_eval.py` | Leave (remaining rack) evaluation |
 | `real_risk.py` | Opponent threat analysis |
 | `lookahead.py` | 1-ply lookahead evaluation |
-| `lookahead_3ply.py` | 3-ply exhaustive endgame |
+| `lookahead_3ply.py` | 3-ply exhaustive endgame + near-endgame hybrid evaluator |
 | `parallel_eval.py` | Multi-worker parallel evaluation |
 | `opening_heuristics.py` | Opening move strategy |
 | `power_tiles.py` | High-value tile tracking |

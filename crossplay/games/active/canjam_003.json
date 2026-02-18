@@ -57,12 +57,278 @@
       "note": "",
       "timestamp": "2026-02-17T08:48:42.032580",
       "engine": null
+    },
+    {
+      "word": "YOGI",
+      "row": 11,
+      "col": 10,
+      "dir": "V",
+      "player": "opp",
+      "score": 31,
+      "bag": 67,
+      "blanks": [],
+      "cumulative": [
+        50,
+        65
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T09:55:21.899523",
+      "engine": null
+    },
+    {
+      "word": "HAKU",
+      "row": 12,
+      "col": 9,
+      "dir": "V",
+      "player": "me",
+      "score": 57,
+      "bag": 63,
+      "blanks": [],
+      "cumulative": [
+        107,
+        65
+      ],
+      "rack": "HURRAHK",
+      "drawn": "IHLO",
+      "note": "",
+      "timestamp": "2026-02-17T09:59:41.167424",
+      "engine": null
+    },
+    {
+      "word": "ZONAE",
+      "row": 11,
+      "col": 12,
+      "dir": "V",
+      "player": "opp",
+      "score": 60,
+      "bag": 58,
+      "blanks": [],
+      "cumulative": [
+        107,
+        125
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T10:12:08.213150",
+      "engine": null
+    },
+    {
+      "word": "RHO",
+      "row": 3,
+      "col": 10,
+      "dir": "V",
+      "player": "me",
+      "score": 14,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        121,
+        125
+      ],
+      "rack": "IHRRHLO",
+      "drawn": "AOD",
+      "note": "",
+      "timestamp": "2026-02-17T10:27:35.383175",
+      "engine": null
+    },
+    {
+      "word": "QUEST",
+      "row": 1,
+      "col": 12,
+      "dir": "V",
+      "player": "opp",
+      "score": 54,
+      "bag": 50,
+      "blanks": [],
+      "cumulative": [
+        121,
+        179
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T10:35:45.209847",
+      "engine": null
+    },
+    {
+      "word": "SIDH",
+      "row": 4,
+      "col": 12,
+      "dir": "H",
+      "player": "me",
+      "score": 21,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        142,
+        179
+      ],
+      "rack": "IHAROLD",
+      "drawn": "BEA",
+      "note": "",
+      "timestamp": "2026-02-17T10:47:55.010850",
+      "engine": null
+    },
+    {
+      "word": "BACH",
+      "row": 1,
+      "col": 15,
+      "dir": "V",
+      "player": "opp",
+      "score": 19,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        142,
+        198
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T11:19:00.673405",
+      "engine": null
+    },
+    {
+      "word": "BAAL",
+      "row": 2,
+      "col": 9,
+      "dir": "V",
+      "player": "me",
+      "score": 30,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        172,
+        198
+      ],
+      "rack": "BEAROLA",
+      "drawn": "YITA",
+      "note": "",
+      "timestamp": "2026-02-17T11:27:35.619754",
+      "engine": null
+    },
+    {
+      "word": "MUX",
+      "row": 12,
+      "col": 13,
+      "dir": "V",
+      "player": "opp",
+      "score": 29,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        172,
+        227
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T11:31:36.394225",
+      "engine": null
+    },
+    {
+      "word": "IRATE",
+      "row": 10,
+      "col": 14,
+      "dir": "V",
+      "player": "me",
+      "score": 39,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        211,
+        227
+      ],
+      "rack": "YEIROTA",
+      "drawn": "RSPR?",
+      "note": "",
+      "timestamp": "2026-02-17T11:45:33.751211",
+      "engine": null
+    },
+    {
+      "word": "MINES",
+      "row": 8,
+      "col": 15,
+      "dir": "V",
+      "player": "opp",
+      "score": 52,
+      "bag": 27,
+      "blanks": [],
+      "cumulative": [
+        211,
+        279
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T11:52:11.302837",
+      "engine": null
+    },
+    {
+      "word": "PYRROLS",
+      "row": 6,
+      "col": 3,
+      "dir": "H",
+      "player": "me",
+      "score": 66,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        277,
+        279
+      ],
+      "rack": "YRSOPR?",
+      "drawn": "RNOTEG?",
+      "note": "bingo",
+      "timestamp": "2026-02-17T12:01:13.259859",
+      "engine": null
+    },
+    {
+      "word": "JO",
+      "row": 7,
+      "col": 14,
+      "dir": "V",
+      "player": "opp",
+      "score": 35,
+      "bag": 18,
+      "blanks": [],
+      "cumulative": [
+        273,
+        314
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T12:18:52.302889",
+      "engine": null
+    },
+    {
+      "word": "STRONGER",
+      "row": 4,
+      "col": 6,
+      "dir": "V",
+      "player": "me",
+      "score": 56,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        329,
+        314
+      ],
+      "rack": "RNOTEG?",
+      "drawn": "FNRTTII",
+      "note": "bingo",
+      "timestamp": "2026-02-17T12:30:52.375192",
+      "engine": null
     }
   ],
   "blank_positions": [],
-  "your_score": 50,
-  "opp_score": 34,
-  "your_rack": "HURRAHK",
+  "your_score": 328,
+  "opp_score": 314,
+  "your_rack": "FNRTTII",
   "bag": [
     "G",
     "S",
@@ -165,14 +431,14 @@
     "D",
     "A"
   ],
-  "is_your_turn": true,
+  "is_your_turn": false,
   "opponent_name": "canjam",
   "created_at": "2026-02-17",
-  "updated_at": "2026-02-17T08:48:47.061452",
+  "updated_at": "2026-02-17T12:30:54.329959",
   "notes": "Game 12 vs canjam. Opening move.",
   "final_turns_remaining": null,
   "game_id": "canjam_003",
   "status": "active",
-  "spread": 16,
-  "move_count": 3
+  "spread": 14,
+  "move_count": 17
 }

@@ -497,6 +497,330 @@ def _limit_blanks(tiles: str, max_blanks: int = 1) -> str:
     return ''.join(result)
 
 
+def evaluate_near_endgame(
+    board: Board,
+    your_rack: str,
+    unseen_tiles: str,
+    candidates: List[Dict],
+    gaddag=None,
+    board_blanks: List[Tuple[int, int, str]] = None,
+    top_n: int = 25,
+    time_budget: float = 45.0,
+) -> List[Dict]:
+    """
+    Hybrid evaluation for near-endgame positions (bag 1-7).
+
+    For each candidate move, checks whether it empties the bag:
+      - YES (tiles_used >= bag_size): Exhaustive 3-ply evaluation over all
+        possible opponent rack assignments. Since emptying the bag makes all
+        racks deterministic, this is exact (no sampling, no leave heuristics).
+        Enumerates C(unseen, 7) opponent racks × endgame 2-ply for each.
+      - NO: Uses 1-ply equity from the pre-ranked candidate (score + leave).
+
+    The "exhaust" candidates get much more accurate evaluation than MC could
+    provide, correctly capturing the structural advantage of emptying the bag
+    (you control who gets the final turn).
+
+    Args:
+        board:          Current Board object
+        your_rack:      Your tile rack
+        unseen_tiles:   All unseen tiles as string (bag + opponent rack)
+        candidates:     Pre-ranked candidate moves from 1-ply analysis.
+                        Each must have: word, row, col, direction, score,
+                        tiles_used (str of tiles consumed from rack).
+        gaddag:         GADDAG instance
+        board_blanks:   List of (row, col, letter) for blanks on board
+        top_n:          Max candidates to evaluate
+        time_budget:    Max seconds to spend
+
+    Returns:
+        List of result dicts sorted by equity (best first). Each dict has:
+            word, row, col, direction, score, eval_type ('exhaust'|'1ply'),
+            opp_avg, opp_max, your_resp_avg, net_equity, n_racks,
+            leave, leave_value, top_opp_responses
+    """
+    from itertools import combinations
+    from .move_finder_opt import find_best_score_opt
+
+    t_start = time.perf_counter()
+
+    if gaddag is None:
+        gaddag = get_gaddag()
+    if board_blanks is None:
+        board_blanks = []
+
+    unseen_count = len(unseen_tiles)
+    bag_size = max(0, unseen_count - 7)  # unseen minus opp rack (7)
+
+    if bag_size < 1 or bag_size > 7:
+        return []  # Not in near-endgame range
+
+    # Pre-compute board blank set (0-indexed)
+    bb_set = {(r - 1, c - 1) for r, c, _ in board_blanks}
+
+    # Blank correction factor for opponent moves (blanks capped to 1 for speed)
+    blanks_in_unseen = unseen_tiles.count('?')
+    from .mc_eval import _blank_correction_factor
+    blank_corr = _blank_correction_factor(unseen_count, blanks_in_unseen)
+
+    # Try Cython acceleration (same path as MC eval)
+    _use_cython = False
+    _accel = None
+    _gdata_bytes = None
+    _word_set = None
+    try:
+        import gaddag_accel as _accel
+        _gdata_bytes = bytes(gaddag._data)
+        from .move_finder_c import _get_dict
+        _d = _get_dict()
+        class _SetDict:
+            __slots__ = ('is_valid',)
+            def __init__(self, s): self.is_valid = s.__contains__
+        _word_set = _SetDict(_d._words)
+        from .config import TILE_VALUES, VALID_TWO_LETTER, BINGO_BONUS, RACK_SIZE
+        _tv = [0] * 26
+        for _ch, _val in TILE_VALUES.items():
+            if _ch != '?':
+                _tv[ord(_ch) - ord('A')] = _val
+        from .config import BONUS_SQUARES
+        _bonus = [[(1, 1)] * 15 for _ in range(15)]
+        for (_r1, _c1), _btype in BONUS_SQUARES.items():
+            _r0, _c0 = _r1 - 1, _c1 - 1
+            if _btype == '2L': _bonus[_r0][_c0] = (2, 1)
+            elif _btype == '3L': _bonus[_r0][_c0] = (3, 1)
+            elif _btype == '2W': _bonus[_r0][_c0] = (1, 2)
+            elif _btype == '3W': _bonus[_r0][_c0] = (1, 3)
+        _use_cython = True
+    except (ImportError, Exception) as e:
+        _use_cython = False
+
+    def _make_ctx(grid, bb):
+        """Build Cython board context (reusable for multiple racks)."""
+        if _use_cython:
+            return _accel.prepare_board_context(
+                grid, _gdata_bytes, bb, _word_set, VALID_TWO_LETTER,
+                _tv, _bonus, BINGO_BONUS, RACK_SIZE)
+        return None
+
+    def _find_best(grid, rack_str, bb, ctx=None):
+        """Find best scoring move, using Cython if available."""
+        if _use_cython:
+            if ctx is None:
+                ctx = _make_ctx(grid, bb)
+            return _accel.find_best_score_c(ctx, rack_str)
+        else:
+            return find_best_score_opt(grid, gaddag._data, rack_str, bb)
+
+    # Limit candidates
+    cands = candidates[:top_n]
+
+    results = []
+    exhaust_count = 0
+    oneply_count = 0
+
+    # --- PASS 1: Process all non-exhausting candidates instantly (1-ply) ---
+    exhaust_cands = []
+    for move in cands:
+        tiles_used = move.get('tiles_used', move['word'])
+        n_tiles_used = len(tiles_used) if isinstance(tiles_used, str) else len(str(tiles_used))
+
+        if n_tiles_used >= bag_size:
+            exhaust_cands.append(move)
+        else:
+            # NON-EXHAUSTING MOVE: use 1-ply equity from candidate
+            oneply_count += 1
+            leave_val = move.get('leave_value', 0.0)
+            if isinstance(leave_val, str):
+                leave_val = 0.0
+            equity = move['score'] + leave_val
+            results.append({
+                'word': move['word'],
+                'row': move['row'],
+                'col': move['col'],
+                'direction': move['direction'],
+                'score': move['score'],
+                'eval_type': '1ply',
+                'leave': move.get('leave_str', ''),
+                'leave_value': round(leave_val, 1),
+                'opp_avg': 0.0,
+                'opp_max': 0,
+                'your_resp_avg': 0.0,
+                'net_equity': round(equity, 1),
+                'n_racks': 0,
+                'top_opp_responses': [],
+            })
+
+    # --- PASS 2: Evaluate bag-exhausting candidates under time budget ---
+    for idx, move in enumerate(exhaust_cands):
+        elapsed = time.perf_counter() - t_start
+        if elapsed > time_budget:
+            break
+
+        # --- BAG-EXHAUSTING MOVE: full 3-ply over all opponent rack combos ---
+        exhaust_count += 1
+
+        # Calculate leave (tiles remaining in your rack after playing)
+        your_leave = _calculate_leave(your_rack, move)
+
+        # Place your move on the board
+        horizontal = move['direction'] == 'H'
+        placed_1 = board.place_move(move['word'], move['row'], move['col'], horizontal)
+
+        # Update blank positions after your move
+        move_blanks = list(board_blanks)
+        for bi in move.get('blanks_used', []):
+            r = move['row'] + (0 if horizontal else bi)
+            c = move['col'] + (bi if horizontal else 0)
+            move_blanks.append((r, c, move['word'][bi]))
+        post_move_bb = {(r - 1, c - 1) for r, c, _ in move_blanks}
+
+        # After you play tiles_used and draw min(n_tiles_used, bag_size) = bag_size
+        # tiles from bag, the bag empties. The unseen tiles split into:
+        #   - Your drawn tiles: bag_size tiles (unknown which ones)
+        #   - Opponent rack: 7 tiles (the rest)
+        # Your post-draw rack = your_leave + drawn tiles
+        #
+        # Enumerate all C(unseen, 7) ways to assign 7 tiles to opponent.
+        # For each assignment, the remaining tiles are what you drew.
+
+        unseen_list = list(unseen_tiles)
+
+        # Generate all unique 7-tile opponent racks from unseen tiles.
+        # Use indices to handle duplicate tiles correctly.
+        n_unseen = len(unseen_list)
+        opp_rack_size = min(7, n_unseen)
+
+        # Accumulate stats across all opponent rack assignments
+        net_scores = []
+        opp_scores_all = []
+        your_resp_scores_all = []
+        opp_response_counts = {}  # word -> (count, max_score)
+
+        # Build Cython context ONCE for ply 2 (board is fixed after our move)
+        ply2_ctx = _make_ctx(board._grid, post_move_bb)
+
+        for combo_indices in combinations(range(n_unseen), opp_rack_size):
+            # Opponent gets these tiles
+            opp_rack_list = [unseen_list[i] for i in combo_indices]
+            opp_rack = ''.join(opp_rack_list)
+
+            # You drew the remaining tiles
+            drawn_indices = set(range(n_unseen)) - set(combo_indices)
+            drawn_tiles = ''.join(unseen_list[i] for i in drawn_indices)
+            your_full_rack = your_leave + drawn_tiles
+
+            # Limit blanks for opponent move generation
+            opp_rack_limited = _limit_blanks(opp_rack, max_blanks=1)
+
+            # PLY 2: Opponent's best response on post-move board (cached ctx)
+            opp_result = _find_best(
+                board._grid, opp_rack_limited, post_move_bb, ctx=ply2_ctx)
+            opp_score = opp_result[0] if opp_result[0] > 0 else 0
+            opp_word = opp_result[1] if opp_result[0] > 0 else "(pass)"
+
+            # Apply blank correction
+            opp_score_corrected = int(opp_score * blank_corr)
+
+            # Track opponent responses
+            if opp_word != "(pass)":
+                if opp_word not in opp_response_counts:
+                    opp_response_counts[opp_word] = [0, 0]
+                opp_response_counts[opp_word][0] += 1
+                opp_response_counts[opp_word][1] = max(
+                    opp_response_counts[opp_word][1], opp_score)
+
+            # PLY 3: Your counter-response after opponent plays
+            # Board changes each time (opp places different move), so no ctx cache
+            your_resp_score = 0
+            if opp_score > 0:
+                # Place opponent's move
+                opp_horiz = opp_result[4] == 'H'
+                placed_2 = board.place_move(
+                    opp_word, opp_result[2], opp_result[3], opp_horiz)
+
+                # Find your best response with full post-draw rack
+                your_resp_result = _find_best(
+                    board._grid, your_full_rack, post_move_bb)
+                your_resp_score = your_resp_result[0] if your_resp_result[0] > 0 else 0
+
+                board.undo_move(placed_2)
+            else:
+                # Opponent passes — find your best on unchanged board (reuse ply2 ctx)
+                your_resp_result = _find_best(
+                    board._grid, your_full_rack, post_move_bb, ctx=ply2_ctx)
+                your_resp_score = your_resp_result[0] if your_resp_result[0] > 0 else 0
+
+            # PLY 4: Opponent's final turn
+            # After your response, opponent still has their leave
+            # But for now, 3-ply net is sufficient — ply 4 adds marginal value
+            # and would require tracking opponent's leave from ply 2
+
+            net = move['score'] - opp_score_corrected + your_resp_score
+            net_scores.append(net)
+            opp_scores_all.append(opp_score_corrected)
+            your_resp_scores_all.append(your_resp_score)
+
+        board.undo_move(placed_1)
+
+        # Aggregate stats
+        n_racks = len(net_scores)
+        if n_racks > 0:
+            avg_net = sum(net_scores) / n_racks
+            avg_opp = sum(opp_scores_all) / n_racks
+            max_opp = max(opp_scores_all) if opp_scores_all else 0
+            avg_resp = sum(your_resp_scores_all) / n_racks
+        else:
+            avg_net = float(move['score'])
+            avg_opp = 0.0
+            max_opp = 0
+            avg_resp = 0.0
+
+        # Top opponent responses by frequency
+        top_opp = sorted(opp_response_counts.items(),
+                         key=lambda x: (-x[1][0], -x[1][1]))[:5]
+        top_opp_list = [
+            {'word': w, 'count': c, 'max_score': s}
+            for w, (c, s) in top_opp
+        ]
+
+        results.append({
+            'word': move['word'],
+            'row': move['row'],
+            'col': move['col'],
+            'direction': move['direction'],
+            'score': move['score'],
+            'eval_type': 'exhaust',
+            'leave': your_leave,
+            'leave_value': 0.0,  # Not needed — 3-ply is exact
+            'opp_avg': round(avg_opp, 1),
+            'opp_max': max_opp,
+            'your_resp_avg': round(avg_resp, 1),
+            'net_equity': round(avg_net, 1),
+            'n_racks': n_racks,
+            'top_opp_responses': top_opp_list,
+        })
+
+    elapsed = time.perf_counter() - t_start
+
+    # Sort all results by net equity
+    results.sort(key=lambda r: -r['net_equity'])
+
+    # Attach metadata to first result
+    if results:
+        results[0]['_meta'] = {
+            'elapsed_s': round(elapsed, 2),
+            'bag_size': bag_size,
+            'unseen_count': unseen_count,
+            'exhaust_evaluated': exhaust_count,
+            'oneply_evaluated': oneply_count,
+            'total_candidates': len(cands),
+            'blank_correction': round(blank_corr, 3),
+            'solver': 'near_endgame_hybrid',
+        }
+
+    return results
+
+
 def test_3ply():
     """Test 3-ply on a sample position."""
     board = Board()
