@@ -18,6 +18,16 @@ from .move_finder_gaddag import GADDAGMoveFinder
 from .gaddag import get_gaddag
 from .leave_eval import evaluate_leave
 
+# Bag parity: P(opponent empties bag on their turn | bag_after tiles remain)
+# Conservative estimates based on typical Crossplay move lengths.
+# bag_after=1 means opp just needs to play 1+ tile (nearly certain).
+# bag_after=7 means opp must play all 7 tiles / bingo (rare).
+_PARITY_P_OPP_EMPTIES = {
+    1: 0.97, 2: 0.94, 3: 0.88, 4: 0.78,
+    5: 0.62, 6: 0.40, 7: 0.18,
+}
+_PARITY_STRUCTURAL_ADV = 10.0  # equity pts for emptying the bag
+
 
 def evaluate_endgame_2ply(
     board: Board,
@@ -508,14 +518,16 @@ def evaluate_near_endgame(
     time_budget: float = 45.0,
 ) -> List[Dict]:
     """
-    Hybrid evaluation for near-endgame positions (bag 1-7).
+    Hybrid evaluation for near-endgame positions (bag 1-8).
 
     For each candidate move, checks whether it empties the bag:
       - YES (tiles_used >= bag_size): Exhaustive 3-ply evaluation over all
         possible opponent rack assignments. Since emptying the bag makes all
         racks deterministic, this is exact (no sampling, no leave heuristics).
-        Enumerates C(unseen, 7) opponent racks × endgame 2-ply for each.
-      - NO: Uses 1-ply equity from the pre-ranked candidate (score + leave).
+        Enumerates C(unseen, 7) opponent racks x endgame 2-ply for each.
+      - NO: Parity-adjusted 1-ply equity. Penalizes moves that let the
+        opponent empty the bag on their next turn, based on P(opp empties)
+        lookup table x structural advantage of bag control (~10 pts).
 
     The "exhaust" candidates get much more accurate evaluation than MC could
     provide, correctly capturing the structural advantage of emptying the bag
@@ -552,7 +564,7 @@ def evaluate_near_endgame(
     unseen_count = len(unseen_tiles)
     bag_size = max(0, unseen_count - 7)  # unseen minus opp rack (7)
 
-    if bag_size < 1 or bag_size > 7:
+    if bag_size < 1 or bag_size > 8:
         return []  # Not in near-endgame range
 
     # Pre-compute board blank set (0-indexed)
@@ -621,25 +633,38 @@ def evaluate_near_endgame(
     # --- PASS 1: Process all non-exhausting candidates instantly (1-ply) ---
     exhaust_cands = []
     for move in cands:
-        tiles_used = move.get('tiles_used', move['word'])
-        n_tiles_used = len(tiles_used) if isinstance(tiles_used, str) else len(str(tiles_used))
+        tiles_used = move.get('tiles_used', move.get('used', move['word']))
+        n_tiles_used = len(tiles_used)
 
         if n_tiles_used >= bag_size:
             exhaust_cands.append(move)
         else:
-            # NON-EXHAUSTING MOVE: use 1-ply equity from candidate
+            # NON-EXHAUSTING MOVE: parity-adjusted 1-ply equity
             oneply_count += 1
             leave_val = move.get('leave_value', 0.0)
             if isinstance(leave_val, str):
                 leave_val = 0.0
             equity = move['score'] + leave_val
+
+            # Bag parity penalty: if this move leaves bag_after tiles
+            # and opponent can empty the bag on their turn, penalize
+            n_draw = min(n_tiles_used, bag_size)
+            bag_after = bag_size - n_draw
+            parity_penalty = 0.0
+            p_opp_empties = 0.0
+            if 1 <= bag_after <= 7:
+                p_opp_empties = _PARITY_P_OPP_EMPTIES[bag_after]
+                parity_penalty = -p_opp_empties * _PARITY_STRUCTURAL_ADV
+                equity += parity_penalty
+
+            eval_type = 'parity' if parity_penalty != 0 else '1ply'
             results.append({
                 'word': move['word'],
                 'row': move['row'],
                 'col': move['col'],
                 'direction': move['direction'],
                 'score': move['score'],
-                'eval_type': '1ply',
+                'eval_type': eval_type,
                 'leave': move.get('leave_str', ''),
                 'leave_value': round(leave_val, 1),
                 'opp_avg': 0.0,
@@ -648,6 +673,9 @@ def evaluate_near_endgame(
                 'net_equity': round(equity, 1),
                 'n_racks': 0,
                 'top_opp_responses': [],
+                'parity_penalty': round(parity_penalty, 1),
+                'p_opp_empties': round(p_opp_empties, 2),
+                'bag_after': bag_after,
             })
 
     # --- PASS 2: Evaluate bag-exhausting candidates under time budget ---

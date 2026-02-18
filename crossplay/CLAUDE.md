@@ -45,9 +45,10 @@ endgame equity calculation is:
    - **MC simulation is unnecessary** when bag = 0 -- opponent's rack
      can be inferred exactly (unseen tiles = their rack), so evaluate
      deterministically instead of sampling.
-   - **When bag has 1-6 tiles**: the draw that empties the bag triggers
-     final turns. Factor in that after this draw, each player gets
-     exactly one more turn.
+   - **When bag has 1-8 tiles**: near-endgame hybrid evaluation.
+     Bag-emptying moves get exact 3-ply. Non-emptying moves get
+     parity-adjusted 1-ply (penalized for letting opponent empty bag).
+     The player who empties the bag gains ~10 equity structural advantage.
 
 ## Architecture overview
 
@@ -186,12 +187,42 @@ are NOT flagged (NYT almost certainly keeps them).
 ## V17 changes: near-endgame evaluator + gen2 training
 
 **Near-endgame hybrid evaluator (`evaluate_near_endgame()` in `lookahead_3ply.py`):**
-When bag has 1-7 tiles, bag-emptying moves get exhaustive 3-ply evaluation over
-all C(unseen, 7) opponent rack combinations (8-3432 combos, all tractable). Non-emptying
-moves keep 1-ply equity. This captures the structural advantage of knowing the
-opponent's exact rack when you empty the bag. Two-pass approach: instant 1-ply
-candidates first, then exhaust candidates under time budget. Routing in
-`game_manager.py._show_2ply_analysis()` triggers when `1 <= bag_size <= 7`.
+When bag has 1-8 tiles, bag-emptying moves get exhaustive 3-ply evaluation over
+all C(unseen, 7) opponent rack combinations (8-6435 combos, all tractable). Non-emptying
+moves get parity-adjusted 1-ply equity (see bag parity below). This captures the
+structural advantage of knowing the opponent's exact rack when you empty the bag.
+Two-pass approach: instant parity-adjusted 1-ply candidates first, then exhaust
+candidates under time budget. Routing in `game_manager.py._show_2ply_analysis()`
+triggers when `1 <= bag_size <= 8`.
+
+**Bag parity penalty (non-emptying moves at bag 1-8):**
+Non-emptying moves are penalized based on the probability that the opponent will
+empty the bag on their next turn, handing them the structural advantage of knowing
+your exact rack + getting the last move (~10 equity points).
+
+Formula: `parity_penalty = -P(opp_empties) * STRUCTURAL_ADVANTAGE`
+where `P(opp_empties)` depends on `bag_after` (tiles left in bag after your draw):
+
+| bag_after | P(opp empties) | penalty |
+|:---------:|:--------------:|:-------:|
+| 1         | 0.97           | -9.7    |
+| 2         | 0.94           | -9.4    |
+| 3         | 0.88           | -8.8    |
+| 4         | 0.78           | -7.8    |
+| 5         | 0.62           | -6.2    |
+| 6         | 0.40           | -4.0    |
+| 7         | 0.18           | -1.8    |
+
+Constants in `lookahead_3ply.py`: `_PARITY_P_OPP_EMPTIES` (lookup table),
+`_PARITY_STRUCTURAL_ADV = 10.0`. Display uses eval_type `'parity'` (vs
+`'exhaust'` for bag-emptying moves and `'1ply'` for moves outside the range).
+
+**tiles_used field name bug fix:**
+`game_manager.py` stored rack tiles consumed as `'used'`, but `lookahead_3ply.py`
+and `mc_eval.py` looked for `'tiles_used'`, falling back to `move['word']` which
+overcounts (full word length vs actual rack tiles). Fixed at source (added
+`'tiles_used': used` alongside `'used'`) and at all 5 consumer sites with
+belt-and-suspenders fallback: `move.get('tiles_used', move.get('used', move['word']))`.
 
 **Gen2 training signal improvements (`self_play.py`):**
 - Equity-based signal: `signal = move_equity - top_score_equity` (not game-mean)

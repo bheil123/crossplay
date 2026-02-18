@@ -397,7 +397,7 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
 
     # Calculate leave
     from .leave_eval import evaluate_leave
-    tiles_used = move.get('tiles_used', move['word'])
+    tiles_used = move.get('tiles_used', move.get('used', move['word']))
     leave = _get_leave(your_rack, tiles_used)
     leave_value = evaluate_leave(leave)
 
@@ -968,7 +968,7 @@ def _mc_eval_sequential(
             for k, v in top_responses
         ]
 
-        tiles_used = move.get('tiles_used', move['word'])
+        tiles_used = move.get('tiles_used', move.get('used', move['word']))
         leave = _get_leave(your_rack, tiles_used)
         leave_value = evaluate_leave(leave)
         mc_equity = move['score'] - avg_opp
@@ -1116,7 +1116,7 @@ def mc_evaluate_2ply(
             'col': move['col'],
             'direction': move['direction'],
             'score': move['score'],
-            'tiles_used': move.get('tiles_used', move['word']),
+            'tiles_used': move.get('tiles_used', move.get('used', move['word'])),
             'positional_adj': move.get('positional_adj', 0),
             'expected_risk': move.get('expected_risk', 0),
             'baseline_risk': move.get('baseline_risk', 0),

@@ -565,6 +565,7 @@ class Game:
             preliminary.append({
                 **move,
                 'used': used,
+                'tiles_used': used,
                 'leave': leave_str,
                 'leave_value': leave_value,
                 'prelim_equity': prelim_equity
@@ -795,7 +796,7 @@ class Game:
             
             # Show power tile draw probability if power tiles exist
             if has_power_tiles:
-                tiles_used = len(move.get('tiles_used', word))  # Approximate
+                tiles_used = len(move.get('tiles_used', move.get('used', word)))
                 leave_len = len(move['leave'])
                 draw_count = 7 - leave_len  # How many tiles we'd draw
                 if draw_count > 0 and bag_size > 0:
@@ -987,17 +988,18 @@ class Game:
         
         # Routing based on bag size:
         #   bag == 0: deterministic 2-ply (opp rack known exactly)
-        #   bag 1-7:  hybrid near-endgame (exhaustive for bag-emptying moves)
-        #   bag 8+:   Monte Carlo 2-ply sampling
+        #   bag 1-8:  hybrid near-endgame (exhaustive for bag-emptying moves,
+        #             parity-adjusted 1-ply for non-emptying moves)
+        #   bag 9+:   Monte Carlo 2-ply sampling
         bag_size = total_unseen - 7  # unseen minus opponent rack
         if bag_size == 0:
             # Bag empty: opponent rack is known exactly — use deterministic 2-ply
             self._show_endgame_2ply(rack, unseen_str, total_unseen)
             return
-        if 1 <= bag_size <= 7:
+        if 1 <= bag_size <= 8:
             # Near-endgame: hybrid evaluation. Bag-emptying moves get exact
             # 3-ply enumeration over all C(unseen,7) opponent racks.
-            # Non-emptying moves keep 1-ply equity.
+            # Non-emptying moves get parity-adjusted 1-ply equity.
             self._show_near_endgame(rack, unseen_str, total_unseen, top_moves)
             return
 
@@ -1547,11 +1549,12 @@ class Game:
             traceback.print_exc()
 
     def _show_near_endgame(self, rack: str, unseen_str: str, total_unseen: int, top_moves: list):
-        """Show hybrid near-endgame analysis for bag 1-7.
+        """Show hybrid near-endgame analysis for bag 1-8.
 
         Bag-emptying moves get exact 3-ply evaluation (exhaustive enumeration
-        over all possible opponent rack assignments). Non-emptying moves keep
-        their 1-ply equity. This correctly captures the structural advantage
+        over all possible opponent rack assignments). Non-emptying moves get
+        parity-adjusted 1-ply equity (penalized by P(opp empties bag) ×
+        structural advantage). This correctly captures the structural advantage
         of emptying the bag.
         """
         from .lookahead_3ply import evaluate_near_endgame
@@ -1560,8 +1563,9 @@ class Game:
 
         print(f"\n{'='*70}")
         print(f"NEAR-ENDGAME HYBRID (bag: {bag_size}, unseen: {total_unseen})")
-        print(f"  Exhaust moves: exact 3-ply over all opponent racks")
-        print(f"  Non-exhaust moves: 1-ply equity (score + leave)")
+        print(f"  EXH = EMPTIES BAG (exact 3-ply over all opp racks)")
+        print(f"  PAR = leaves tiles in bag (parity penalty applied)")
+        print(f"  Emptying the bag = you know opp's rack + control endgame")
         print("=" * 70)
 
         try:
@@ -1587,34 +1591,52 @@ class Game:
             solver_time = meta.get('elapsed_s', round(t_elapsed, 2))
             bcf = meta.get('blank_correction', 1.0)
 
-            print(f"  {n_exhaust} exhaust + {n_1ply} non-exhaust candidates | "
+            n_parity = sum(1 for r in results if r.get('eval_type') == 'parity')
+            n_plain_1ply = n_1ply - n_parity
+
+            print(f"  {n_exhaust} exhaust + {n_parity} parity + "
+                  f"{n_plain_1ply} 1ply candidates | "
                   f"{solver_time}s | blank_corr={bcf}")
             print()
 
             # Table header
             print(f"{'#':<3} {'Word':<12} {'Pos':<12} {'Pts':>4} "
                   f"{'Type':<7} {'AvgOpp':>6} {'MaxOpp':>6} {'YourResp':>8} "
-                  f"{'Net Eq':>7} {'Racks':>6}")
-            print("-" * 80)
+                  f"{'Net Eq':>7} {'Bag>':>5} {'Parity':>7}")
+            print("-" * 90)
 
             for i, r in enumerate(results[:20], 1):
                 pos = f"R{r['row']}C{r['col']} {r['direction']}"
                 etype = r['eval_type']
-                tag = "EXH" if etype == 'exhaust' else "1PL"
+                if etype == 'exhaust':
+                    tag = "EXH"
+                elif etype == 'parity':
+                    tag = "PAR"
+                else:
+                    tag = "1PL"
 
                 if etype == 'exhaust':
                     print(f"{i:<3} {r['word']:<12} {pos:<12} {r['score']:>4} "
                           f"{tag:<7} {r['opp_avg']:>6.1f} {r['opp_max']:>6} "
                           f"{r['your_resp_avg']:>8.1f} {r['net_equity']:>+7.1f} "
-                          f"{r['n_racks']:>6}")
-                else:
-                    # 1-ply: show leave value instead of opp/resp
+                          f"{'>0':>5} {'EMPTY':>7}")
+                elif etype == 'parity':
+                    # Parity-adjusted: show leave value and penalty
                     lv = r.get('leave_value', 0.0)
-                    leave = r.get('leave', '')
+                    bag_after = r.get('bag_after', '?')
+                    penalty = r.get('parity_penalty', 0.0)
+                    p_opp = r.get('p_opp_empties', 0.0)
                     print(f"{i:<3} {r['word']:<12} {pos:<12} {r['score']:>4} "
                           f"{tag:<7} {'':>6} {'':>6} "
                           f"{'lv=' + str(lv):>8} {r['net_equity']:>+7.1f} "
-                          f"{'':>6}")
+                          f"{'>' + str(bag_after):>5} {penalty:>+7.1f}")
+                else:
+                    # Plain 1-ply: show leave value
+                    lv = r.get('leave_value', 0.0)
+                    print(f"{i:<3} {r['word']:<12} {pos:<12} {r['score']:>4} "
+                          f"{tag:<7} {'':>6} {'':>6} "
+                          f"{'lv=' + str(lv):>8} {r['net_equity']:>+7.1f} "
+                          f"{'':>5} {'':>7}")
 
             # Best move summary
             best = results[0]
@@ -1626,11 +1648,22 @@ class Game:
                       f"+ avg_resp {best['your_resp_avg']:.1f} "
                       f"= net {best['net_equity']:+.1f}")
                 print(f"    Evaluated {best['n_racks']} opponent rack assignments")
+                print(f"    ** Empties bag -> you control endgame")
                 if best['top_opp_responses']:
                     print(f"    Top opp responses:")
                     for resp in best['top_opp_responses'][:3]:
                         print(f"      {resp['word']}: {resp['count']}x "
                               f"(max {resp['max_score']} pts)")
+            elif best['eval_type'] == 'parity':
+                bag_after = best.get('bag_after', '?')
+                penalty = best.get('parity_penalty', 0.0)
+                p_opp = best.get('p_opp_empties', 0.0)
+                print(f"    Parity-adjusted 1-ply: score {best['score']} + "
+                      f"leave {best['leave_value']:+.1f} "
+                      f"+ parity {penalty:+.1f} "
+                      f"= {best['net_equity']:+.1f}")
+                print(f"    !! Leaves {bag_after} in bag -> "
+                      f"P(opp empties)={p_opp:.0%} -> penalty {penalty:+.1f}")
             else:
                 print(f"    1-ply: score {best['score']} + "
                       f"leave {best['leave_value']:+.1f} "
