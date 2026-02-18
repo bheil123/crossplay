@@ -57,12 +57,50 @@
       "note": "",
       "timestamp": "2026-02-17T23:56:29.115305",
       "engine": null
+    },
+    {
+      "word": "OUTER",
+      "row": 4,
+      "col": 8,
+      "dir": "V",
+      "player": "opp",
+      "score": 14,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        102,
+        31
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-18T15:30:00.000000",
+      "engine": null
+    },
+    {
+      "word": "FIDGETER",
+      "row": 7,
+      "col": 9,
+      "dir": "V",
+      "player": "me",
+      "score": 69,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        164,
+        31
+      ],
+      "rack": "TGDEREF",
+      "drawn": null,
+      "note": "bingo",
+      "timestamp": "2026-02-18T15:40:00.000000",
+      "engine": null
     }
   ],
   "blank_positions": [],
-  "your_score": 102,
-  "opp_score": 17,
-  "your_rack": "",
+  "your_score": 164,
+  "opp_score": 31,
+  "your_rack": "SQUASHF",
   "bag": [
     "Z",
     "O",
@@ -168,11 +206,11 @@
   "is_your_turn": false,
   "opponent_name": "melain",
   "created_at": "2026-02-17T23:56:22.847824",
-  "updated_at": "2026-02-17T23:56:31.786076",
+  "updated_at": "2026-02-18T15:27:41.460751",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "melain_002",
   "status": "active",
-  "spread": 85,
-  "move_count": 3
+  "spread": 133,
+  "move_count": 5
 }

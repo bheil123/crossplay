@@ -129,9 +129,20 @@ equity, plus whether the engine's top pick was followed).
 
 **Commands:**
 - `new N opponent` -- creates new game in library, assigns to slot N
+  (refuses if slot has an in-progress game; use `reset N` first)
+- `load GAME_ID` -- loads an active game into the current slot (for
+  resuming orphaned or unlinked games after session restart)
+- `games` -- lists all active games with slot assignments; shows
+  orphaned games not currently in any slot
 - Games auto-save on every state change (no manual save needed)
 - On game completion: archived to JSONL, active JSON deleted, slot freed
 - First run auto-migrates from legacy factory functions
+
+**Resuming after session restart:** Games in slots auto-load from
+`index.json` on startup. If a game was orphaned (exists in
+`games/active/` but not in any slot), startup prints a warning.
+Use `games` to see all active games, then `load GAME_ID` to bring
+an orphaned game back into a slot.
 
 **Key module:** `game_library.py` -- `save_active()`, `load_active()`,
 `list_active()`, `archive_completed()`, `search_archive()`,

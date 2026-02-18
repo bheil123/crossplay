@@ -2711,7 +2711,34 @@ class GameManager:
             except Exception as e:
                 print(f"  Slot {slot}: ! Failed to load {game_id}: {e}")
                 self.games[slot] = None
-    
+
+        # Detect orphaned games (active files not assigned to any slot)
+        assigned_ids = {v for v in slots.values() if v}
+        try:
+            import os as _os
+            active_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                       'games', 'active')
+            if _os.path.isdir(active_dir):
+                on_disk = {f.replace('.json', '') for f in _os.listdir(active_dir)
+                           if f.endswith('.json')}
+                orphaned = on_disk - assigned_ids
+                if orphaned:
+                    print(f"\n  [!] {len(orphaned)} orphaned game(s) not in any slot:")
+                    for gid in sorted(orphaned):
+                        g = lib.load_active(gid)
+                        if g:
+                            s = g.state
+                            spread = s.your_score - s.opp_score
+                            print(f"      {gid}: vs {s.opponent_name} "
+                                  f"({s.your_score}-{s.opp_score}, "
+                                  f"{'+' if spread >= 0 else ''}{spread})"
+                                  f" | {len(s.board_moves)} moves")
+                        else:
+                            print(f"      {gid}: (failed to load)")
+                    print(f"      Use 'load GAME_ID' in assisted mode to assign to a slot")
+        except Exception:
+            pass  # Non-critical -- don't block startup
+
     def show_slots(self):
         """Show all game slots."""
         print(f"\n{'='*60}")
@@ -2746,10 +2773,85 @@ class GameManager:
         else:
             print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
     
+    def _show_all_games(self):
+        """Show all active games, highlighting which slot they're in (if any)."""
+        from . import game_library as lib
+
+        index = lib.load_index()
+        slot_to_id = {v: int(k) for k, v in index.get('slots', {}).items() if v}
+
+        all_games = lib.list_active()
+        if not all_games:
+            print("\nNo active games.")
+            return
+
+        print(f"\n{'='*60}")
+        print("ALL ACTIVE GAMES")
+        print(f"{'='*60}")
+        for g in all_games:
+            gid = g['game_id']
+            opp = g.get('opponent', '?')
+            ys = g.get('your_score', 0)
+            os_ = g.get('opp_score', 0)
+            spread = ys - os_
+            spread_str = f"+{spread}" if spread >= 0 else str(spread)
+            moves = g.get('move_count', 0)
+            slot = slot_to_id.get(gid)
+            if slot:
+                loc = f"Slot {slot}"
+            else:
+                loc = "[not in slot]"
+            print(f"  {gid}: vs {opp} ({ys}-{os_}, {spread_str}) "
+                  f"| {moves} moves | {loc}")
+
+        orphaned = [g for g in all_games if g['game_id'] not in slot_to_id]
+        if orphaned:
+            print(f"\nTo load an orphaned game: load GAME_ID")
+
+    def _load_game_into_slot(self, game_id: str, slot: int):
+        """Load an active game by ID into the given slot."""
+        from . import game_library as lib
+
+        if slot < 1 or slot > self.MAX_GAMES:
+            print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
+            return
+
+        game = lib.load_active(game_id)
+        if game is None:
+            print(f"[X] Game '{game_id}' not found in games/active/")
+            return
+
+        game.game_id = game_id
+        game.auto_save = True
+        self.games[slot] = game
+        self.current_slot = slot
+
+        # Update index
+        index = lib.load_index()
+        index['slots'][str(slot)] = game_id
+        lib.save_index(index)
+
+        s = game.state
+        spread = s.your_score - s.opp_score
+        print(f"[OK] Loaded {game_id} into Slot {slot}: vs {s.opponent_name} "
+              f"({s.your_score}-{s.opp_score}, {'+' if spread >= 0 else ''}{spread})")
+
     def new_game(self, slot: int, opponent_name: str = "Opponent"):
         """Start a new game in a slot."""
         if slot < 1 or slot > self.MAX_GAMES:
             print(f"[X] Invalid slot. Use 1-{self.MAX_GAMES}")
+            return
+
+        # Overwrite protection: refuse to clobber an in-progress game
+        existing = self.games.get(slot)
+        if existing and len(existing.state.board_moves) > 0:
+            s = existing.state
+            gid = getattr(existing, 'game_id', '?')
+            spread = s.your_score - s.opp_score
+            print(f"[X] Slot {slot} has an in-progress game: {gid} vs {s.opponent_name}")
+            print(f"    Score: {s.your_score}-{s.opp_score} ({'+' if spread >= 0 else ''}{spread})"
+                  f" | {len(s.board_moves)} moves")
+            print(f"    Use 'reset {slot}' first to clear it, or 'slot {slot}' to resume")
             return
 
         from . import game_library as lib
@@ -2964,7 +3066,7 @@ class GameManager:
             if game:
                 game.show_status()
             
-            print("\nCommands: slot N | new N NAME | board | rack TILES | analyze")
+            print("\nCommands: slot N | new N NAME | load ID | games | board | rack TILES | analyze")
             print("          play WORD R C H/V | opp WORD R C H/V SCORE | save | reset N | back")
             
             try:
@@ -2997,7 +3099,15 @@ class GameManager:
             
             elif action == 'slots':
                 self.show_slots()
-            
+
+            elif action == 'games':
+                self._show_all_games()
+
+            elif action == 'load' and len(parts) >= 2:
+                game_id = parts[1]
+                self._load_game_into_slot(game_id, self.current_slot)
+                game = self.current_game()  # refresh after load
+
             elif action == 'board':
                 if game:
                     game.show_board()
