@@ -24,6 +24,7 @@ import math
 import glob
 import argparse
 import logging
+import threading
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -223,6 +224,96 @@ def find_latest_checkpoint(generation=None):
 
 
 # ---------------------------------------------------------------------------
+# Async checkpoint save
+# ---------------------------------------------------------------------------
+
+_save_lock = threading.Lock()
+_save_thread = None
+
+
+def _async_save(table, paths):
+    """Save table to one or more paths in a background thread."""
+    global _save_thread
+    # Wait for any previous save to finish
+    if _save_thread is not None:
+        _save_thread.join()
+
+    # Snapshot the table dict under lock so main thread can continue
+    with _save_lock:
+        snapshot = dict(table._table)
+
+    def _do_save():
+        import pickle, tempfile
+        for path in paths:
+            dir_name = os.path.dirname(path) or '.'
+            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
+            try:
+                with os.fdopen(fd, 'wb') as f:
+                    pickle.dump(snapshot, f, protocol=pickle.HIGHEST_PROTOCOL)
+                os.replace(tmp_path, path)
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+    _save_thread = threading.Thread(target=_do_save, daemon=True)
+    _save_thread.start()
+
+
+def _flush_async_save():
+    """Wait for any pending async save to complete."""
+    global _save_thread
+    if _save_thread is not None:
+        _save_thread.join()
+        _save_thread = None
+
+
+def _cleanup_old_checkpoints(generation, current_games, checkpoint_every, keep=3):
+    """Remove old intermediate checkpoints, keeping the most recent few.
+
+    Always keeps checkpoints at multiples of checkpoint_every.
+    Removes non-multiple checkpoints (e.g. from interrupts) older than keep.
+    """
+    pattern = os.path.join(_superleaves_dir(), f'gen{generation}_*.pkl')
+    files = glob.glob(pattern)
+    if not files:
+        return
+
+    intermediates = []
+    for f in files:
+        base = os.path.basename(f)
+        try:
+            parts = base.replace('.pkl', '').split('_')
+            games = int(parts[1])
+        except (ValueError, IndexError):
+            continue
+        if base.startswith('_'):
+            continue
+        # Keep the current and most recent checkpoints
+        if games >= current_games:
+            continue
+        # Keep multiples of checkpoint_every (10K boundaries)
+        if games % checkpoint_every == 0:
+            intermediates.append((games, f))
+        else:
+            # Non-boundary checkpoints from interrupts -- always remove old ones
+            try:
+                os.unlink(f)
+            except OSError:
+                pass
+
+    # Among boundary checkpoints, keep only the most recent `keep`
+    if len(intermediates) > keep:
+        intermediates.sort(key=lambda x: x[0])
+        for games, path in intermediates[:-keep]:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+
+# ---------------------------------------------------------------------------
 # Main training loop
 # ---------------------------------------------------------------------------
 
@@ -339,6 +430,7 @@ def train(num_games, workers, generation=1, resume_from=None,
                 # Check for recalibration request
                 if check_recalibrate_request():
                     print(f"\n  [!] Recalibration requested. Saving checkpoint and exiting...", flush=True)
+                    _flush_async_save()
                     cp_path = _checkpoint_path(generation, games_done)
                     table.save(cp_path)
                     elapsed = time.time() - start_time
@@ -410,16 +502,16 @@ def train(num_games, workers, generation=1, resume_from=None,
                             stv
                         )
 
-                    # Checkpoint
+                    # Checkpoint (async to avoid blocking the training loop)
                     if games_done % checkpoint_every < batch_size or games_done >= num_games:
                         cp_games = (games_done // checkpoint_every) * checkpoint_every
                         if games_done >= num_games:
                             cp_games = num_games
                         cp_path = _checkpoint_path(generation, cp_games)
                         if not os.path.exists(cp_path):
-                            table.save(cp_path)
-                            # Also update worker table for fresh submits
-                            table.save(worker_table_path)
+                            _async_save(table, [cp_path, worker_table_path])
+                            _cleanup_old_checkpoints(
+                                generation, cp_games, checkpoint_every)
 
                     # Submit next batch if needed
                     if submitted_games < games_remaining:
@@ -436,6 +528,7 @@ def train(num_games, workers, generation=1, resume_from=None,
 
     except KeyboardInterrupt:
         print(f"\n  [!] Interrupted at {games_done:,}/{num_games:,} games")
+        _flush_async_save()
         cp_path = _checkpoint_path(generation, games_done)
         table.save(cp_path)
         print(f"  Checkpoint saved: {cp_path}")
@@ -448,7 +541,8 @@ def train(num_games, workers, generation=1, resume_from=None,
         print("  Status: paused. Resume with --resume flag.")
         return table
 
-    # Save final table
+    # Flush any pending async checkpoint, then save final table synchronously
+    _flush_async_save()
     final_path = _checkpoint_path(generation, num_games)
     table.save(final_path)
 

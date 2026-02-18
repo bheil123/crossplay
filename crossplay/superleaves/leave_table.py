@@ -21,6 +21,7 @@ class LeaveTable:
 
     def __init__(self):
         self._table = {}
+        self._stv_cache = None  # cached single_tile_values
 
     def __len__(self):
         return len(self._table)
@@ -93,17 +94,25 @@ class LeaveTable:
             agg[leave_key][1] += weight
 
         # Apply EMA: new = (1-alpha) * old + alpha * observed_mean
+        stv_dirty = False
         for leave_key, (wsum, wtotal) in agg.items():
             observed_mean = wsum / wtotal
             old = self._table.get(leave_key, 0.0)
             self._table[leave_key] = (1 - alpha) * old + alpha * observed_mean
+            if len(leave_key) == 1:
+                stv_dirty = True
+        if stv_dirty:
+            self._stv_cache = None
 
     def single_tile_values(self):
-        """Return dict of single-tile leave values for validation."""
+        """Return dict of single-tile leave values for validation (cached)."""
+        if self._stv_cache is not None:
+            return self._stv_cache
         result = {}
         for key, val in self._table.items():
             if len(key) == 1:
                 result[key[0]] = val
+        self._stv_cache = result
         return result
 
     def save(self, path):
