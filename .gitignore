@@ -45,6 +45,7 @@ crossplay/games/archive_moves.csv
 # Scratch / temp files
 _cmds.txt
 tmp_diff.txt
+start_training.bat
 
 # SuperLeaves training (local artifacts)
 crossplay/superleaves/status.json

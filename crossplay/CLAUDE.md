@@ -447,21 +447,44 @@ SIMD architecture.
 
 On session start, check `crossplay/superleaves/status.json` for training
 status. If status is "running" or "paused", report progress and suggest
-resuming with `python -m crossplay.superleaves.trainer --resume --workers N`.
+resuming.
+
+**Restarting training (e.g. after context compaction):**
+The easiest way is to double-click `start_training.bat` in the project root.
+This uses the full Python path to avoid Windows Store alias issues and
+auto-resumes from the latest checkpoint.
+
+Alternatively, from a **native Windows terminal** (not Git Bash — multiprocessing
+deadlocks in Git Bash):
+```bash
+C:\Users\billh\AppData\Local\Programs\Python\Python312\python.exe -m crossplay.superleaves.trainer --resume --generation 2 --games 700000
+```
+
+Or launch via PowerShell from Claude Code:
+```bash
+powershell.exe -Command "Start-Process 'C:\Users\billh\crossplay\start_training.bat'"
+```
+
+Worker count defaults to `cpu_count - 3` (reserves 3 cores for OS, Claude Code,
+and game analysis). Override with `--workers N`. On the 8-core dev machine this
+gives 5 workers.
+
+**IMPORTANT:** After launching, workers take 30-90 seconds to load the GADDAG
+before any progress appears. Don't kill the process during this startup phase.
 
 Quick start:
 ```bash
 # Smoke test (100K games, ~2-3 hours)
-python -m crossplay.superleaves.trainer --smoke-test --workers 4
+python -m crossplay.superleaves.trainer --smoke-test
 
-# Full gen1 (350K games, ~22 hours with 4 workers)
-python -m crossplay.superleaves.trainer --workers 4 --games 350000
+# Full gen1 (350K games, ~22 hours)
+python -m crossplay.superleaves.trainer --games 350000
 
 # Gen2 from gen1 (700K games, equity-based signal)
-python -m crossplay.superleaves.trainer --generation 2 --workers 4 --games 700000 --init-from gen1_350000.pkl
+python -m crossplay.superleaves.trainer --generation 2 --games 700000 --init-from gen1_350000.pkl
 
-# Resume interrupted training
-python -m crossplay.superleaves.trainer --resume --generation 2 --workers 4
+# Resume interrupted training (auto-finds latest checkpoint)
+python -m crossplay.superleaves.trainer --resume --generation 2 --games 700000
 
 # Validate trained table vs formula
 python -m crossplay.superleaves.validate --table superleaves/gen1_350000.pkl --games 1000

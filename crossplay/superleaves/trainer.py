@@ -4,9 +4,16 @@ CROSSPLAY V15 - SuperLeaves Trainer
 Parallel self-play training with checkpointing and resume.
 
 Usage:
-    python -m crossplay.superleaves.trainer --smoke-test --workers 4
-    python -m crossplay.superleaves.trainer --workers 6 --games 1000000
-    python -m crossplay.superleaves.trainer --resume --workers 6
+    python -m crossplay.superleaves.trainer --smoke-test
+    python -m crossplay.superleaves.trainer --games 700000 --generation 2
+    python -m crossplay.superleaves.trainer --resume --generation 2
+
+Worker count defaults to (cpu_count - 3) to leave headroom for OS and
+gameplay analysis.  Override with --workers N.
+
+Restart after crash / context compaction:
+    python -m crossplay.superleaves.trainer --resume --generation 2 --games 700000
+Or double-click start_training.bat in the project root.
 """
 
 import os
@@ -18,6 +25,18 @@ import glob
 import argparse
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
+
+
+def _default_workers():
+    """Return a sensible default worker count: cpu_count - 3 (min 1).
+
+    Reserves 3 cores for OS, Claude Code, and game analysis.
+    """
+    try:
+        cpus = os.cpu_count() or 4
+    except Exception:
+        cpus = 4
+    return max(1, cpus - 3)
 
 
 # ---------------------------------------------------------------------------
@@ -48,20 +67,37 @@ _worker_leave_table = None
 def _init_worker(leave_table_path):
     """Load GADDAG and leave table once per worker process."""
     global _worker_gaddag, _worker_move_finder_cls, _worker_leave_table
-    from ..gaddag import get_gaddag
-    from .leave_table import LeaveTable
+    pid = os.getpid()
 
-    _worker_gaddag = get_gaddag()
-    _worker_leave_table = LeaveTable.load(leave_table_path)
+    try:
+        t0 = time.time()
+        print(f"  [Worker {pid}] Loading GADDAG...", flush=True)
+        from ..gaddag import get_gaddag
+        _worker_gaddag = get_gaddag()
+        print(f"  [Worker {pid}] GADDAG loaded ({time.time()-t0:.1f}s)", flush=True)
 
-    # Prefer Cython-accelerated move finder (~5-8x faster)
-    from ..move_finder_c import is_available as c_available
-    if c_available():
-        from ..move_finder_c import CMoveFinder
-        _worker_move_finder_cls = CMoveFinder
-    else:
-        from ..move_finder_gaddag import GADDAGMoveFinder
-        _worker_move_finder_cls = GADDAGMoveFinder
+        t1 = time.time()
+        from .leave_table import LeaveTable
+        _worker_leave_table = LeaveTable.load(leave_table_path)
+        print(f"  [Worker {pid}] Leave table loaded: {len(_worker_leave_table):,} entries ({time.time()-t1:.1f}s)", flush=True)
+
+        # Prefer Cython-accelerated move finder (~5-8x faster)
+        from ..move_finder_c import is_available as c_available
+        if c_available():
+            from ..move_finder_c import CMoveFinder
+            _worker_move_finder_cls = CMoveFinder
+            print(f"  [Worker {pid}] Move finder: C-accelerated", flush=True)
+        else:
+            from ..move_finder_gaddag import GADDAGMoveFinder
+            _worker_move_finder_cls = GADDAGMoveFinder
+            print(f"  [Worker {pid}] Move finder: Python (C extension not available)", flush=True)
+
+        print(f"  [Worker {pid}] Ready! (total init: {time.time()-t0:.1f}s)", flush=True)
+    except Exception as e:
+        print(f"  [Worker {pid}] INIT FAILED: {type(e).__name__}: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 def _play_batch(batch_size):
@@ -257,6 +293,10 @@ def train(num_games, workers, generation=1, resume_from=None,
     from crossplay.superleaves.trainer import _init_worker as init_fn
     from crossplay.superleaves.trainer import _play_batch as batch_fn
 
+    print(f"Spawning {workers} worker processes (each loads GADDAG + leave table)...")
+    print(f"  This typically takes 30-90 seconds. Please wait.\n", flush=True)
+    spawn_t0 = time.time()
+
     try:
         with ProcessPoolExecutor(
             max_workers=workers,
@@ -278,6 +318,7 @@ def train(num_games, workers, generation=1, resume_from=None,
                 futures[fut] = bs
                 submitted_games += bs
 
+            first_batch = True
             while futures:
                 # Wait for any future to complete
                 done_iter = as_completed(futures)
@@ -294,6 +335,10 @@ def train(num_games, workers, generation=1, resume_from=None,
                     total_s1 += s1
                     total_s2 += s2
                     total_obs_count += len(obs)
+
+                    if first_batch:
+                        print(f"\n  First batch complete! Workers loaded in {time.time()-spawn_t0:.1f}s. Training is running.\n", flush=True)
+                        first_batch = False
 
                     # Compute alpha for current progress
                     progress = games_done / max(num_games, 1)
@@ -412,8 +457,10 @@ def main():
     parser = argparse.ArgumentParser(
         description='SuperLeaves trainer -- self-play leave value training'
     )
-    parser.add_argument('--workers', type=int, default=4,
-                        help='Number of parallel workers (default: 4)')
+    default_w = _default_workers()
+    parser.add_argument('--workers', type=int, default=default_w,
+                        help=f'Number of parallel workers (default: {default_w}, '
+                             f'based on {os.cpu_count()} cores minus 3 reserved)')
     parser.add_argument('--games', type=int, default=1_000_000,
                         help='Total games per generation (default: 1M)')
     parser.add_argument('--generation', type=int, default=1,
@@ -432,6 +479,15 @@ def main():
     parser.add_argument('--report-every', type=int, default=1000,
                         help='Progress report interval (default: 1K)')
     args = parser.parse_args()
+
+    # System info
+    import platform
+    cpus = os.cpu_count() or '?'
+    print(f"\nSystem: {platform.system()} {platform.machine()}, "
+          f"Python {platform.python_version()}, "
+          f"{cpus} CPUs")
+    print(f"Workers: {args.workers} (of {cpus} cores, {max(0, int(cpus)-args.workers) if isinstance(cpus,int) else '?'} reserved)")
+    print()
 
     if args.smoke_test:
         num_games = 100_000

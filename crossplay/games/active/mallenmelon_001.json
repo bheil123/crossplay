@@ -227,16 +227,35 @@
       "engine": null
     },
     {
+      "word": "JUS",
+      "row": 8,
+      "col": 12,
+      "dir": "H",
+      "player": "me",
+      "score": 13,
+      "bag": 12,
+      "blanks": [],
+      "cumulative": [
+        260,
+        359
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T17:00:00.000000",
+      "engine": null
+    },
+    {
       "word": "AGOG",
       "row": 1,
       "col": 1,
       "dir": "V",
       "player": "opp",
       "score": 24,
-      "bag": 19,
+      "bag": 5,
       "blanks": [],
       "cumulative": [
-        247,
+        260,
         383
       ],
       "rack": null,
@@ -246,32 +265,13 @@
       "engine": null
     },
     {
-      "word": "AGOG",
-      "row": 1,
-      "col": 1,
-      "dir": "V",
-      "player": "opp",
-      "score": 24,
-      "bag": 19,
-      "blanks": [],
-      "cumulative": [
-        247,
-        407
-      ],
-      "rack": null,
-      "drawn": null,
-      "note": "",
-      "timestamp": "2026-02-17T17:15:29.697913",
-      "engine": null
-    },
-    {
       "word": "CONTRAS",
       "row": 14,
       "col": 2,
       "dir": "H",
       "player": "me",
       "score": 73,
-      "bag": 19,
+      "bag": 0,
       "blanks": [],
       "cumulative": [
         333,
@@ -281,6 +281,63 @@
       "drawn": "RKBYBEI",
       "note": "",
       "timestamp": "2026-02-17T17:45:07.302326",
+      "engine": null
+    },
+    {
+      "word": "RAND",
+      "row": 12,
+      "col": 4,
+      "dir": "V",
+      "player": "opp",
+      "score": 18,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        333,
+        401
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T18:00:00.000000",
+      "engine": null
+    },
+    {
+      "word": "BORK",
+      "row": 3,
+      "col": 11,
+      "dir": "V",
+      "player": "me",
+      "score": 28,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        361,
+        401
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "engine recommended KERRY R12C1 H for 39",
+      "timestamp": "2026-02-17T18:30:00.000000",
+      "engine": null
+    },
+    {
+      "word": "QUERN",
+      "row": 12,
+      "col": 1,
+      "dir": "H",
+      "player": "opp",
+      "score": 39,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        361,
+        440
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T19:00:00.000000",
       "engine": null
     }
   ],
@@ -296,38 +353,18 @@
       "E"
     ]
   ],
-  "your_score": 333,
-  "opp_score": 383,
-  "your_rack": "RKBYBEI",
-  "bag": [
-    "S",
-    "R",
-    "O",
-    "Z",
-    "Q",
-    "D",
-    "A",
-    "O",
-    "N",
-    "?",
-    "C",
-    "G",
-    "E",
-    "D",
-    "M",
-    "N",
-    "O",
-    "N",
-    "A"
-  ],
-  "is_your_turn": true,
+  "your_score": 361,
+  "opp_score": 440,
+  "your_rack": "",
+  "bag": [],
+  "is_your_turn": false,
   "opponent_name": "mallenmelon",
   "created_at": "2026-02-12",
-  "updated_at": "2026-02-17T17:45:07.302326",
-  "notes": "Turn 15. Me 230, Opp 296. Bag 25. Opp turn. Down 66. Rack ARAATUN. 2 blanks on board (L in OUTWILED, E in WHOEVER).",
-  "final_turns_remaining": null,
+  "updated_at": "2026-02-17T19:00:00.000000",
+  "notes": "Game complete. Lost 361-440 (-79). Direction bug caused BORK instead of KERRY/KIBBE. 2 blanks on board (L in OUTWILED, E in WHOEVER).",
+  "final_turns_remaining": 0,
   "game_id": "mallenmelon_001",
-  "status": "active",
-  "spread": -50,
-  "move_count": 20
+  "status": "completed",
+  "spread": -79,
+  "move_count": 23
 }

@@ -275,7 +275,9 @@
       "player": "me",
       "score": 66,
       "bag": 93,
-      "blanks": [],
+      "blanks": [
+        "L"
+      ],
       "cumulative": [
         277,
         279
@@ -313,7 +315,9 @@
       "player": "me",
       "score": 56,
       "bag": 93,
-      "blanks": [],
+      "blanks": [
+        "S"
+      ],
       "cumulative": [
         329,
         314
@@ -323,12 +327,125 @@
       "note": "bingo",
       "timestamp": "2026-02-17T12:30:52.375192",
       "engine": null
+    },
+    {
+      "word": "CEE",
+      "row": 7,
+      "col": 2,
+      "dir": "H",
+      "player": "opp",
+      "score": 20,
+      "bag": 8,
+      "blanks": [],
+      "cumulative": [
+        328,
+        334
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T21:01:49.446725",
+      "engine": null
+    },
+    {
+      "word": "FRITTS",
+      "row": 4,
+      "col": 1,
+      "dir": "H",
+      "player": "me",
+      "score": 27,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        355,
+        334
+      ],
+      "rack": "FNRTTII",
+      "drawn": "EESNI",
+      "note": "",
+      "timestamp": "2026-02-17T21:18:36.808789",
+      "engine": null
+    },
+    {
+      "word": "DELT",
+      "row": 1,
+      "col": 4,
+      "dir": "V",
+      "player": "opp",
+      "score": 18,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        355,
+        352
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T22:07:32.923988",
+      "engine": null
+    },
+    {
+      "word": "EN",
+      "row": 3,
+      "col": 8,
+      "dir": "V",
+      "player": "me",
+      "score": 17,
+      "bag": 93,
+      "blanks": [],
+      "cumulative": [
+        372,
+        352
+      ],
+      "rack": "INEESNI",
+      "drawn": "E",
+      "note": "",
+      "timestamp": "2026-02-17T22:14:35.673443",
+      "engine": null
+    },
+    {
+      "word": "GAVELS",
+      "row": 2,
+      "col": 1,
+      "dir": "H",
+      "player": "opp",
+      "score": 26,
+      "bag": 93,
+      "blanks": [
+        4
+      ],
+      "cumulative": [
+        372,
+        378
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-17T22:15:52.628563",
+      "engine": null
     }
   ],
-  "blank_positions": [],
-  "your_score": 328,
-  "opp_score": 314,
-  "your_rack": "FNRTTII",
+  "blank_positions": [
+    [
+      6,
+      8,
+      "L"
+    ],
+    [
+      4,
+      6,
+      "S"
+    ],
+    [
+      2,
+      5,
+      "L"
+    ]
+  ],
+  "your_score": 372,
+  "opp_score": 378,
+  "your_rack": "IEESNI",
   "bag": [
     "G",
     "S",
@@ -431,14 +548,14 @@
     "D",
     "A"
   ],
-  "is_your_turn": false,
+  "is_your_turn": true,
   "opponent_name": "canjam",
   "created_at": "2026-02-17",
-  "updated_at": "2026-02-17T12:30:54.329959",
+  "updated_at": "2026-02-17T22:15:52.628563",
   "notes": "Game 12 vs canjam. Opening move.",
-  "final_turns_remaining": null,
+  "final_turns_remaining": 0,
   "game_id": "canjam_003",
   "status": "active",
-  "spread": 14,
-  "move_count": 17
+  "spread": -6,
+  "move_count": 22
 }
