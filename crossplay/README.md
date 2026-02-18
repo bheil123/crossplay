@@ -86,6 +86,15 @@ python3 setup_accel.py build_ext --inplace
 | `pattern_index.pkl` | 11MB | Pattern matching index |
 | `gaddag_compact.bin` | 28MB | Auto-generated on first run |
 
+### Training data (Git LFS)
+| File | Size | Purpose |
+|------|------|---------|
+| `superleaves/deployed_leaves.pkl` | 21MB | Live leave table (921K patterns) |
+| `superleaves/gen1_350000.pkl` | 21MB | Gen1 final checkpoint (gen2 seed) |
+
+These files are tracked via Git LFS and downloaded automatically on clone.
+Intermediate training checkpoints are gitignored.
+
 ### Documentation
 | File | Purpose |
 |------|---------|

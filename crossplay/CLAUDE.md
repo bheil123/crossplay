@@ -475,6 +475,32 @@ Training runs in background and does not interfere with game play.
 Uses `Board()` directly (no `Game` class), so it does not trigger game
 library auto-save. Use `--workers N` to control CPU usage.
 
+**Training data in Git (LFS):** Two pkl files are tracked via Git LFS and
+pushed to GitHub so the engine works immediately after cloning:
+- `deployed_leaves.pkl` -- the live leave table used by the engine
+- `gen1_350000.pkl` -- final gen1 output (seed for gen2 training)
+
+All other pkl files (intermediate checkpoints, worker tables) are gitignored.
+After training a new generation, update deployed_leaves.pkl and commit:
+```bash
+cp superleaves/gen2_700000.pkl superleaves/deployed_leaves.pkl
+git add crossplay/superleaves/deployed_leaves.pkl
+git commit -m "Deploy gen2 SuperLeaves"
+git push
+```
+
+**Cleanup after training:** Intermediate checkpoints (gen2_10000.pkl through
+gen2_690000.pkl) accumulate at ~21 MB each during training. Delete all except
+the final checkpoint after training completes:
+```bash
+# Keep only gen2_700000.pkl (the final), delete intermediates
+ls superleaves/gen2_*.pkl | grep -v gen2_700000 | xargs rm
+```
+
+**Cloning on a new machine:** `git clone` + `git lfs pull` fetches all code
+and the deployed leave table. The engine is immediately playable. The GADDAG
+(gaddag_compact.bin) auto-builds on first run (~48 seconds).
+
 ## Common tasks
 
 **Start a new game:** `new N opponent` (e.g., `new 1 canjam`) -- creates
