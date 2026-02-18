@@ -554,6 +554,21 @@ Training runs in background and does not interfere with game play.
 Uses `Board()` directly (no `Game` class), so it does not trigger game
 library auto-save. Use `--workers N` to control CPU usage.
 
+**Graceful pause/resume for game analysis** (`analysis_lock.py`):
+The trainer and game analysis now coordinate CPU usage via a shared lock file.
+When you call `game.analyze()`, it creates `.analysis_lock` which signals the
+trainer to pause at the next checkpoint. The trainer resumes when analysis
+completes and the lock is cleared. Lock has a 5-minute timeout for crash
+recovery (stale lock auto-clears on trainer startup). This prevents the
+11-12 thread thrashing that occurs when both run simultaneously.
+
+**Recalibration (in development):**
+To recalibrate MC speed (recommended if throughput drops):
+1. Create signal file: `touch crossplay/.recalibrate_request`
+2. Trainer will checkpoint and exit when it sees the signal
+3. Run calibration: `python -m crossplay.mc_calibrate calibrate --force`
+4. Resume training: `python -m crossplay.superleaves.trainer --resume --generation 2 --games 700000`
+
 **Training data in Git (LFS):** Two pkl files are tracked via Git LFS and
 pushed to GitHub so the engine works immediately after cloning:
 - `deployed_leaves.pkl` -- the live leave table used by the engine

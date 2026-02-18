@@ -23,6 +23,8 @@ import time
 import math
 import glob
 import argparse
+import logging
+from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -320,6 +322,9 @@ def train(num_games, workers, generation=1, resume_from=None,
 
             first_batch = True
             while futures:
+                # Check for analysis pause request before processing next batch
+                from crossplay.analysis_lock import wait_for_analysis
+                wait_for_analysis(max_wait=600)
                 # Wait for any future to complete
                 done_iter = as_completed(futures)
                 for fut in done_iter:

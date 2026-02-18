@@ -45,6 +45,7 @@ from .lookahead import evaluate_with_lookahead
 from .parallel_eval import evaluate_with_lookahead_parallel
 from .mc_eval import mc_evaluate_2ply
 from .nyt_filter import is_nyt_curated, nyt_warning
+from .analysis_lock import acquire_lock, release_lock
 
 # =============================================================================
 # GAME STATE
@@ -454,6 +455,15 @@ class Game:
                          spread). MC early stopping controls actual sim
                          count per candidate (~150-530 avg vs K=2000 cap).
         """
+        # Request pause from training for duration of analysis
+        acquire_lock('game_analysis')
+        try:
+            return self._analyze_impl(rack, top_n, lookahead_n)
+        finally:
+            release_lock()
+
+    def _analyze_impl(self, rack: str, top_n: int, lookahead_n: int):
+        """Internal analyze implementation."""
         rack = rack or self.state.your_rack
         if not rack:
             print("No rack to analyze!")
