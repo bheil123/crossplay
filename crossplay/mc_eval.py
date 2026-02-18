@@ -1118,6 +1118,17 @@ def mc_evaluate_2ply(
             gaddag, k_sims, blank_corr
         )
 
+    # Convert board_moves dicts to (word, row, col, horizontal) tuples for workers.
+    # Workers unpack as: for word, row, col, horiz in board_moves
+    # GameState stores enriched dicts with 12+ keys; passing those raw causes
+    # "too many values to unpack" in workers and silent fallback to sequential.
+    board_move_tuples = []
+    for m in board_moves:
+        if isinstance(m, dict):
+            board_move_tuples.append((m['word'], m['row'], m['col'], m['dir'] == 'H'))
+        else:
+            board_move_tuples.append(m)
+
     # Build picklable argument tuples for parallel execution
     args_list = []
     exchange_args_list = []
@@ -1136,7 +1147,7 @@ def mc_evaluate_2ply(
         # Each worker gets a unique seed derived from the base seed
         worker_seed = (seed + i * 1000) if seed is not None else None
         args_list.append((
-            list(board_moves),
+            board_move_tuples,
             clean_move,
             unseen_pool,
             your_rack,
@@ -1150,7 +1161,7 @@ def mc_evaluate_2ply(
         for j, exch in enumerate(exchange_candidates):
             exch_seed = (seed + (len(candidates) + j) * 1000) if seed is not None else None
             exchange_args_list.append((
-                list(board_moves),
+                board_move_tuples,
                 exch,
                 unseen_pool,
                 board_blanks,

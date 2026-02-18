@@ -286,6 +286,15 @@ def evaluate_with_lookahead_parallel(
             board, candidates, opp_tiles_limited, your_rack, board_blanks, gaddag
         )
 
+    # Convert board_moves dicts to (word, row, col, horizontal) tuples for workers.
+    # Workers unpack as: for word, row, col, horiz in board_moves
+    board_move_tuples = []
+    for m in board_moves:
+        if isinstance(m, dict):
+            board_move_tuples.append((m['word'], m['row'], m['col'], m['dir'] == 'H'))
+        else:
+            board_move_tuples.append(m)
+
     # Build picklable argument tuples
     # Convert move dicts to plain dicts (drop any non-picklable refs)
     args_list = []
@@ -299,7 +308,7 @@ def evaluate_with_lookahead_parallel(
             'tiles_used': move.get('tiles_used', move['word']),
         }
         args_list.append((
-            list(board_moves),  # ensure it's a plain list
+            board_move_tuples,
             clean_move,
             opp_tiles_limited,
             your_rack,
