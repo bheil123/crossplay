@@ -236,8 +236,23 @@ for the next generation (starts at 0 games, not resume).
 **Gen1 results:** 350K games, 921K leave entries. Validated at parity with formula
 (498-501 over 1000 games, +2.9 avg spread). Deployed as `deployed_leaves.pkl`.
 
-**Gen2 status:** Training 700K games with 4 workers, initialized from gen1.
+**Gen2 status:** Training 700K games with 5 workers, initialized from gen1.
 Check `superleaves/status.json` for progress.
+
+**C-accelerated move scoring (`score_moves_c` in `gaddag_accel.pyx`):**
+Move scoring during training was moved from Python (in `move_finder_c.py`)
+to Cython. The new `score_moves_c()` function converts the board grid, bonus
+squares, and tile values to C arrays once per call, then scores all candidate
+moves (main word + crosswords + bingo bonus) using C-level loops. This is
+called by `find_all_moves_c()` after GADDAG traversal returns raw move tuples.
+Output format is unchanged -- same move dicts with all fields preserved.
+Result: **70% training speedup** (2.7 -> 4.6 games/sec at 5 workers).
+
+**Orphaned worker cleanup (`_cleanup_stale_workers` in `trainer.py`):**
+On Windows, orphaned multiprocessing workers from crashed/killed training runs
+can hold file locks on `gaddag_accel.pyd` and compete for CPU. The trainer now
+scans for orphaned Python multiprocessing workers (parent PID no longer alive)
+at startup and terminates them before spawning new workers.
 
 ## V18 roadmap: bingo -> sweep terminology
 
@@ -347,9 +362,13 @@ pip install cython
 python setup_accel.py build_ext --inplace
 ```
 
-The C extension accelerates single-call move generation (~1.5x faster per
-rack). For MC evaluation, the pure-Python `GADDAGMoveFinder` is used in
-parallel workers to avoid Python-C call overhead across process boundaries.
+The C extension provides three acceleration paths:
+- `find_moves_c()` -- GADDAG traversal for move generation
+- `score_moves_c()` -- C-level move scoring (main word + crosswords + bingo)
+- `find_best_score_c()` + `BoardContext` -- pre-computed MC simulation path
+
+For MC evaluation, the pure-Python `GADDAGMoveFinder` is used in parallel
+workers to avoid Python-C call overhead across process boundaries.
 
 ## Coding conventions
 

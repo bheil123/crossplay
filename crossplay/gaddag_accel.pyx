@@ -686,6 +686,228 @@ def find_moves_c(bytes gdata, list grid, str rack_str,
 
 
 # =========================================================================
+# score_moves_c — C-accelerated move scoring for training path
+#
+# Takes raw moves from find_moves_c() and scores them entirely in C,
+# replacing the Python scoring loop in move_finder_c.py.
+# =========================================================================
+
+def score_moves_c(list raw_moves, list grid, set board_blank_set,
+                  list tile_values_list, list bonus_data,
+                  int bingo_bonus, int rack_size):
+    """Score raw moves using C arrays. Returns list of scored move dicts.
+
+    Args:
+        raw_moves: list of (word_str, row1, col1, is_horiz, blanks_list)
+                   from find_moves_c()
+        grid: board._grid (0-indexed 15x15 list of lists, None or 'A'-'Z')
+        board_blank_set: set of (r0, c0) for blank tiles on board (0-indexed)
+        tile_values_list: list of 26 ints (tile values by letter index A=0)
+        bonus_data: list of 15 lists of 15 (letter_mult, word_mult) tuples
+        bingo_bonus: bonus for using all rack tiles
+        rack_size: rack size (7)
+
+    Returns:
+        list of move dicts sorted by score descending, each with:
+        word, row, col, direction, score, crosswords, blanks_used
+    """
+    # Convert to C arrays once
+    cdef int c_grid[15][15]
+    cdef int c_blanks[15][15]
+    cdef int c_tv[26]
+    cdef int c_lm[15][15]
+    cdef int c_wm[15][15]
+    cdef int r, c, i, j
+
+    for r in range(15):
+        for c in range(15):
+            val = (<list>(<list>grid)[r])[c]
+            if val is None:
+                c_grid[r][c] = -1
+            else:
+                c_grid[r][c] = <int>(ord(<str>val)) - 65
+            c_blanks[r][c] = 1 if (r, c) in board_blank_set else 0
+            lm_wm = (<list>(<list>bonus_data)[r])[c]
+            c_lm[r][c] = <int>(lm_wm[0])
+            c_wm[r][c] = <int>(lm_wm[1])
+
+    for i in range(26):
+        c_tv[i] = <int>tile_values_list[i]
+
+    # Score each move
+    cdef list results = []
+    cdef str word_str
+    cdef int row1, col1, r0, c0, wlen
+    cdef bint is_horiz
+    cdef list blanks_list
+    cdef set blanks_set
+    cdef int main_score, word_mult, lv, lm_val, wm_val
+    cdef int cw_total, cw_score, cw_wmult, plv
+    cdef bint is_new, is_blank, has_perp
+    cdef int cr, cc, wi
+    cdef int new_count
+    cdef int total
+    cdef int c2, r2
+    cdef int ch_idx
+    cdef list new_positions
+
+    for move_tuple in raw_moves:
+        word_str = <str>move_tuple[0]
+        row1 = <int>move_tuple[1]
+        col1 = <int>move_tuple[2]
+        is_horiz = <bint>move_tuple[3]
+        blanks_list = <list>move_tuple[4]
+
+        r0 = row1 - 1
+        c0 = col1 - 1
+        wlen = len(word_str)
+        blanks_set = set(blanks_list)
+
+        # Score main word
+        main_score = 0
+        word_mult = 1
+        new_positions = []
+
+        for i in range(wlen):
+            if is_horiz:
+                cr = r0
+                cc = c0 + i
+            else:
+                cr = r0 + i
+                cc = c0
+
+            is_new = c_grid[cr][cc] < 0
+
+            if i in blanks_set:
+                lv = 0
+            elif not is_new and c_blanks[cr][cc]:
+                lv = 0
+            else:
+                lv = c_tv[<int>(ord(word_str[i])) - 65]
+
+            if is_new:
+                new_positions.append((cr, cc, i))
+                lm_val = c_lm[cr][cc]
+                wm_val = c_wm[cr][cc]
+                lv = lv * lm_val
+                word_mult = word_mult * wm_val
+
+            main_score += lv
+
+        main_score = main_score * word_mult
+
+        # Score crosswords
+        cw_total = 0
+        crosswords = []
+
+        for pos_tuple in new_positions:
+            cr = <int>pos_tuple[0]
+            cc = <int>pos_tuple[1]
+            wi = <int>pos_tuple[2]
+            is_blank = wi in blanks_set
+
+            if is_horiz:
+                has_perp = (cr > 0 and c_grid[cr-1][cc] >= 0) or \
+                           (cr < 14 and c_grid[cr+1][cc] >= 0)
+            else:
+                has_perp = (cc > 0 and c_grid[cr][cc-1] >= 0) or \
+                           (cc < 14 and c_grid[cr][cc+1] >= 0)
+
+            if not has_perp:
+                continue
+
+            cw_horiz = not is_horiz
+            cw_score = 0
+            cw_wmult = 1
+            cw_chars = []
+            cw_start_r = cr
+            cw_start_c = cc
+
+            if cw_horiz:
+                # Scan left
+                c2 = cc - 1
+                pre = []
+                while c2 >= 0 and c_grid[cr][c2] >= 0:
+                    ch_idx = c_grid[cr][c2]
+                    pre.append(chr(ch_idx + 65))
+                    cw_score += 0 if c_blanks[cr][c2] else c_tv[ch_idx]
+                    cw_start_c = c2
+                    c2 -= 1
+                pre.reverse()
+                cw_chars.extend(pre)
+                # Placed letter
+                cw_chars.append(word_str[wi])
+                plv = 0 if is_blank else c_tv[<int>(ord(word_str[wi])) - 65]
+                lm_val = c_lm[cr][cc]
+                wm_val = c_wm[cr][cc]
+                plv = plv * lm_val
+                cw_wmult = cw_wmult * wm_val
+                cw_score += plv
+                # Scan right
+                c2 = cc + 1
+                while c2 < 15 and c_grid[cr][c2] >= 0:
+                    ch_idx = c_grid[cr][c2]
+                    cw_chars.append(chr(ch_idx + 65))
+                    cw_score += 0 if c_blanks[cr][c2] else c_tv[ch_idx]
+                    c2 += 1
+            else:
+                # Scan up
+                r2 = cr - 1
+                pre = []
+                while r2 >= 0 and c_grid[r2][cc] >= 0:
+                    ch_idx = c_grid[r2][cc]
+                    pre.append(chr(ch_idx + 65))
+                    cw_score += 0 if c_blanks[r2][cc] else c_tv[ch_idx]
+                    cw_start_r = r2
+                    r2 -= 1
+                pre.reverse()
+                cw_chars.extend(pre)
+                # Placed letter
+                cw_chars.append(word_str[wi])
+                plv = 0 if is_blank else c_tv[<int>(ord(word_str[wi])) - 65]
+                lm_val = c_lm[cr][cc]
+                wm_val = c_wm[cr][cc]
+                plv = plv * lm_val
+                cw_wmult = cw_wmult * wm_val
+                cw_score += plv
+                # Scan down
+                r2 = cr + 1
+                while r2 < 15 and c_grid[r2][cc] >= 0:
+                    ch_idx = c_grid[r2][cc]
+                    cw_chars.append(chr(ch_idx + 65))
+                    cw_score += 0 if c_blanks[r2][cc] else c_tv[ch_idx]
+                    r2 += 1
+
+            cw_score = cw_score * cw_wmult
+            cw_total += cw_score
+            crosswords.append({
+                'word': ''.join(cw_chars),
+                'row': cw_start_r + 1,
+                'col': cw_start_c + 1,
+                'horizontal': cw_horiz,
+                'score': cw_score,
+            })
+
+        total = main_score + cw_total
+        new_count = len(new_positions)
+        if new_count >= rack_size:
+            total += bingo_bonus
+
+        results.append({
+            'word': word_str,
+            'row': row1,
+            'col': col1,
+            'direction': 'H' if is_horiz else 'V',
+            'score': total,
+            'crosswords': crosswords,
+            'blanks_used': blanks_list,
+        })
+
+    results.sort(key=lambda m: -m['score'])
+    return results
+
+
+# =========================================================================
 # BoardContext — pre-computed board state for fast MC simulation
 #
 # Usage: ctx = prepare_board_context(...) once per board state,

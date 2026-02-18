@@ -490,6 +490,77 @@ def train(num_games, workers, generation=1, resume_from=None,
 # CLI
 # ---------------------------------------------------------------------------
 
+def _cleanup_stale_workers():
+    """Kill any leftover trainer worker processes from a previous run.
+
+    On Windows, orphaned multiprocessing workers can hold file locks
+    (e.g. gaddag_accel.pyd) and compete for CPU during benchmarks.
+    This scans for Python processes spawned via multiprocessing whose
+    parent PID no longer exists (orphans) and terminates them.
+    """
+    if sys.platform != 'win32':
+        return  # Unix handles this via process groups
+
+    try:
+        import subprocess
+        # Get all Python processes with their PIDs and parent PIDs
+        result = subprocess.run(
+            ['wmic', 'process', 'where', "Name like 'python%'",
+             'get', 'ProcessId,ParentProcessId,CommandLine',
+             '/format:csv'],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            return
+
+        my_pid = os.getpid()
+        stale_pids = []
+
+        for line in result.stdout.strip().split('\n'):
+            line = line.strip()
+            if not line or 'ProcessId' in line:
+                continue
+            parts = line.split(',')
+            if len(parts) < 4:
+                continue
+            # CSV format: Node,CommandLine,ParentProcessId,ProcessId
+            cmd = parts[1] if len(parts) > 1 else ''
+            try:
+                parent_pid = int(parts[-2])
+                pid = int(parts[-1])
+            except (ValueError, IndexError):
+                continue
+
+            # Skip ourselves
+            if pid == my_pid:
+                continue
+
+            # Only target multiprocessing spawn workers
+            if 'multiprocessing' not in cmd and 'spawn' not in cmd:
+                continue
+
+            # Check if parent is still alive
+            try:
+                os.kill(parent_pid, 0)  # signal 0 = existence check
+            except OSError:
+                # Parent is dead -- this is an orphaned worker
+                stale_pids.append(pid)
+
+        if stale_pids:
+            import signal
+            print(f"  Cleaning up {len(stale_pids)} orphaned worker(s) "
+                  f"from a previous run...", flush=True)
+            for pid in stale_pids:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except OSError:
+                    pass  # Already gone
+            time.sleep(1)  # Give them time to exit
+
+    except Exception:
+        pass  # Non-critical -- don't block startup
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='SuperLeaves trainer -- self-play leave value training'
@@ -525,6 +596,8 @@ def main():
           f"{cpus} CPUs")
     print(f"Workers: {args.workers} (of {cpus} cores, {max(0, int(cpus)-args.workers) if isinstance(cpus,int) else '?'} reserved)")
     print()
+
+    _cleanup_stale_workers()
 
     if args.smoke_test:
         num_games = 100_000
