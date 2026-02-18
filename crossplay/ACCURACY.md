@@ -81,25 +81,27 @@ leave accuracy.
 
 ### 2. MC blank capping
 
-**Current approach:** Opponent racks capped at 1 blank for move
-generation speed. Post-hoc correction factor applied using
-hypergeometric ratios (RATIO_0v1=0.637, RATIO_2v1=1.284,
-RATIO_3v1=1.617).
+**Current approach:** Opponent racks capped at 2 blanks for move
+generation speed. Post-hoc correction factor applied only when all 3
+blanks are unseen, using hypergeometric ratios (RATIO_0v2=0.470,
+RATIO_1v2=0.687, RATIO_3v2=1.036). Cap=2 was chosen because it
+handles the vast majority of draws exactly (only 3-blank draws need
+correction, ~0.3% of draws at unseen=44), while cap=3 is ~2.7x slower.
 
-**Why it matters:** When 2-3 blanks are unseen, the correction factor
-adjusts avg_opp but uses global ratios measured on a single board
-position. Actual ratios vary by board density: dense boards with many
-constrained squares make blanks less valuable (fewer valid placements),
-while sparse boards make blanks more valuable.
+**Why it matters:** With cap=2, the correction is much smaller than the
+old cap=1 approach (~1.01-1.04x vs ~1.05-1.15x). The remaining error
+is from the rare 3-blank draws, which are nearly negligible in most
+game states.
 
 **Known weaknesses:**
 - Correction ratios are global, not per-board-density
 - Ratios were calibrated on a single Crossplay board state
-- 3-blank games (Crossplay-specific) have a wider correction range
-  than 2-blank Scrabble, amplifying any ratio error
+- Correction only matters when all 3 blanks are unseen (early-mid game)
 
-**Fix path:** Build a density-indexed correction table. Run calibration
-at sparse/dense/vdense board states and interpolate.
+**Fix path:** Already substantially improved by moving from cap=1 to
+cap=2. Remaining correction is small enough that per-density indexing
+has diminishing returns. Could still calibrate at multiple board states
+for marginal accuracy.
 
 ### 3. Phase 2 positional heuristics
 

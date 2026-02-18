@@ -273,9 +273,9 @@ def evaluate_3ply(
     blanks_in_unseen = unseen_tiles.count('?')
 
     # Limit blanks in unseen for opponent move generation speed
-    unseen_limited = _limit_blanks(unseen_tiles, max_blanks=1)
-    
-    # Blank correction: compensate for capping blanks at 1
+    unseen_limited = _limit_blanks(unseen_tiles, max_blanks=2)
+
+    # Blank correction: compensate for capping blanks at 2
     from .mc_eval import _blank_correction_factor
     blank_corr = _blank_correction_factor(unseen_count, blanks_in_unseen)
 
@@ -493,7 +493,7 @@ def _calculate_leave(rack: str, move: dict) -> str:
     return ''.join(sorted(leave))
 
 
-def _limit_blanks(tiles: str, max_blanks: int = 1) -> str:
+def _limit_blanks(tiles: str, max_blanks: int = 2) -> str:
     """Limit blanks in tile string to avoid exponential blowup."""
     result = []
     blank_count = 0
@@ -570,7 +570,7 @@ def evaluate_near_endgame(
     # Pre-compute board blank set (0-indexed)
     bb_set = {(r - 1, c - 1) for r, c, _ in board_blanks}
 
-    # Blank correction factor for opponent moves (blanks capped to 1 for speed)
+    # Blank correction factor for opponent moves (blanks capped to 2 for speed)
     blanks_in_unseen = unseen_tiles.count('?')
     from .mc_eval import _blank_correction_factor
     blank_corr = _blank_correction_factor(unseen_count, blanks_in_unseen)
@@ -738,7 +738,7 @@ def evaluate_near_endgame(
             your_full_rack = your_leave + drawn_tiles
 
             # Limit blanks for opponent move generation
-            opp_rack_limited = _limit_blanks(opp_rack, max_blanks=1)
+            opp_rack_limited = _limit_blanks(opp_rack, max_blanks=2)
 
             # PLY 2: Opponent's best response on post-move board (cached ctx)
             opp_result = _find_best(

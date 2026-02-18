@@ -674,76 +674,88 @@ def _get_leave(rack: str, tiles_used: str) -> str:
 def _blank_correction_factor(total_unseen: int, blanks_unseen: int) -> float:
     """
     Calculate correction multiplier for MC opponent scores when blanks are capped.
-    
-    The MC simulation caps blanks at 1 in opponent racks for performance.
-    This underestimates opponent scoring when 2+ blanks are unseen.
-    
-    Based on empirical measurement (Crossplay board, N=50 per category):
-      0-blank avg best = 49.3
-      1-blank avg best = 77.5  (baseline)
-      2-blank avg best = 99.5  (1.28x vs 1-blank)
-    
+
+    The MC simulation caps blanks at 2 in opponent racks for performance.
+    This is only needed when 3 blanks are unseen (Crossplay has 3 blanks).
+    With cap=2, the correction is small (~1.01-1.04x) since 3-blank racks
+    are extremely rare (~0.3% of draws at unseen=44).
+
+    Based on empirical measurement (Crossplay board, N=20 per category):
+      0-blank avg best = 39
+      1-blank avg best = 57
+      2-blank avg best = 83  (baseline for cap=2)
+      3-blank avg best = 86  (1.04x vs 2-blank)
+
     Uses hypergeometric distribution to calculate P(opp draws k blanks).
     Returns multiplier to apply to avg_opp score (1.0 = no correction needed).
-    
-    Typical corrections (Crossplay, 3 blanks total):
-      unseen=12, 2 blanks: 1.19x
-      unseen=17, 2 blanks: 1.16x
-      unseen=14, 3 blanks: 1.34x
-      unseen=19, 3 blanks: 1.29x
+
+    Typical corrections (Crossplay, 3 blanks total, cap=2):
+      unseen=24, 3 blanks: ~1.04x
+      unseen=44, 3 blanks: ~1.02x
+      unseen=65, 3 blanks: ~1.01x
+      unseen=93, 3 blanks: ~1.01x
     """
-    if blanks_unseen <= 1 or total_unseen < 7:
+    if blanks_unseen <= 2 or total_unseen < 7:
         return 1.0
-    
+
     from math import comb
-    
-    # Empirical scoring ratios: score[k_blanks] / score[1_blank]
-    # Calibrated on Crossplay board (N=50 per category)
-    RATIO_0v1 = 0.637   # 0-blank scores ~64% of 1-blank
-    RATIO_2v1 = 1.284   # 2-blank scores ~128% of 1-blank
-    RATIO_3v1 = 1.617   # 3-blank estimated (RATIO_2v1 ^ 1.5)
-    
+
+    # Empirical scoring ratios: score[k_blanks] / score[2_blank]
+    # Calibrated on Crossplay board (Turn 13 position, N=20 per category)
+    RATIO_0v2 = 0.470   # 0-blank scores ~47% of 2-blank
+    RATIO_1v2 = 0.687   # 1-blank scores ~69% of 2-blank
+    RATIO_3v2 = 1.036   # 3-blank scores ~104% of 2-blank
+
     draw = min(7, total_unseen)
-    
+
     def p_draw_k(k):
         """P(exactly k blanks in draw from unseen)"""
         non = total_unseen - blanks_unseen
         if k > blanks_unseen or k > draw or (draw - k) > non:
             return 0.0
         return comb(blanks_unseen, k) * comb(non, draw - k) / comb(total_unseen, draw)
-    
-    # True expected score (relative to 1-blank baseline):
-    # E_true = P(0)*ratio_0v1 + P(1)*1.0 + P(2)*ratio_2v1 + P(3)*ratio_3v1
+
+    # True expected score (relative to 2-blank baseline):
+    # E_true = P(0)*ratio_0v2 + P(1)*ratio_1v2 + P(2)*1.0 + P(3)*ratio_3v2
     p0 = p_draw_k(0)
     p1 = p_draw_k(1)
     p2 = p_draw_k(2)
     p3 = p_draw_k(3) if blanks_unseen >= 3 else 0.0
-    
-    e_true = p0 * RATIO_0v1 + p1 * 1.0 + p2 * RATIO_2v1 + p3 * RATIO_3v1
-    
+
+    e_true = p0 * RATIO_0v2 + p1 * RATIO_1v2 + p2 * 1.0 + p3 * RATIO_3v2
+
     # MC-capped expected score:
-    # MC pool has (total - blanks_removed) tiles with only 1 blank.
+    # MC pool has (total - blanks_removed) tiles with 2 blanks max.
     # Recalculate draw probabilities for the capped pool.
-    blanks_removed = blanks_unseen - 1
+    blanks_removed = blanks_unseen - 2
     cap_total = total_unseen - blanks_removed
-    cap_non = cap_total - 1  # 1 blank remains
+    cap_blanks = 2  # 2 blanks remain in capped pool
     cap_draw = min(7, cap_total)
-    
+
     if cap_total < 1 or cap_draw < 1:
         return 1.0
-    
-    cp0 = comb(cap_non, cap_draw) / comb(cap_total, cap_draw) if cap_non >= cap_draw else 0.0
-    cp1 = 1.0 - cp0
-    
-    e_capped = cp0 * RATIO_0v1 + cp1 * 1.0
-    
+
+    cap_non = cap_total - cap_blanks
+
+    def p_draw_k_capped(k):
+        """P(exactly k blanks in draw from capped pool)"""
+        if k > cap_blanks or k > cap_draw or (cap_draw - k) > cap_non:
+            return 0.0
+        return comb(cap_blanks, k) * comb(cap_non, cap_draw - k) / comb(cap_total, cap_draw)
+
+    cp0 = p_draw_k_capped(0)
+    cp1 = p_draw_k_capped(1)
+    cp2 = p_draw_k_capped(2)
+
+    e_capped = cp0 * RATIO_0v2 + cp1 * RATIO_1v2 + cp2 * 1.0
+
     if e_capped <= 0:
         return 1.0
-    
+
     return e_true / e_capped
 
 
-def _limit_blanks(tiles: str, max_blanks: int = 1) -> str:
+def _limit_blanks(tiles: str, max_blanks: int = 2) -> str:
     """Limit blanks in tile string to avoid exponential move generation."""
     blank_count = tiles.count('?')
     if blank_count <= max_blanks:
@@ -1064,7 +1076,7 @@ def mc_evaluate_2ply(
     blank_corr = _blank_correction_factor(len(unseen_tiles_str), blanks_in_unseen)
 
     # Limit blanks in unseen to avoid exponential blowup in move generation
-    unseen_limited = _limit_blanks(unseen_tiles_str, max_blanks=1)
+    unseen_limited = _limit_blanks(unseen_tiles_str, max_blanks=2)
 
     # Expand to a list for random.sample
     unseen_pool = _expand_unseen_to_pool(unseen_limited)

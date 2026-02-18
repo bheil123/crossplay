@@ -80,8 +80,8 @@ def evaluate_with_lookahead(
         )
         
         # Limit blanks in opponent tiles to avoid exponential blowup
-        # Move generation with 2+ blanks is extremely slow
-        opp_tiles_limited = _limit_blanks(opponent_tiles, max_blanks=1)
+        # Move generation with 3+ blanks is extremely slow
+        opp_tiles_limited = _limit_blanks(opponent_tiles, max_blanks=2)
         
         # Find opponent's best response
         opp_finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks)
@@ -194,16 +194,16 @@ def _get_leave(rack: str, tiles_used: str) -> str:
     return ''.join(rack_list)
 
 
-def _limit_blanks(tiles: str, max_blanks: int = 1) -> str:
+def _limit_blanks(tiles: str, max_blanks: int = 2) -> str:
     """
     Limit the number of blanks in a tile string.
-    
-    Move generation with 2+ blanks is extremely slow (exponential).
-    For practical 2-ply lookahead, we cap blanks.
+
+    Move generation with 3+ blanks is extremely slow (exponential).
+    For practical 2-ply lookahead, we cap blanks at 2.
     
     Args:
         tiles: Tile string (may contain '?' for blanks)
-        max_blanks: Maximum blanks to keep (default 1)
+        max_blanks: Maximum blanks to keep (default 2)
         
     Returns:
         Tile string with excess blanks removed

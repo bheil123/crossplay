@@ -983,12 +983,12 @@ class Game:
             lookahead_n: Override N (None = adaptive)
             exchange_candidates: Exchange moves to compete with regular plays
         """
-        # Build unseen tiles string (limit blanks to 1 for speed)
+        # Build unseen tiles string (limit blanks to 2 for speed)
         unseen_tiles = []
         blank_count = 0
         for letter, count in sorted(unseen.items()):
             if letter == '?':
-                blanks_to_add = min(count, 1)
+                blanks_to_add = min(count, 2)
                 unseen_tiles.extend(['?'] * blanks_to_add)
                 blank_count = count
             else:
@@ -1035,10 +1035,10 @@ class Game:
         print(f"MONTE CARLO 2-PLY (K={k_sims} sims x N={lookahead_n} candidates) [{total_unseen} unseen]")
         print(f"  ({nk_reason})")
         print("=" * 70)
-        if blank_count > 1:
+        if blank_count > 2:
             from .mc_eval import _blank_correction_factor
             bcf = _blank_correction_factor(total_unseen, blank_count)
-            print(f"Note: {blank_count} blanks unseen, capped to 1 for speed (correction: {bcf:.3f}x)")
+            print(f"Note: {blank_count} blanks unseen, capped to 2 for speed (correction: {bcf:.3f}x)")
         
         try:
             t_mc_start = time.time()

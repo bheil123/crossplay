@@ -133,7 +133,7 @@ def _get_leave_static(rack: str, tiles_used: str) -> str:
 # Shared helpers (used by both parallel and sequential paths)
 # ---------------------------------------------------------------------------
 
-def _limit_blanks(tiles: str, max_blanks: int = 1) -> str:
+def _limit_blanks(tiles: str, max_blanks: int = 2) -> str:
     """Limit blanks in tile string to avoid exponential move generation."""
     blank_count = tiles.count('?')
     if blank_count <= max_blanks:
@@ -266,7 +266,7 @@ def evaluate_with_lookahead_parallel(
         return []
 
     candidates = _select_candidates(your_moves, board, top_n, include_blockers)
-    opp_tiles_limited = _limit_blanks(opponent_tiles, max_blanks=1)
+    opp_tiles_limited = _limit_blanks(opponent_tiles, max_blanks=2)
 
     # Fall back to sequential if board_moves not provided
     if board_moves is None:
