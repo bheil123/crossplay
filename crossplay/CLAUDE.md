@@ -264,6 +264,28 @@ their new rack. Drawn tiles are inferred by comparing old rack (minus tiles
 used) to the new rack. Without the 6th arg, the old behavior (validate
 against current rack, simulate draw) is preserved.
 
+**Rack tracking (IMPORTANT):**
+Always capture the player's rack with every move. When recording moves:
+- Set `game.state.your_rack` BEFORE calling `play_move()` so the rack-before
+  is saved in the move record
+- After the move, either provide the new rack (post-draw) or let the engine
+  simulate the draw
+- For opponent moves, rack is unknown (null) — that's expected
+- For NYT Crossplay games: NYT reports full move-by-move detail including
+  racks after game completion. Backfill rack data post-game for analysis.
+- Without rack data, post-game analysis comparing engine vs NYT recommendations
+  is impossible
+
+**Game management — use standard functions ONLY:**
+Never edit game JSON files directly. Always use GameManager methods:
+- `gm.new_game(slot, opponent_name)` — create a new game
+- `game.play_move(word, row, col, horizontal)` — record your move
+- `game.record_opponent_move(word, row, col, horizontal, score)` — record opponent
+- `gm.end_game(slot, result, your_score, opp_score)` — archive completed game
+- `game.state.your_rack = "LETTERS"` — set rack before analysis/play
+These functions handle scoring, blank detection, board placement, bag tracking,
+endgame detection, auto-save, and crash-recovery archiving.
+
 ## Data files (committed, do not regenerate)
 
 | File | Size | Purpose |

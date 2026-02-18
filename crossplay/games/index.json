@@ -1,8 +1,8 @@
 {
   "slots": {
-    "1": "canjam_003",
-    "2": "mallenmelon_001",
-    "3": "eggsbenny_001",
+    "1": "melain_002",
+    "2": null,
+    "3": null,
     "4": "sophie_001"
   },
   "counters": {
@@ -10,7 +10,8 @@
     "mallenmelon": 1,
     "eggsbenny": 1,
     "sophie": 1,
-    "garnetgirl": 1
+    "garnetgirl": 1,
+    "melain": 2
   },
   "opponent_notes": {}
 }
