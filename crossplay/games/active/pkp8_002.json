@@ -85,19 +85,96 @@
       "player": "me",
       "score": 51,
       "bag": 66,
-      "blanks": [0],
-      "cumulative": [103, 45],
+      "blanks": [
+        0
+      ],
+      "cumulative": [
+        103,
+        45
+      ],
       "rack": "NKREYA?",
       "drawn": "NDSYE",
       "note": "",
       "timestamp": "2026-02-18T19:58:00.000000",
       "engine": null
+    },
+    {
+      "word": "REZ",
+      "row": 2,
+      "col": 12,
+      "dir": "H",
+      "player": "opp",
+      "score": 24,
+      "bag": 90,
+      "blanks": [],
+      "cumulative": [
+        103,
+        69
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-19T13:07:36.975619",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "DEW",
+      "row": 5,
+      "col": 11,
+      "dir": "H",
+      "player": "me",
+      "score": 8,
+      "bag": 90,
+      "blanks": [],
+      "cumulative": [
+        111,
+        69
+      ],
+      "rack": "NNRDSYE",
+      "drawn": "I",
+      "note": "",
+      "timestamp": "2026-02-19T13:11:55.333445",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "DEW",
+      "row": 5,
+      "col": 11,
+      "dir": "H",
+      "player": "me",
+      "score": 8,
+      "bag": 90,
+      "blanks": [],
+      "cumulative": [
+        119,
+        69
+      ],
+      "rack": "NNRISYE",
+      "drawn": "",
+      "note": "",
+      "timestamp": "2026-02-19T13:12:02.709663",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
-  "blank_positions": [[1, 12, "B"]],
-  "your_score": 103,
-  "opp_score": 45,
-  "your_rack": "NNRDSYE",
+  "blank_positions": [
+    [
+      1,
+      12,
+      "B"
+    ]
+  ],
+  "your_score": 119,
+  "opp_score": 69,
+  "your_rack": "NNRISYE",
   "bag": [
     "R",
     "I",
@@ -197,14 +274,14 @@
     "L",
     "J"
   ],
-  "is_your_turn": false,
+  "is_your_turn": true,
   "opponent_name": "pkp8",
   "created_at": "2026-02-18T15:55:58.762425",
-  "updated_at": "2026-02-18T19:58:45.138934",
+  "updated_at": "2026-02-19T13:12:04.030084",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "pkp8_002",
   "status": "active",
-  "spread": 58,
-  "move_count": 5
+  "spread": 50,
+  "move_count": 8
 }
