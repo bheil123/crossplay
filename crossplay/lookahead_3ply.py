@@ -586,8 +586,11 @@ def evaluate_near_endgame(
         from .move_finder_c import _get_dict
         _d = _get_dict()
         class _SetDict:
-            __slots__ = ('is_valid',)
-            def __init__(self, s): self.is_valid = s.__contains__
+            __slots__ = ('is_valid', '_contains')
+            def __init__(self, s):
+                self.is_valid = s.__contains__
+                self._contains = s.__contains__
+            def __contains__(self, w): return self._contains(w)
         _word_set = _SetDict(_d._words)
         from .config import TILE_VALUES, VALID_TWO_LETTER, BINGO_BONUS, RACK_SIZE
         _tv = [0] * 26
