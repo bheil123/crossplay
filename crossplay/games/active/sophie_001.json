@@ -87,7 +87,7 @@
     },
     {
       "word": "EF",
-      "row": 12,
+      "row": 13,
       "col": 2,
       "dir": "V",
       "player": null,
@@ -212,7 +212,7 @@
     {
       "word": "MOT",
       "row": 13,
-      "col": 6,
+      "col": 7,
       "dir": "H",
       "player": "opp",
       "score": 18,
@@ -303,6 +303,46 @@
       "note": "",
       "timestamp": "2026-02-18T06:25:06.361577",
       "engine": null
+    },
+    {
+      "word": "ETA",
+      "row": 14,
+      "col": 7,
+      "dir": "H",
+      "player": "opp",
+      "score": 27,
+      "bag": 37,
+      "blanks": [],
+      "cumulative": [
+        336,
+        308
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-18T16:16:27.486915",
+      "engine": null
+    },
+    {
+      "word": "SIZE",
+      "row": 15,
+      "col": 9,
+      "dir": "H",
+      "player": "me",
+      "score": 40,
+      "bag": 33,
+      "blanks": [
+        0
+      ],
+      "cumulative": [
+        376,
+        308
+      ],
+      "rack": "JOIEIZ?",
+      "drawn": "GSE?",
+      "note": "",
+      "timestamp": "2026-02-18T16:48:19.322054",
+      "engine": null
     }
   ],
   "blank_positions": [
@@ -310,11 +350,16 @@
       15,
       4,
       "E"
+    ],
+    [
+      15,
+      9,
+      "S"
     ]
   ],
-  "your_score": 336,
-  "opp_score": 281,
-  "your_rack": "OZIIEZE",
+  "your_score": 376,
+  "opp_score": 308,
+  "your_rack": "JOOTVIW",
   "bag": [
     "O",
     "U",
@@ -355,20 +400,16 @@
     "I",
     "O",
     "R",
-    "H",
-    "?",
-    "E",
-    "S",
-    "G"
+    "H"
   ],
-  "is_your_turn": true,
+  "is_your_turn": false,
   "opponent_name": "sophie",
   "created_at": "2026-02-12",
-  "updated_at": "2026-02-18T06:25:07.020770",
+  "updated_at": "2026-02-18T16:48:19.511782",
   "notes": "Turn 13. Me 199, Opp 118. Bag 42. Sophie turn. Rack SRTLAAN. Up 81.",
   "final_turns_remaining": null,
   "game_id": "sophie_001",
   "status": "active",
-  "spread": 55,
-  "move_count": 20
+  "spread": 68,
+  "move_count": 22
 }

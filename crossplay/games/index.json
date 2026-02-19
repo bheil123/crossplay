@@ -2,7 +2,7 @@
   "slots": {
     "1": "melain_003",
     "2": "melain_002",
-    "3": null,
+    "3": "pkp8_002",
     "4": "sophie_001"
   },
   "counters": {
@@ -11,7 +11,8 @@
     "eggsbenny": 1,
     "sophie": 1,
     "garnetgirl": 1,
-    "melain": 3
+    "melain": 3,
+    "pkp8": 2
   },
   "opponent_notes": {}
 }
