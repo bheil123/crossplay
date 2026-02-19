@@ -3272,6 +3272,9 @@ class GameManager:
             
             elif action == 'play' and len(parts) >= 5:
                 if game:
+                    if not game.state.is_your_turn:
+                        print("[!] It's not your turn. Use 'opp' to record opponent's move.")
+                        continue
                     try:
                         word = parts[1].upper()
                         row = int(parts[2])
@@ -3289,9 +3292,12 @@ class GameManager:
                         print(f"Error: {e}")
                 else:
                     print("No game in current slot")
-            
+
             elif action in ('opp', 'opp!') and len(parts) >= 6:
                 if game:
+                    if game.state.is_your_turn:
+                        print("[!] It's your turn. Use 'play' to record your move.")
+                        continue
                     try:
                         force = (action == 'opp!')
                         word = parts[1].upper()
