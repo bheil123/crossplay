@@ -305,6 +305,15 @@ Fixed in all three move finder implementations:
 The fix removes `and limit == 0` from the guard condition. When limit > 0,
 both strategies are now tried: (1) extend left first, (2) start at anchor.
 
+**Opponent move validation (V17.2):**
+`record_opponent_move()` validates moves BEFORE placing them on the board.
+Checks: board bounds, tile conflicts, connectivity to existing tiles (or
+center coverage on first move), main word validity (GADDAG dictionary), and
+cross-word validity. Invalid moves print specific errors and suggest `opp!`
+to force-accept. The `opp!` override handles cases where WWF accepts a word
+not in our NASPA dictionary. Validation is read-only and cannot corrupt board
+state.
+
 **Auto-analyze after opponent moves:**
 `record_opponent_move()` now automatically runs `analyze()` after recording
 an opponent move (when a rack is set). This ensures the engine recommendation

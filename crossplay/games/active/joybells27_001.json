@@ -135,6 +135,50 @@
       "note": "",
       "timestamp": "2026-02-18T22:53:58.044981",
       "engine": null
+    },
+    {
+      "word": "ETCH",
+      "row": 10,
+      "col": 9,
+      "dir": "H",
+      "player": "opp",
+      "score": 20,
+      "bag": 76,
+      "blanks": [],
+      "cumulative": [
+        162,
+        84
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-19T11:18:19.536774",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "VARY",
+      "row": 12,
+      "col": 4,
+      "dir": "V",
+      "player": "me",
+      "score": 36,
+      "bag": 76,
+      "blanks": [],
+      "cumulative": [
+        198,
+        84
+      ],
+      "rack": "SRIARYR",
+      "drawn": "OHT",
+      "note": "",
+      "timestamp": "2026-02-19T11:21:01.144983",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -144,9 +188,9 @@
       "S"
     ]
   ],
-  "your_score": 162,
-  "opp_score": 64,
-  "your_rack": "SRIARRY",
+  "your_score": 198,
+  "opp_score": 84,
+  "your_rack": "SRIOHTR",
   "bag": [
     "L",
     "R",
@@ -232,14 +276,14 @@
     "G",
     "?"
   ],
-  "is_your_turn": false,
+  "is_your_turn": true,
   "opponent_name": "joybells27",
   "created_at": "2026-02-18T20:31:54.615959",
-  "updated_at": "2026-02-18T22:53:58.966338",
+  "updated_at": "2026-02-19T11:21:01.871303",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "joybells27_001",
   "status": "active",
-  "spread": 98,
-  "move_count": 7
+  "spread": 114,
+  "move_count": 9
 }

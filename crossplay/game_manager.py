@@ -35,9 +35,9 @@ from enum import Enum
 from .board import Board, tiles_used as _board_tiles_used
 from .move_finder_gaddag import GADDAGMoveFinder
 from .gaddag import get_gaddag
-from .scoring import calculate_move_score
+from .scoring import calculate_move_score, find_crosswords
 from .dictionary import Dictionary
-from .config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE
+from .config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE, BOARD_SIZE, CENTER_ROW, CENTER_COL
 from .leave_eval import evaluate_leave
 from .tile_tracker import TileTracker
 from .blocked_cache import BlockedSquareCache
@@ -2155,12 +2155,104 @@ class Game:
         self._check_archive()
 
         return True, score
-    
-    def record_opponent_move(self, word: str, row: int, col: int, horizontal: bool, 
+
+    # -----------------------------------------------------------------
+    # Opponent move validation (V17.2)
+    # -----------------------------------------------------------------
+    def _validate_opponent_move(self, word: str, row: int, col: int,
+                                horizontal: bool):
+        """Validate an opponent move BEFORE placing it on the board.
+
+        Checks bounds, tile conflicts, connectivity, main-word validity,
+        and cross-word validity.  Returns (is_valid, errors, warnings).
+        All checks are read-only — board state is never modified.
+        """
+        errors = []
+        warnings = []
+        new_tile_positions = []
+        connects = False
+        covers_center = False
+
+        # --- Check 1 & 2: bounds + tile conflicts ---
+        for i, letter in enumerate(word):
+            r = row + (0 if horizontal else i)
+            c = col + (i if horizontal else 0)
+
+            # Bounds
+            if r < 1 or r > BOARD_SIZE or c < 1 or c > BOARD_SIZE:
+                errors.append(f"Out of bounds at R{r}C{c}")
+                continue
+
+            if r == CENTER_ROW and c == CENTER_COL:
+                covers_center = True
+
+            existing = self.board.get_tile(r, c)
+            if existing is not None:
+                if existing != letter:
+                    errors.append(
+                        f"Tile conflict at R{r}C{c}: board has '{existing}', "
+                        f"word has '{letter}'")
+                else:
+                    connects = True          # overlapping existing tile
+            else:
+                new_tile_positions.append((r, c))
+                if self.board.has_adjacent_tile(r, c):
+                    connects = True
+
+        if errors:
+            return False, errors, warnings
+
+        # --- Check 3: must place at least one new tile ---
+        if not new_tile_positions:
+            errors.append("No new tiles placed — word is already on the board")
+            return False, errors, warnings
+
+        # --- Check 4: connectivity ---
+        if self.board.is_board_empty():
+            if not covers_center:
+                errors.append(
+                    f"First move must cover the center square "
+                    f"(R{CENTER_ROW}C{CENTER_COL})")
+        else:
+            if not connects:
+                pos_str = ", ".join(f"R{r}C{c}" for r, c in new_tile_positions)
+                errors.append(
+                    f"Move does not connect to existing tiles\n"
+                    f"        New tile positions: {pos_str}")
+
+        if errors:
+            return False, errors, warnings
+
+        # --- Check 5: main word validity ---
+        if not self.gaddag.is_word(word):
+            errors.append(f"'{word}' is not a valid dictionary word")
+
+        # --- Check 6: cross-word validity ---
+        crosswords = find_crosswords(
+            self.board, word, row, col, horizontal, new_tile_positions)
+        for cw in crosswords:
+            cw_word = cw['word']
+            cw_dir = 'H' if cw['horizontal'] else 'V'
+            if not self.gaddag.is_word(cw_word):
+                errors.append(
+                    f"Invalid cross-word '{cw_word}' at "
+                    f"R{cw['row']}C{cw['col']} {cw_dir}")
+
+        # --- NYT warnings (non-blocking) ---
+        if is_nyt_curated(word):
+            warnings.append(f"'{word}' is NYT-curated (may not be in WWF)")
+        for cw in crosswords:
+            if is_nyt_curated(cw['word']):
+                warnings.append(
+                    f"Cross-word '{cw['word']}' is NYT-curated")
+
+        return len(errors) == 0, errors, warnings
+
+    def record_opponent_move(self, word: str, row: int, col: int, horizontal: bool,
                              score: int, new_opp_score: int = None, new_bag_count: int = None,
-                             blanks: List[str] = None):
+                             blanks: List[str] = None, force: bool = False):
         """Record opponent's move with validation.
-        
+
         Args:
             word: Word played
             row, col: Starting position (1-indexed)
@@ -2169,18 +2261,43 @@ class Game:
             new_opp_score: Opponent's total score after move (for validation)
             new_bag_count: Tiles remaining in bag after move (for validation)
             blanks: List of letters in the word that are blanks, e.g. ['M'] if M is blank
-        
+            force: If True, accept even if validation fails (opp! command)
+
         Validation checks:
+            - Board connectivity, word validity, cross-words (pre-placement)
             - Calculated score vs reported score (catches unreported blanks)
             - Expected opp total vs reported total
             - Expected bag count vs reported count
         """
         word = word.upper()
         blanks = [b.upper() for b in (blanks or [])]
-        
+
+        # --- Move validation gate (V17.2) ---
+        direction = 'H' if horizontal else 'V'
+        valid, errors, warnings = self._validate_opponent_move(
+            word, row, col, horizontal)
+
+        for w in warnings:
+            print(f"  [NOTE] {w}")
+
+        if not valid:
+            if force:
+                print(f"  [FORCED] Accepting {word} at R{row}C{col} "
+                      f"{direction} despite errors:")
+                for e in errors:
+                    print(f"    [X] {e}")
+            else:
+                print(f"\n  [INVALID MOVE] {word} at R{row}C{col} {direction}")
+                for e in errors:
+                    print(f"    [X] {e}")
+                print(f"\n    To force-accept anyway, use:")
+                print(f"    opp! {word.lower()} {row} {col} {direction} {score}")
+                print()
+                return
+
         from .scoring import calculate_move_score
         from .config import TILE_VALUES
-        
+
         # Identify which tile positions are new (placed from rack)
         new_tile_indices = []
         for i, letter in enumerate(word):
@@ -3173,15 +3290,17 @@ class GameManager:
                 else:
                     print("No game in current slot")
             
-            elif action == 'opp' and len(parts) >= 6:
+            elif action in ('opp', 'opp!') and len(parts) >= 6:
                 if game:
                     try:
+                        force = (action == 'opp!')
                         word = parts[1].upper()
                         row = int(parts[2])
                         col = int(parts[3])
                         horiz = parts[4].upper() == 'H'
                         score = int(parts[5])
-                        game.record_opponent_move(word, row, col, horiz, score)
+                        game.record_opponent_move(word, row, col, horiz, score,
+                                                  force=force)
                     except Exception as e:
                         print(f"Error: {e}")
                 else:
