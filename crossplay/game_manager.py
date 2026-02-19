@@ -46,6 +46,7 @@ from .parallel_eval import evaluate_with_lookahead_parallel
 from .mc_eval import mc_evaluate_2ply
 from .nyt_filter import is_nyt_curated, nyt_warning
 from .analysis_lock import acquire_lock, release_lock
+from . import __version__
 
 # =============================================================================
 # GAME STATE
@@ -1194,6 +1195,9 @@ class Game:
                     'top3': [
                         {
                             'word': r['word'],
+                            'row': r['row'],
+                            'col': r['col'],
+                            'dir': r['direction'],
                             'score': r['score'],
                             'equity': r.get('total_equity', 0),
                             'risk_eq': r.get('risk_adj_equity', r.get('total_equity', 0)),
@@ -1679,6 +1683,23 @@ class Game:
                       f"leave {best['leave_value']:+.1f} "
                       f"= {best['net_equity']:+.1f}")
 
+            # Store near-endgame recommendation for next play_move() call
+            if results:
+                self.last_analysis = {
+                    'top3': [
+                        {
+                            'word': r['word'],
+                            'row': r['row'],
+                            'col': r['col'],
+                            'dir': r['direction'],
+                            'score': r['score'],
+                            'equity': r.get('net_equity', 0),
+                            'risk_eq': r.get('net_equity', 0),
+                        }
+                        for r in results[:3]
+                    ]
+                }
+
         except Exception as e:
             print(f"Near-endgame error: {e}")
             import traceback
@@ -2074,6 +2095,9 @@ class Game:
             'note': 'bingo' if len(tiles_used) >= RACK_SIZE else '',
             'timestamp': datetime.now().isoformat(),
             'engine': engine_rec,
+            'engine_version': __version__,
+            'win_pct': None,
+            'nyt': None,
         }
         self.state.board_moves.append(enriched)
 
@@ -2324,6 +2348,9 @@ class Game:
             'note': 'bingo' if len(new_tile_indices) >= RACK_SIZE else '',
             'timestamp': datetime.now().isoformat(),
             'engine': None,     # No engine analysis for opponent moves
+            'engine_version': __version__,
+            'win_pct': None,
+            'nyt': None,
         }
         self.state.board_moves.append(enriched)
 
