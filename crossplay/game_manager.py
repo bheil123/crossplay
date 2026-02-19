@@ -3135,12 +3135,11 @@ class GameManager:
                         horiz = parts[4].upper() == 'H'
                         # Optional 6th arg: new rack after drawing
                         post_rack = parts[5].upper() if len(parts) >= 6 else None
-                        if post_rack:
-                            # User provided post-draw rack: skip tile validation,
-                            # set rack directly (assisted play workflow)
-                            game.play_move(word, row, col, horiz, new_rack=post_rack)
-                        else:
-                            game.play_move(word, row, col, horiz, rack=game.state.your_rack)
+                        # Always pass rack for blank detection; optionally
+                        # pass new_rack so the post-draw rack is set directly.
+                        game.play_move(word, row, col, horiz,
+                                       rack=game.state.your_rack,
+                                       new_rack=post_rack)
                         game.state.is_your_turn = False
                     except Exception as e:
                         print(f"Error: {e}")

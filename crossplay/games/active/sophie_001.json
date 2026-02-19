@@ -329,19 +329,57 @@
       "col": 9,
       "dir": "H",
       "player": "me",
-      "score": 40,
+      "score": 35,
       "bag": 33,
       "blanks": [
         0
       ],
       "cumulative": [
-        376,
+        371,
         308
       ],
       "rack": "JOIEIZ?",
       "drawn": "GSE?",
       "note": "",
       "timestamp": "2026-02-18T16:48:19.322054",
+      "engine": null
+    },
+    {
+      "word": "GI",
+      "row": 2,
+      "col": 13,
+      "dir": "H",
+      "player": "opp",
+      "score": 19,
+      "bag": 33,
+      "blanks": [],
+      "cumulative": [
+        371,
+        327
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-19T05:41:17.621294",
+      "engine": null
+    },
+    {
+      "word": "WO",
+      "row": 5,
+      "col": 3,
+      "dir": "H",
+      "player": "me",
+      "score": 15,
+      "bag": 31,
+      "blanks": [],
+      "cumulative": [
+        386,
+        327
+      ],
+      "rack": "JOOTVIW",
+      "drawn": "HR",
+      "note": "",
+      "timestamp": "2026-02-19T05:46:29.419341",
       "engine": null
     }
   ],
@@ -357,9 +395,9 @@
       "S"
     ]
   ],
-  "your_score": 376,
-  "opp_score": 308,
-  "your_rack": "JOOTVIW",
+  "your_score": 386,
+  "opp_score": 327,
+  "your_rack": "VTJIOSO",
   "bag": [
     "O",
     "U",
@@ -398,18 +436,16 @@
     "T",
     "O",
     "I",
-    "O",
-    "R",
-    "H"
+    "O"
   ],
   "is_your_turn": false,
   "opponent_name": "sophie",
   "created_at": "2026-02-12",
-  "updated_at": "2026-02-18T16:48:19.511782",
+  "updated_at": "2026-02-19T05:46:29.621657",
   "notes": "Turn 13. Me 199, Opp 118. Bag 42. Sophie turn. Rack SRTLAAN. Up 81.",
   "final_turns_remaining": null,
   "game_id": "sophie_001",
   "status": "active",
-  "spread": 68,
-  "move_count": 22
+  "spread": 59,
+  "move_count": 24
 }
