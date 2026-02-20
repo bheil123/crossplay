@@ -359,6 +359,50 @@
       "engine_version": "17.1.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "GIT",
+      "row": 15,
+      "col": 8,
+      "dir": "H",
+      "player": "opp",
+      "score": 27,
+      "bag": 76,
+      "blanks": [],
+      "cumulative": [
+        374,
+        232
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-20T09:38:06.029969",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "FAYED",
+      "row": 11,
+      "col": 14,
+      "dir": "V",
+      "player": "me",
+      "score": 24,
+      "bag": 76,
+      "blanks": [],
+      "cumulative": [
+        398,
+        232
+      ],
+      "rack": "NUFYDEH",
+      "drawn": "SDNS",
+      "note": "",
+      "timestamp": "2026-02-20T09:43:38.595044",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -378,9 +422,9 @@
       "O"
     ]
   ],
-  "your_score": 374,
-  "opp_score": 205,
-  "your_rack": "NUFYDEH",
+  "your_score": 398,
+  "opp_score": 232,
+  "your_rack": "NSUDNSH",
   "bag": [
     "L",
     "R",
@@ -466,14 +510,14 @@
     "G",
     "?"
   ],
-  "is_your_turn": false,
+  "is_your_turn": true,
   "opponent_name": "joybells27",
   "created_at": "2026-02-18T20:31:54.615959",
-  "updated_at": "2026-02-20T00:00:00.000000",
+  "updated_at": "2026-02-20T09:43:38.813193",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "joybells27_001",
   "status": "active",
-  "spread": 169,
-  "move_count": 17
+  "spread": 166,
+  "move_count": 19
 }
