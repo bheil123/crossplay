@@ -526,10 +526,10 @@ class Game:
         if has_power_tiles:
             print(f"{format_power_tile_display(unseen, bag_size)}")
         print(f"{'='*70}")
-        print(f"\n{'#':<3} {'Word':<12} {'Position':<12} {'Pts':>4} {'Risk (exp/max)':<20} {'Leave':>6} {'DLS':>5} {'DD':>4} {'Trn':>4} {'Equity':>6} {'Worst':>6}")
-        print("-" * 90)
+        print(f"\n{'#':<3} {'Word':<12} {'Position':<12} {'Pts':>4} {'Risk (exp/max)':<20} {'Leave':>6} {'DLS':>5} {'DD':>4} {'Trn':>4} {'TW':>5} {'Equity':>6} {'Worst':>6}")
+        print("-" * 95)
         print("* = Top Equity    Safe = Best Worst-Case    ! = Negative Worst-Case")
-        print("-" * 90)
+        print("-" * 95)
         
         # OPTIMIZATION: Two-phase analysis
         # Phase 1: Quick score + leave for all moves (no risk calculation)
@@ -661,8 +661,12 @@ class Game:
                     'dls_penalty': 0,
                     'dd_bonus': 0,
                     'turnover_bonus': 0,
+                    'hvt_bonus': 0,
+                    'tw_dw_penalty': 0,
                     'dls_details': [],
                     'dd_desc': '',
+                    'hvt_details': [],
+                    'tw_dw_details': [],
                     'positional_adj': 0,
                     'equity': move['prelim_equity'],
                     'worst_case': move['prelim_equity'],
@@ -688,20 +692,22 @@ class Game:
             dls_penalty = oh['dls_penalty']
             dd_bonus = oh['dd_bonus']
             turnover_bonus = oh['turnover_bonus']
-            
+            hvt_bonus = oh['hvt_bonus']
+            tw_dw_penalty = oh['tw_dw_penalty']
+
             # Full equity = score + leave_value - expected_risk + blocking_bonus + positional
-            equity = move['score'] + move['leave_value'] - expected_risk + blocking_bonus + dls_penalty + dd_bonus + turnover_bonus
-            
+            equity = move['score'] + move['leave_value'] - expected_risk + blocking_bonus + dls_penalty + dd_bonus + turnover_bonus + hvt_bonus + tw_dw_penalty
+
             # Worst case equity = score + leave_value - max_damage + blocking_bonus + positional
-            worst_case = move['score'] + move['leave_value'] - max_damage + blocking_bonus + dls_penalty + dd_bonus + turnover_bonus
-            
+            worst_case = move['score'] + move['leave_value'] - max_damage + blocking_bonus + dls_penalty + dd_bonus + turnover_bonus + hvt_bonus + tw_dw_penalty
+
             # Update best equity found
             if equity > best_equity:
                 best_equity = equity
-            
+
             # Net positional adjustment from Phase 2 (blocking, risk, heuristics)
             # This will be carried into MC with dampening to avoid double-counting
-            positional_adj = blocking_bonus - expected_risk + dls_penalty + dd_bonus + turnover_bonus
+            positional_adj = blocking_bonus - expected_risk + dls_penalty + dd_bonus + turnover_bonus + hvt_bonus + tw_dw_penalty
 
             analyzed_moves.append({
                 **move,
@@ -713,8 +719,12 @@ class Game:
                 'dls_penalty': dls_penalty,
                 'dd_bonus': dd_bonus,
                 'turnover_bonus': turnover_bonus,
+                'hvt_bonus': hvt_bonus,
+                'tw_dw_penalty': tw_dw_penalty,
                 'dls_details': oh['dls_details'],
                 'dd_desc': oh['dd_desc'],
+                'hvt_details': oh['hvt_details'],
+                'tw_dw_details': oh['tw_dw_details'],
                 'positional_adj': positional_adj,
                 'equity': equity,
                 'worst_case': worst_case,
@@ -760,7 +770,7 @@ class Game:
             # NYT curated word warning
             nyt_tag = nyt_warning(word)
 
-            print(f"{i:<3} {word:<12} {pos:<12} {pts:>4} {risk_display:<20} {leave_value:>+6.1f} {move['dls_penalty']:>+5.1f} {move['dd_bonus']:>+4.1f} {move['turnover_bonus']:>+3.1f} {equity:>+6.0f} {worst_case:>+6.0f}  {indicator}{nyt_tag}")
+            print(f"{i:<3} {word:<12} {pos:<12} {pts:>4} {risk_display:<20} {leave_value:>+6.1f} {move['dls_penalty']:>+5.1f} {move['dd_bonus']:>+4.1f} {move['turnover_bonus']:>+3.1f} {move['tw_dw_penalty']:>+5.1f} {equity:>+6.0f} {worst_case:>+6.0f}  {indicator}{nyt_tag}")
         
         # Top 3 detailed view
         by_equity = analyzed_moves[:3]
@@ -784,7 +794,9 @@ class Game:
             dls_p = move.get('dls_penalty', 0)
             dd_b = move.get('dd_bonus', 0)
             turn_b = move.get('turnover_bonus', 0)
-            if dls_p != 0 or dd_b != 0 or turn_b != 0:
+            hvt_b = move.get('hvt_bonus', 0)
+            tw_dw_p = move.get('tw_dw_penalty', 0)
+            if dls_p != 0 or dd_b != 0 or turn_b != 0 or hvt_b != 0 or tw_dw_p != 0:
                 parts = []
                 if dls_p != 0:
                     parts.append(f"DLS:{dls_p:+.1f}")
@@ -792,14 +804,27 @@ class Game:
                     parts.append(f"DD:{dd_b:+.1f}")
                 if turn_b != 0:
                     parts.append(f"Turn:{turn_b:+.1f}")
+                if hvt_b != 0:
+                    parts.append(f"HVT:{hvt_b:+.1f}")
+                if tw_dw_p != 0:
+                    parts.append(f"TW/DW:{tw_dw_p:+.1f}")
                 print(f"   [INFO] Positional: {' | '.join(parts)}")
-                
+
                 # Show DLS exposure details
                 for d in move.get('dls_details', []):
                     tile_r, tile_c, tile_l = d['tile_pos']
                     dls_r, dls_c = d['dls_pos']
                     print(f"      ! {tile_l}@R{tile_r}C{tile_c} -> DLS@R{dls_r}C{dls_c}: opp {d['worst_tile']} for {d['max_damage']}pts ({d['probability']*100:.0f}%)")
-                
+
+                # Show HVT premium details
+                for d in move.get('hvt_details', []):
+                    print(f"      + {d}")
+
+                # Show TW/DW exposure details
+                for d in move.get('tw_dw_details', []):
+                    sq_r, sq_c = d['square']
+                    print(f"      ! Opens {d['bonus_type']}@R{sq_r}C{sq_c} ({d['access_type']}): -{d['penalty']:.1f}pt")
+
                 # Show DD description if notable
                 dd_desc = move.get('dd_desc', '')
                 if 'DOUBLE-DOUBLE' in dd_desc:

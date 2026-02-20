@@ -91,6 +91,10 @@ DOUBLE_LETTER_SQUARES: List[Tuple[int, int]] = [
 BINGO_BONUS: int = 40  # Bonus for using all 7 tiles (Crossplay uses 40, not 50)
 RACK_SIZE: int = 7
 
+# High-value tiles eligible for premium square offensive bonus
+HIGH_VALUE_TILES: set = {'J', 'Q', 'X', 'Z', 'K'}
+HVT_PREMIUM_SCALE: float = 0.15  # Bonus = extra_pts * SCALE → ~1-4 pts range
+
 # =============================================================================
 # RISK ASSESSMENT CONFIGURATION
 # =============================================================================

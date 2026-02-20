@@ -298,30 +298,240 @@ def evaluate_tile_turnover(move, rack, bag_size):
     return min(2.0, base_bonus * bag_factor)
 
 
+def evaluate_hvt_premium(board, move):
+    """
+    #6: High-Value Tile on Premium Square bonus.
+
+    Rewards moves that place words containing high-value tiles (J, Q, X, Z, K)
+    through premium squares. Compensates for MC's tendency to penalize
+    high-scoring premium plays by acknowledging that the score gain is
+    certain while opponent threats are probabilistic.
+
+    Two cases:
+    - Letter multiplier (3L, 2L): bonus if the HVT itself lands on the bonus
+    - Word multiplier (3W, 2W): bonus based on HVT values in the word when
+      any newly placed tile lands on the word bonus
+
+    Returns:
+        (float, list): total bonus and detail records
+    """
+    from .config import HIGH_VALUE_TILES, HVT_PREMIUM_SCALE
+
+    word = move['word']
+    row, col = move['row'], move['col']
+    horizontal = (move['direction'] == 'H')
+    blanks_used = set(move.get('blanks_used', []))
+
+    total_bonus = 0.0
+    details = []
+
+    # Build lists of new tile positions and their letters
+    new_positions = []  # (word_index, row, col, letter)
+    for i, letter in enumerate(word):
+        r = row + (0 if horizontal else i)
+        c = col + (i if horizontal else 0)
+        if board.get_tile(r, c) is None:
+            new_positions.append((i, r, c, letter))
+
+    # Collect HVT values among newly placed non-blank tiles
+    hvt_new_values = []
+    for wi, r, c, letter in new_positions:
+        if wi not in blanks_used and letter in HIGH_VALUE_TILES:
+            hvt_new_values.append(TILE_VALUES.get(letter, 0))
+
+    if not hvt_new_values:
+        return 0.0, []
+
+    sum_hvt = sum(hvt_new_values)
+
+    for wi, r, c, letter in new_positions:
+        bonus_type = BONUS_SQUARES.get((r, c))
+        if bonus_type is None:
+            continue
+
+        if bonus_type == '3L':
+            # Letter multiplier: only rewards if THIS tile is HVT
+            if wi not in blanks_used and letter in HIGH_VALUE_TILES:
+                tv = TILE_VALUES.get(letter, 0)
+                extra = tv * 2  # (3-1) multiplier gain
+                bonus = extra * HVT_PREMIUM_SCALE
+                total_bonus += bonus
+                details.append(f"{letter}({tv}) on 3L R{r}C{c}: +{bonus:.1f}")
+        elif bonus_type == '2L':
+            if wi not in blanks_used and letter in HIGH_VALUE_TILES:
+                tv = TILE_VALUES.get(letter, 0)
+                extra = tv * 1  # (2-1) multiplier gain
+                bonus = extra * HVT_PREMIUM_SCALE
+                total_bonus += bonus
+                details.append(f"{letter}({tv}) on 2L R{r}C{c}: +{bonus:.1f}")
+        elif bonus_type == '3W':
+            # Word multiplier: bonus based on all HVT values in word
+            extra = sum_hvt * 2  # (3-1) multiplier gain
+            bonus = extra * HVT_PREMIUM_SCALE
+            total_bonus += bonus
+            details.append(f"3W R{r}C{c} with HVT={sum_hvt}: +{bonus:.1f}")
+        elif bonus_type == '2W':
+            extra = sum_hvt * 1  # (2-1) multiplier gain
+            bonus = extra * HVT_PREMIUM_SCALE
+            total_bonus += bonus
+            details.append(f"2W R{r}C{c} with HVT={sum_hvt}: +{bonus:.1f}")
+
+    return total_bonus, details
+
+
+def evaluate_tw_dw_exposure(board, move):
+    """
+    #7: Triple Word / Double Word Exposure Penalty.
+
+    Penalizes moves that open (make newly reachable) 3W or 2W squares.
+    Only counts premium squares that were NOT already adjacent to existing
+    tiles before the move -- i.e., squares our move newly exposes.
+
+    Scale factor 0.4 avoids double-counting with real_risk.py which
+    already captures word-level threats for opened squares.
+
+    Accessibility weighting:
+    - Perpendicular adjacency (hook point): full penalty (1.0x)
+    - Word-end adjacency (extension point): reduced (0.7x)
+
+    Returns:
+        (float, list): total penalty (negative) and detail records
+    """
+    from .config import RISK_PENALTY_3W, RISK_PENALTY_2W
+
+    SCALE_FACTOR = 0.4
+    WORD_END_FACTOR = 0.7
+
+    word = move['word']
+    row, col = move['row'], move['col']
+    horizontal = (move['direction'] == 'H')
+    word_len = len(word)
+
+    # Build set of squares the word occupies and new tile positions
+    word_squares = set()
+    has_new_tile = False
+    for i in range(word_len):
+        if horizontal:
+            r, c = row, col + i
+        else:
+            r, c = row + i, col
+        if not (1 <= r <= 15 and 1 <= c <= 15):
+            continue
+        word_squares.add((r, c))
+        if board.get_tile(r, c) is None:
+            has_new_tile = True
+
+    if not has_new_tile:
+        return 0.0, []
+
+    total_penalty = 0.0
+    details = []
+    seen_squares = set()
+
+    def _was_already_reachable(pr, pc):
+        """Check if premium square was already adjacent to an existing tile
+        BEFORE our move was placed."""
+        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            ar, ac = pr + dr, pc + dc
+            if 1 <= ar <= 15 and 1 <= ac <= 15:
+                if (ar, ac) not in word_squares and board.get_tile(ar, ac) is not None:
+                    return True
+        return False
+
+    def _check_and_penalize(nr, nc, access_type):
+        """Check if (nr, nc) is a newly-opened premium square and penalize."""
+        nonlocal total_penalty
+
+        if not (1 <= nr <= 15 and 1 <= nc <= 15):
+            return
+        if (nr, nc) in word_squares:
+            return  # Our word covers this square (blocking, not opening)
+        if (nr, nc) in seen_squares:
+            return
+        if board.get_tile(nr, nc) is not None:
+            return  # Already occupied
+
+        bonus = BONUS_SQUARES.get((nr, nc))
+        if bonus not in ('3W', '2W'):
+            return
+
+        if _was_already_reachable(nr, nc):
+            return  # Already exposed before our move
+
+        seen_squares.add((nr, nc))
+
+        base_penalty = RISK_PENALTY_3W if bonus == '3W' else RISK_PENALTY_2W
+        access_factor = WORD_END_FACTOR if access_type == 'end' else 1.0
+        penalty = base_penalty * SCALE_FACTOR * access_factor
+
+        total_penalty += penalty
+        details.append({
+            'square': (nr, nc),
+            'bonus_type': bonus,
+            'access_type': access_type,
+            'penalty': penalty,
+        })
+
+    # Check perpendicular adjacency for each tile in the word
+    for i in range(word_len):
+        if horizontal:
+            r, c = row, col + i
+            _check_and_penalize(r - 1, c, 'adjacent')
+            _check_and_penalize(r + 1, c, 'adjacent')
+        else:
+            r, c = row + i, col
+            _check_and_penalize(r, c - 1, 'adjacent')
+            _check_and_penalize(r, c + 1, 'adjacent')
+
+    # Check word-end squares (extension points)
+    if horizontal:
+        if col > 1:
+            _check_and_penalize(row, col - 1, 'end')
+        end_col = col + word_len
+        if end_col <= 15:
+            _check_and_penalize(row, end_col, 'end')
+    else:
+        if row > 1:
+            _check_and_penalize(row - 1, col, 'end')
+        end_row = row + word_len
+        if end_row <= 15:
+            _check_and_penalize(end_row, col, 'end')
+
+    return -total_penalty, details
+
+
 def evaluate_opening_heuristics(board, move, rack, unseen_tiles=None, bag_size=86):
     """
     Combined evaluation of all opening heuristics.
-    
+
     Returns:
         dict with:
             'dls_penalty': float
             'dls_details': list
-            'dd_bonus': float  
+            'dd_bonus': float
             'dd_desc': str
             'turnover_bonus': float
+            'hvt_bonus': float
+            'hvt_details': list
             'total_adjustment': float
     """
     dls_penalty, dls_details = evaluate_dls_exposure(board, move, unseen_tiles)
     dd_bonus, dd_desc = evaluate_double_double(board, move)
     turnover_bonus = evaluate_tile_turnover(move, rack, bag_size)
-    
-    total = dls_penalty + dd_bonus + turnover_bonus
-    
+    hvt_bonus, hvt_details = evaluate_hvt_premium(board, move)
+    tw_dw_penalty, tw_dw_details = evaluate_tw_dw_exposure(board, move)
+
+    total = dls_penalty + dd_bonus + turnover_bonus + hvt_bonus + tw_dw_penalty
+
     return {
         'dls_penalty': dls_penalty,
         'dls_details': dls_details,
         'dd_bonus': dd_bonus,
         'dd_desc': dd_desc,
         'turnover_bonus': turnover_bonus,
+        'hvt_bonus': hvt_bonus,
+        'hvt_details': hvt_details,
+        'tw_dw_penalty': tw_dw_penalty,
+        'tw_dw_details': tw_dw_details,
         'total_adjustment': total
     }
