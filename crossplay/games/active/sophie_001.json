@@ -425,6 +425,28 @@
       "engine_version": "17.1.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "HIN",
+      "row": 14,
+      "col": 12,
+      "dir": "H",
+      "player": "opp",
+      "score": 14,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        423,
+        379
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "Final move. Sophie left with Q?. GAME OVER - WIN!",
+      "timestamp": "2026-02-20T08:15:00.000000",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -440,7 +462,7 @@
     ]
   ],
   "your_score": 423,
-  "opp_score": 365,
+  "opp_score": 379,
   "your_rack": "OV",
   "bag": [
     "O",
@@ -485,11 +507,11 @@
   "is_your_turn": false,
   "opponent_name": "sophie",
   "created_at": "2026-02-12",
-  "updated_at": "2026-02-19T23:25:00.000000",
-  "notes": "Endgame. JOIST played. Sophie has 1 final turn. Her rack: HINQ?",
-  "final_turns_remaining": 1,
+  "updated_at": "2026-02-20T08:15:00.000000",
+  "notes": "GAME OVER - WIN! Final: 423-379 (+44). Sophie left with Q?.",
+  "final_turns_remaining": 0,
   "game_id": "sophie_001",
-  "status": "active",
-  "spread": 58,
-  "move_count": 26
+  "status": "completed",
+  "spread": 44,
+  "move_count": 27
 }
