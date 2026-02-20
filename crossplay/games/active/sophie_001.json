@@ -381,6 +381,50 @@
       "note": "",
       "timestamp": "2026-02-19T05:46:29.419341",
       "engine": null
+    },
+    {
+      "word": "PERRY",
+      "row": 2,
+      "col": 15,
+      "dir": "V",
+      "player": "opp",
+      "score": 38,
+      "bag": 31,
+      "blanks": [],
+      "cumulative": [
+        386,
+        365
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-19T23:12:41.636754",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "JOIST",
+      "row": 5,
+      "col": 13,
+      "dir": "V",
+      "player": "me",
+      "score": 37,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        423,
+        365
+      ],
+      "rack": "VTJIOSO",
+      "drawn": "",
+      "note": "Endgame - bag empty",
+      "timestamp": "2026-02-19T23:25:00.000000",
+      "engine": null,
+      "engine_version": "17.1.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -395,9 +439,9 @@
       "S"
     ]
   ],
-  "your_score": 386,
-  "opp_score": 327,
-  "your_rack": "VTJIOSO",
+  "your_score": 423,
+  "opp_score": 365,
+  "your_rack": "OV",
   "bag": [
     "O",
     "U",
@@ -441,11 +485,11 @@
   "is_your_turn": false,
   "opponent_name": "sophie",
   "created_at": "2026-02-12",
-  "updated_at": "2026-02-19T05:46:29.621657",
-  "notes": "Turn 13. Me 199, Opp 118. Bag 42. Sophie turn. Rack SRTLAAN. Up 81.",
-  "final_turns_remaining": null,
+  "updated_at": "2026-02-19T23:25:00.000000",
+  "notes": "Endgame. JOIST played. Sophie has 1 final turn. Her rack: HINQ?",
+  "final_turns_remaining": 1,
   "game_id": "sophie_001",
   "status": "active",
-  "spread": 59,
-  "move_count": 24
+  "spread": 58,
+  "move_count": 26
 }
