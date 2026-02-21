@@ -70,11 +70,13 @@ def _recalibrate_request_path():
 _worker_gaddag = None
 _worker_move_finder_cls = None
 _worker_leave_table = None
+_worker_td_gamma = 0.97
 
 
-def _init_worker(leave_table_path):
+def _init_worker(leave_table_path, td_gamma=0.97):
     """Load GADDAG and leave table once per worker process."""
-    global _worker_gaddag, _worker_move_finder_cls, _worker_leave_table
+    global _worker_gaddag, _worker_move_finder_cls, _worker_leave_table, _worker_td_gamma
+    _worker_td_gamma = td_gamma
     pid = os.getpid()
 
     try:
@@ -121,7 +123,8 @@ def _play_batch(batch_size):
 
     for _ in range(batch_size):
         obs, s1, s2 = play_one_game(
-            _worker_gaddag, _worker_move_finder_cls, _worker_leave_table
+            _worker_gaddag, _worker_move_finder_cls, _worker_leave_table,
+            td_gamma=_worker_td_gamma
         )
         all_obs.extend(obs)
         total_s1 += s1
@@ -320,7 +323,8 @@ def _cleanup_old_checkpoints(generation, current_games, checkpoint_every, keep=3
 
 def train(num_games, workers, generation=1, resume_from=None,
           resume_games=0, batch_size=100, checkpoint_every=10000,
-          report_every=1000, is_smoke_test=False, init_from=None):
+          report_every=1000, is_smoke_test=False, init_from=None,
+          td_gamma=0.97):
     """Run training for one generation.
 
     Args:
@@ -336,6 +340,9 @@ def train(num_games, workers, generation=1, resume_from=None,
         init_from: path to a previous generation's checkpoint to use as
                    starting point (e.g., gen1 table for gen2 training).
                    Unlike resume, this starts at 0 games completed.
+        td_gamma: TD discount factor for bootstrapping (default 0.97).
+                  0.0 = no bootstrapping (pure advantage signal),
+                  1.0 = full discount.
     """
     from .leave_table import LeaveTable
 
@@ -374,6 +381,7 @@ def train(num_games, workers, generation=1, resume_from=None,
     print(f"  Games: {games_done:,} -> {num_games:,} ({games_remaining:,} remaining)")
     print(f"  Workers: {workers}")
     print(f"  Batch size: {batch_size}")
+    print(f"  TD gamma: {td_gamma}")
     print(f"  Checkpoint every: {checkpoint_every:,}")
     print(f"  Report every: {report_every:,}")
     print()
@@ -406,7 +414,7 @@ def train(num_games, workers, generation=1, resume_from=None,
         with ProcessPoolExecutor(
             max_workers=workers,
             initializer=init_fn,
-            initargs=(worker_table_path,)
+            initargs=(worker_table_path, td_gamma)
         ) as executor:
             # Submit initial batches to fill the pipeline
             futures = {}
@@ -689,6 +697,9 @@ def main():
                         help='Checkpoint interval (default: 10K)')
     parser.add_argument('--report-every', type=int, default=1000,
                         help='Progress report interval (default: 1K)')
+    parser.add_argument('--td-gamma', type=float, default=0.97,
+                        help='TD discount factor (default: 0.97). '
+                             '0.0 = no bootstrapping, 1.0 = full discount.')
     args = parser.parse_args()
 
     # System info
@@ -746,7 +757,8 @@ def main():
         checkpoint_every=args.checkpoint_every,
         report_every=args.report_every,
         is_smoke_test=is_smoke,
-        init_from=init_from
+        init_from=init_from,
+        td_gamma=args.td_gamma
     )
 
 

@@ -95,11 +95,13 @@ def find_all_moves_c(board, gaddag, rack_str: str,
     board_blank_set = {(r - 1, c - 1) for r, c, _ in (board_blanks or [])}
 
     # Call C extension - returns list of (word, row_1idx, col_1idx, is_horiz, blanks_list)
+    # Pass dictionary._words (raw set) for direct O(1) 'in' checks in C,
+    # avoiding Python method dispatch + redundant .upper() on each call.
     raw_moves = _accel.find_moves_c(
         _get_gdata_bytes(gdata),  # cached bytes (avoids 28MB copy per call)
         grid,          # list of lists
         rack_str,
-        dictionary,
+        dictionary._words,
         VALID_TWO_LETTER,
     )
 

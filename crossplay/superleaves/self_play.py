@@ -1,14 +1,15 @@
 """
-CROSSPLAY V16 - Self-Play Game Loop for SuperLeaves Training
+CROSSPLAY V18 - Self-Play Game Loop for SuperLeaves Training
 
-Two greedy bots play a full game. Records (leave_key, equity_signal, weight)
+Two greedy bots play a full game. Records (leave_key, td_target, weight)
 observations for every move where bag > 0.
 
-Gen2 improvements:
-  - Equity-based signal: signal = move_equity - best_alternative_equity
-    (directly measures leave quality contribution)
-  - Outcome weighting: signals scaled by game spread (winning moves boosted)
-  - Top-K expanded to 30 candidates in fast_bot
+Gen3 improvements (TD-learning):
+  - Per-player trajectory tracking through each game
+  - TD(0) backward pass at game end: td_target = advantage + gamma * V(next_leave)
+  - Bootstraps from future leave values, giving ~3-5x more signal per game
+  - Outcome weighting removed (TD naturally propagates trajectory info)
+  - Top-K expanded to 30 candidates in fast_bot (unchanged from gen2)
 """
 
 import random
@@ -17,17 +18,18 @@ from ..config import TILE_DISTRIBUTION, RACK_SIZE
 from .fast_bot import select_best_move, compute_leave
 
 
-def play_one_game(gaddag, move_finder_cls, leave_table):
+def play_one_game(gaddag, move_finder_cls, leave_table, td_gamma=0.97):
     """Play one complete self-play game and collect observations.
 
     Args:
         gaddag: GADDAG instance
         move_finder_cls: GADDAGMoveFinder class
         leave_table: LeaveTable instance (frozen for this generation)
+        td_gamma: TD discount factor (0.0 = no bootstrapping, 1.0 = full)
 
     Returns:
         (observations, score1, score2)
-        observations: list of (leave_key, equity_signal, weight)
+        observations: list of (leave_key, td_target, weight)
     """
     board = Board()
 
@@ -41,9 +43,10 @@ def play_one_game(gaddag, move_finder_cls, leave_table):
     rack2 = [bag.pop() for _ in range(RACK_SIZE)]
     score1, score2 = 0, 0
 
-    # Track raw observations for post-game signal computation
-    # Each entry: (leave_key, move_equity, best_equity, weight, player)
-    raw_observations = []
+    # Per-player trajectories for TD backward pass
+    # Each entry: (leave_key, advantage, weight)
+    trajectory_p1 = []
+    trajectory_p2 = []
 
     turn = 1
     consecutive_passes = 0
@@ -86,27 +89,17 @@ def play_one_game(gaddag, move_finder_cls, leave_table):
         horiz = best_move['direction'] == 'H'
         points = best_move['score']  # already includes bingo
 
-        # Record observation (only when bag > 0 and non-empty leave)
+        # Record trajectory entry (only when bag > 0 and non-empty leave)
         if bag_size > 0 and best_leave and len(best_leave) > 0:
             weight = min(bag_size / RACK_SIZE, 1.0)
 
-            # Compute equity of the best-scoring move (ignoring leave)
-            # This is the "no-leave baseline" — what you'd pick if leave = 0
+            # Advantage: how much equity did the leave add beyond raw score?
             top_score_move = moves[0]  # moves sorted by score desc
             top_score_equity = top_score_move['score']  # pure score, no leave
+            advantage = best_equity - top_score_equity
 
-            # The chosen move's equity (score + leave_value)
-            move_equity = best_equity
-
-            # Signal: how much equity did the leave add beyond raw score?
-            # = (score + leave_value) - score_of_best_scoring_move
-            # Positive = leave choice improved over raw-score pick
-            # Negative = leave cost points (chose worse score for better leave)
-            signal = move_equity - top_score_equity
-
-            raw_observations.append(
-                (best_leave, signal, weight, 1 if is_p1 else 2)
-            )
+            traj = trajectory_p1 if is_p1 else trajectory_p2
+            traj.append((best_leave, advantage, weight))
 
         # Place word on board
         board.place_word(word, row, col, horiz)
@@ -135,25 +128,22 @@ def play_one_game(gaddag, move_finder_cls, leave_table):
         consecutive_passes = 0
         turn += 1
 
-    # --- Post-game: apply outcome weighting ---
-    # Scale signals by how well the player did overall.
-    # Winning player's moves get boosted, losing player's moves get penalized.
-    # This adds game-outcome context to the per-move leave signal.
-    spread = score1 - score2  # positive = P1 won
-
-    # Outcome multiplier: 1.0 +/- scale * normalized_spread
-    # Cap at 0.5-1.5 to avoid extreme weights from blowouts
-    OUTCOME_SCALE = 0.3  # How strongly outcome affects signal (tune this)
-    MAX_SPREAD = 150.0   # Spread normalization range
-
+    # --- Post-game: TD(0) backward pass ---
+    # Compute TD targets for each trajectory entry, working backwards.
+    # td_target_t = advantage_t + gamma * V(next_leave_t+1)
+    # Terminal moves (last in trajectory) get V_next = 0 (no tile penalty).
     observations = []
-    for leave_key, signal, weight, player in raw_observations:
-        # Player 1 spread is positive when P1 wins
-        player_spread = spread if player == 1 else -spread
-        outcome_mult = 1.0 + OUTCOME_SCALE * max(-1.0, min(1.0,
-            player_spread / MAX_SPREAD))
 
-        weighted_signal = signal * outcome_mult
-        observations.append((leave_key, weighted_signal, weight))
+    for traj in (trajectory_p1, trajectory_p2):
+        if not traj:
+            continue
+        # Backward pass: last move has V_next = 0
+        v_next = 0.0
+        for i in range(len(traj) - 1, -1, -1):
+            leave_key, advantage, weight = traj[i]
+            td_target = advantage + td_gamma * v_next
+            observations.append((leave_key, td_target, weight))
+            # V(this_leave) for the move before this one
+            v_next = leave_table.get(leave_key, 0.0)
 
     return observations, score1, score2

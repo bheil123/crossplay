@@ -132,14 +132,43 @@
       "engine_version": "17.3.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "ANCIENT",
+      "row": 6,
+      "col": 1,
+      "dir": "V",
+      "player": "me",
+      "score": 76,
+      "bag": 53,
+      "blanks": [
+        5
+      ],
+      "cumulative": [
+        157,
+        83
+      ],
+      "rack": "CNTAEI?",
+      "drawn": "AGHVTEE",
+      "note": "Sweep!",
+      "timestamp": "2026-02-21T00:30:00.000000",
+      "engine": null,
+      "engine_version": "17.3.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
-  "blank_positions": [],
-  "your_score": 81,
+  "blank_positions": [
+    [
+      11,
+      1,
+      "N"
+    ]
+  ],
+  "your_score": 157,
   "opp_score": 83,
-  "your_rack": "CNTAEI?",
+  "your_rack": "AGHVTEE",
   "bag": [
-    "A",
     "A",
     "A",
     "A",
@@ -155,13 +184,9 @@
     "E",
     "E",
     "E",
-    "E",
-    "E",
     "F",
     "G",
     "G",
-    "G",
-    "H",
     "H",
     "I",
     "I",
@@ -195,10 +220,8 @@
     "T",
     "T",
     "T",
-    "T",
     "U",
     "U",
-    "V",
     "V",
     "W",
     "W",
@@ -207,14 +230,14 @@
     "?",
     "?"
   ],
-  "is_your_turn": true,
+  "is_your_turn": false,
   "opponent_name": "katie",
   "created_at": "2026-02-20T22:05:12.797837",
-  "updated_at": "2026-02-21T00:20:00.000000",
+  "updated_at": "2026-02-21T00:30:00.000000",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "katie_001",
   "status": "active",
-  "spread": -2,
-  "move_count": 6
+  "spread": 74,
+  "move_count": 7
 }

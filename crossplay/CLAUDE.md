@@ -1,4 +1,4 @@
-# CLAUDE.md -- Crossplay V17
+# CLAUDE.md -- Crossplay V18
 
 ## What is this project?
 
@@ -87,7 +87,7 @@ game_manager.py          <- Entry point, game loop, AI orchestration
       |-- fast_bot.py    <- Greedy bot for self-play
       |-- self_play.py   <- Single-game self-play loop
       |-- trainer.py     <- Parallel training orchestrator
-      +-- validate.py    <- Head-to-head validation
+      +-- validate.py    <- Multi-worker head-to-head validation
 ```
 
 ## How to run
@@ -245,10 +245,13 @@ belt-and-suspenders fallback: `move.get('tiles_used', move.get('used', move['wor
 for the next generation (starts at 0 games, not resume).
 
 **Gen1 results:** 350K games, 921K leave entries. Validated at parity with formula
-(498-501 over 1000 games, +2.9 avg spread). Deployed as `deployed_leaves.pkl`.
+(498-501 over 1000 games, +2.9 avg spread).
 
-**Gen2 status:** Training 700K games with 5 workers, initialized from gen1.
-Check `superleaves/status.json` for progress.
+**Gen2 results:** 1M games, 921K leave entries, initialized from gen1 with
+equity-based signal. Validation (1000 games each):
+- Gen2 vs formula: 488-507 (-1.1 spread) -- near parity
+- Gen2 vs gen1: 507-488 (+1.5 spread) -- marginal improvement
+Gen2 is deployed as `deployed_leaves.pkl`.
 
 **C-accelerated move scoring (`score_moves_c` in `gaddag_accel.pyx`):**
 Move scoring during training was moved from Python (in `move_finder_c.py`)
@@ -265,12 +268,74 @@ can hold file locks on `gaddag_accel.pyd` and compete for CPU. The trainer now
 scans for orphaned Python multiprocessing workers (parent PID no longer alive)
 at startup and terminates them before spawning new workers.
 
-## V18 roadmap: bingo -> sweep terminology
+## V18 changes: TD-learning gen3 + Cython word_set optimization
+
+**TD(0) learning for SuperLeaves gen3 (`self_play.py`):**
+Replaces gen2's outcome-weighted equity signal with temporal difference
+learning. Per-player trajectories tracked through each game. At game end,
+a backward pass computes TD targets:
+
+`td_target_t = advantage_t + gamma * V(next_leave_t+1)`
+
+Where `advantage_t` = equity differential (same as gen2: `score + leave_val -
+top_raw_score`), and `V(next_leave)` bootstraps from the current leave table.
+Terminal moves get `V_next = 0` (Crossplay has no tile penalty). Outcome
+weighting removed -- TD naturally propagates trajectory info through the
+bootstrap chain. Gamma defaults to 0.97 (`--td-gamma` CLI arg).
+
+Result: ~17 observations per game (vs gen2's ~0.9), giving ~19x more training
+signal per game. Each leave gets credit/blame for what actually happened on
+the next draw, not just whether this specific move was the best right now.
+
+**Cython `word_set` optimization (`gaddag_accel.pyx`):**
+`find_moves_c()` previously accepted a `dictionary` object and called
+`st.dictionary.is_valid(word)` for every candidate move and cross-check --
+4.2M Python method calls per 50 games. Each call dispatched a Python method,
+called `.upper()` (redundant -- words already uppercase from C), then did
+`word in self._words`.
+
+Changed to accept `word_set` (the raw `set` from `dictionary._words`) and do
+`word in st.word_set` directly in Cython. This eliminates:
+- 4.2M Python method dispatch calls
+- 4.4M redundant `.upper()` calls (0.76s per 50 games)
+- Python/C boundary crossing overhead (~3.5s per 50 games)
+
+The MC fast path (`BoardContext`) already used this pattern. Now the training
+path matches.
+
+**Profiled impact (50 games single-worker):**
+- Before: `is_valid()` callbacks = 5.48s / 18.8s total = 29% of runtime
+- After: `word in word_set` = ~1.2s (dict `__contains__` only, no overhead)
+- Net: ~23% per-worker speedup
+
+**Training throughput improvement:**
+- Before (gen2 signal, old Cython): 15.3 g/s (5 workers, old machine)
+- Before (TD signal, old Cython): 13.0 g/s (9 workers, new machine)
+- After (TD signal, new Cython): **21.8 g/s** (9 workers) -- **68% faster**
+- Batch steady-state: 24.5-25.6 g/s
+
+**Projected training times at 21.8 g/s:**
+
+| Games | Time |
+|-------|------|
+| 1M | ~12.7h |
+| 2M | ~25.5h |
+| 3M | ~38.2h (~1.6 days) |
+
+**Files changed:**
+- `gaddag_accel.pyx`: `_SearchState.dictionary` -> `.word_set`, `find_moves_c()`
+  signature, `_cross_check()`, `_record_move()` -- all use `word in st.word_set`
+- `gaddag_accel.cp312-win_amd64.pyd`: rebuilt
+- `move_finder_c.py`: passes `dictionary._words` instead of `dictionary`
+- `self_play.py`: TD trajectories + backward pass, `td_gamma` parameter
+- `trainer.py`: `--td-gamma` CLI arg, threaded to workers
+
+## V19 roadmap: bingo -> sweep terminology
 
 NYT Crossplay calls a 7-tile play a "sweep" (40 pts), not a "bingo" (50 pts).
 The codebase currently uses "bingo" throughout. Scope: 221 references across
 21 files, 14 variable/constant names to rename, Cython rebuild required.
-Estimated 2-3 hours. Deferred to V17 as a breaking terminology change.
+Estimated 2-3 hours. Deferred as a breaking terminology change.
 
 Key renames: `BINGO_BONUS` -> `SWEEP_BONUS`, `bingo_prob` -> `sweep_prob`,
 `is_bingo` -> `is_sweep`, `[!B]` marker -> `[!S]`, `[DB]` -> `[DS]`, etc.
@@ -454,15 +519,14 @@ due to struct overhead exceeding Cython's efficient C-to-C calling.
 | Component              | Time     | %    | Language |
 |------------------------|----------|------|----------|
 | GADDAG traversal       | 1,900 us | 90%  | C        |
-| Word validation        | 100 us   | 5%   | Python   |
+| Word validation        | 100 us   | 5%   | C (V18: word_set) |
 | Cross-check lookups    | 85 us    | 4%   | C        |
 | Rack parsing           | 5 us     | 0.2% | C        |
 | random.sample + join   | 2 us     | 0.1% | Python   |
 | Result recording       | 4 us     | 0.2% | Python   |
 
-The Cython fast path is already 96% C code. A pure C/Rust rewrite of the
-move finder would only eliminate the 5% Python word-validation callbacks,
-yielding ~5-8% speedup -- not worth the effort.
+The Cython fast path is 97% C code (V18: word validation moved from Python
+method dispatch to direct C-level set lookup -- see V18 changes).
 
 **Future software optimization ideas (each could yield 20-50%):**
 
@@ -552,7 +616,7 @@ auto-resumes from the latest checkpoint.
 Alternatively, from a **native Windows terminal** (not Git Bash — multiprocessing
 deadlocks in Git Bash):
 ```bash
-C:\Users\billh\AppData\Local\Programs\Python\Python312\python.exe -m crossplay.superleaves.trainer --resume --generation 2 --games 700000
+C:\Users\billh\AppData\Local\Programs\Python\Python312\python.exe -m crossplay.superleaves.trainer --resume --generation N --games NNNNNN
 ```
 
 Or launch via PowerShell from Claude Code:
@@ -575,19 +639,29 @@ python -m crossplay.superleaves.trainer --smoke-test
 # Full gen1 (350K games, ~22 hours)
 python -m crossplay.superleaves.trainer --games 350000
 
-# Gen2 from gen1 (700K games, equity-based signal)
-python -m crossplay.superleaves.trainer --generation 2 --games 700000 --init-from gen1_350000.pkl
+# Gen2 from gen1 (1M games, equity-based signal)
+python -m crossplay.superleaves.trainer --generation 2 --games 1000000 --init-from gen1_350000.pkl
+
+# Gen3 from gen2 (TD-learning, 1M+ games, ~12.7h at 21.8 g/s)
+python -m crossplay.superleaves.trainer --generation 3 --games 1000000 --init-from gen2_1000000.pkl --td-gamma 0.97
 
 # Resume interrupted training (auto-finds latest checkpoint)
-python -m crossplay.superleaves.trainer --resume --generation 2 --games 700000
+python -m crossplay.superleaves.trainer --resume --generation N --games NNNNNN
 
-# Validate trained table vs formula
-python -m crossplay.superleaves.validate --table superleaves/gen1_350000.pkl --games 1000
+# Validate trained table vs formula (multi-worker, ~80s for 1000 games)
+python -m crossplay.superleaves.validate --table superleaves/gen2_1000000.pkl --games 1000
+python -m crossplay.superleaves.validate --table superleaves/gen2_1000000.pkl --games 1000 --workers 5
 ```
 
 **Deployment:** Copy a checkpoint to `deployed_leaves.pkl` in the superleaves
 directory. `leave_eval.py` lazy-loads this file and uses trained values before
-falling back to formula. Gen1 is currently deployed.
+falling back to formula. **Gen2 is currently deployed** (1M games, 921K entries).
+
+**Validation (`validate.py`):** Multi-worker head-to-head bot matches.
+Uses `ProcessPoolExecutor` with `cpu_count - 3` default workers (same as
+trainer). Progress printed every 50 games with win/loss, spread, games/sec,
+and ETA. C-accelerated move finder used when available. 1000 games completes
+in ~80s with 5 workers (vs ~22min single-threaded).
 
 Training runs in background and does not interfere with game play.
 Uses `Board()` directly (no `Game` class), so it does not trigger game
@@ -605,30 +679,30 @@ recovery (stale lock auto-clears on trainer startup). This prevents the
 1. Create signal file: `touch crossplay/.recalibrate_request`
 2. Trainer checks for flag at each batch boundary and exits gracefully
 3. Run calibration: `python -m crossplay.mc_calibrate calibrate --force`
-4. Resume training: `python -m crossplay.superleaves.trainer --resume --generation 2 --games 700000`
+4. Resume training: `python -m crossplay.superleaves.trainer --resume --generation N --games NNNNNN`
 
 This allows MC speed tuning without killing workers mid-batch.
 
 **Training data in Git (LFS):** Two pkl files are tracked via Git LFS and
 pushed to GitHub so the engine works immediately after cloning:
-- `deployed_leaves.pkl` -- the live leave table used by the engine
-- `gen1_350000.pkl` -- final gen1 output (seed for gen2 training)
+- `deployed_leaves.pkl` -- the live leave table used by the engine (gen2)
+- `gen2_1000000.pkl` -- final gen2 output (1M games)
 
 All other pkl files (intermediate checkpoints, worker tables) are gitignored.
 After training a new generation, update deployed_leaves.pkl and commit:
 ```bash
-cp superleaves/gen2_700000.pkl superleaves/deployed_leaves.pkl
+cp superleaves/gen3_NNNNNN.pkl superleaves/deployed_leaves.pkl
 git add crossplay/superleaves/deployed_leaves.pkl
-git commit -m "Deploy gen2 SuperLeaves"
+git commit -m "Deploy gen3 SuperLeaves"
 git push
 ```
 
-**Cleanup after training:** Intermediate checkpoints (gen2_10000.pkl through
-gen2_690000.pkl) accumulate at ~21 MB each during training. Delete all except
-the final checkpoint after training completes:
+**Cleanup after training:** Intermediate checkpoints accumulate at ~21 MB
+each during training. Delete all except the final checkpoint after training
+completes:
 ```bash
-# Keep only gen2_700000.pkl (the final), delete intermediates
-ls superleaves/gen2_*.pkl | grep -v gen2_700000 | xargs rm
+# Keep only final checkpoint, delete intermediates
+ls superleaves/gen3_*.pkl | grep -v gen3_FINAL | xargs rm
 ```
 
 **Cloning on a new machine:** `git clone` + `git lfs pull` fetches all code

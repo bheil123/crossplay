@@ -84,12 +84,10 @@ cdef class _SearchState:
     cdef bint empty_board
     cdef dict cross_cache
     cdef object NOT_COMPUTED
-    cdef object dictionary
+    cdef object word_set               # Python set of valid words (direct lookup, no method call)
     cdef set valid_2
     cdef list results
     cdef set seen
-    # Cross-check cache as C-friendly: returns set or None
-    # We keep this as Python because dictionary.is_valid is Python anyway
 
 
 # =========================================================================
@@ -154,7 +152,7 @@ cdef object _cross_check(_SearchState st, int r0, int c0, bint horiz):
         if len(w) == 2:
             if w in st.valid_2:
                 valid.add(letter)
-        elif st.dictionary.is_valid(w):
+        elif w in st.word_set:
             valid.add(letter)
     st.cross_cache[key] = valid
     return valid
@@ -196,7 +194,7 @@ cdef void _record_move(_SearchState st, int* wordbuf, int wlen,
     if wlen == 2:
         if word not in st.valid_2:
             return
-    elif not st.dictionary.is_valid(word):
+    elif word not in st.word_set:
         return
 
     cdef tuple key = (word, sr0, sc0, horiz)
@@ -583,15 +581,18 @@ cdef int _calc_left_limit(list grid, int anchor_r0, int anchor_c0,
 # =========================================================================
 
 def find_moves_c(bytes gdata, list grid, str rack_str,
-                 object dictionary, set valid_2):
+                 object word_set, set valid_2):
     """
     Find all valid moves using GADDAG traversal.
     Returns list of (word_str, row_1idx, col_1idx, is_horiz, blanks_list).
+
+    word_set: Python set of valid words (dictionary._words) for direct
+              O(1) 'in' checks without Python method dispatch overhead.
     """
     cdef _SearchState st = _SearchState.__new__(_SearchState)
     st.data = <const unsigned char*>PyBytes_AsString(gdata)
     st.grid = grid
-    st.dictionary = dictionary
+    st.word_set = word_set
     st.valid_2 = valid_2
     st.results = []
     st.seen = set()

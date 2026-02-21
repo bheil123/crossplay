@@ -1,13 +1,16 @@
 """
-CROSSPLAY V17 - SuperLeaves Validation (Multi-Worker)
+CROSSPLAY V18 - SuperLeaves Validation (Multi-Worker)
 
-Head-to-head: SuperLeaves bot vs formula bot.
+Head-to-head: SuperLeaves bot vs formula bot (or vs another table).
 Alternates first player. Reports win rate, avg score, spread.
 Parallel workers for fast validation with visible progress.
 
 Usage:
-    python -m crossplay.superleaves.validate --table gen2_1000000.pkl --games 1000
-    python -m crossplay.superleaves.validate --table gen2_1000000.pkl --games 1000 --workers 5
+    # Table vs formula
+    python -m crossplay.superleaves.validate --table gen3_1000000.pkl --games 1000
+
+    # Table vs table (gen3 vs gen2)
+    python -m crossplay.superleaves.validate --table gen3_1000000.pkl --opponent gen2_1000000.pkl --games 1000
 """
 
 import os
@@ -137,7 +140,7 @@ _worker_super_table = None
 _worker_formula_table = None
 
 
-def _init_worker(table_path):
+def _init_worker(table_path, opponent_path=None):
     """Load GADDAG and tables once per worker process."""
     global _worker_gaddag, _worker_move_finder_cls
     global _worker_super_table, _worker_formula_table
@@ -152,9 +155,14 @@ def _init_worker(table_path):
 
         t1 = time.time()
         _worker_super_table = LeaveTable.load(table_path)
-        print(f"  [Worker {pid}] SuperLeaves table: {len(_worker_super_table):,} entries ({time.time()-t1:.1f}s)", flush=True)
+        print(f"  [Worker {pid}] Table A: {len(_worker_super_table):,} entries ({time.time()-t1:.1f}s)", flush=True)
 
-        _worker_formula_table = FormulaLeaveAdapter()
+        if opponent_path:
+            t2 = time.time()
+            _worker_formula_table = LeaveTable.load(opponent_path)
+            print(f"  [Worker {pid}] Table B: {len(_worker_formula_table):,} entries ({time.time()-t2:.1f}s)", flush=True)
+        else:
+            _worker_formula_table = FormulaLeaveAdapter()
 
         # Prefer C-accelerated move finder
         from ..move_finder_c import is_available as c_available
@@ -206,22 +214,33 @@ def _play_batch(batch):
 # Main validation
 # ---------------------------------------------------------------------------
 
-def validate(table_path, num_games, workers=None):
+def validate(table_path, num_games, workers=None, opponent_path=None):
     """Run head-to-head validation with parallel workers.
 
     Args:
         table_path: path to trained SuperLeaves table
         num_games: number of games to play
         workers: number of parallel workers (default: cpu_count - 3)
+        opponent_path: optional path to opponent SuperLeaves table.
+                       If None, uses formula as opponent.
     """
     if workers is None:
         workers = _default_workers()
 
-    print(f"Loading SuperLeaves table: {table_path}")
+    print(f"Loading table A: {table_path}")
     super_table = LeaveTable.load(table_path)
     print(f"  Table size: {len(super_table):,}")
 
-    print(f"\nValidation: SuperLeaves vs Formula ({num_games:,} games, {workers} workers)")
+    if opponent_path:
+        opp_label = os.path.basename(opponent_path).replace('.pkl', '')
+        print(f"Loading table B: {opponent_path}")
+        opp_table = LeaveTable.load(opponent_path)
+        print(f"  Table size: {len(opp_table):,}")
+    else:
+        opp_label = "Formula"
+
+    table_label = os.path.basename(table_path).replace('.pkl', '')
+    print(f"\nValidation: {table_label} vs {opp_label} ({num_games:,} games, {workers} workers)")
     print(f"  Alternating first player each game")
     print("=" * 60)
 
@@ -247,7 +266,7 @@ def validate(table_path, num_games, workers=None):
     with ProcessPoolExecutor(
         max_workers=workers,
         initializer=_init_worker,
-        initargs=(table_path,)
+        initargs=(table_path, opponent_path)
     ) as executor:
         futures = {}
         for batch in batches:
@@ -286,7 +305,7 @@ def validate(table_path, num_games, workers=None):
                 eta = remaining / gps if gps > 0 else 0
                 print(
                     f"  [{games_done:,}/{num_games:,}] "
-                    f"Super {super_wins}-{formula_wins}-{ties}  "
+                    f"A {super_wins}-{formula_wins}-{ties}  "
                     f"({win_pct:.1f}%)  "
                     f"spread: {avg_spread:+.1f}  "
                     f"({gps:.1f} g/s, ETA {eta:.0f}s)",
@@ -299,18 +318,18 @@ def validate(table_path, num_games, workers=None):
 
     print(f"\n{'=' * 60}")
     print(f"RESULTS ({num_games:,} games in {elapsed:.0f}s, {gps:.1f} games/sec)")
-    print(f"  SuperLeaves wins: {super_wins} ({100*super_wins/num_games:.1f}%)")
-    print(f"  Formula wins:     {formula_wins} ({100*formula_wins/num_games:.1f}%)")
+    print(f"  {table_label} wins: {super_wins} ({100*super_wins/num_games:.1f}%)")
+    print(f"  {opp_label} wins:   {formula_wins} ({100*formula_wins/num_games:.1f}%)")
     print(f"  Ties:             {ties}")
-    print(f"  Avg SuperLeaves score: {super_total/num_games:.1f}")
-    print(f"  Avg Formula score:     {formula_total/num_games:.1f}")
+    print(f"  Avg {table_label} score: {super_total/num_games:.1f}")
+    print(f"  Avg {opp_label} score:   {formula_total/num_games:.1f}")
     avg_spread = sum(spreads) / len(spreads)
-    print(f"  Avg spread: {avg_spread:+.1f}")
+    print(f"  Avg spread ({table_label} - {opp_label}): {avg_spread:+.1f}")
 
     if super_wins > formula_wins:
-        print(f"\n  --> SuperLeaves WINS by {super_wins - formula_wins} games")
+        print(f"\n  --> {table_label} WINS by {super_wins - formula_wins} games")
     elif formula_wins > super_wins:
-        print(f"\n  --> Formula WINS by {formula_wins - super_wins} games")
+        print(f"\n  --> {opp_label} WINS by {formula_wins - super_wins} games")
     else:
         print(f"\n  --> TIE")
 
@@ -325,6 +344,9 @@ def main():
                         help='Number of validation games (default: 1000)')
     parser.add_argument('--workers', type=int, default=None,
                         help='Number of workers (default: cpu_count - 3)')
+    parser.add_argument('--opponent', type=str, default=None,
+                        help='Path to opponent SuperLeaves .pkl file '
+                             '(default: formula-based evaluation)')
     args = parser.parse_args()
 
     # Resolve table path relative to superleaves dir
@@ -339,7 +361,19 @@ def main():
         print(f"Error: table not found: {table_path}")
         sys.exit(1)
 
-    validate(table_path, args.games, workers=args.workers)
+    # Resolve opponent path
+    opponent_path = args.opponent
+    if opponent_path and not os.path.isabs(opponent_path):
+        candidate = os.path.join(_superleaves_dir(), opponent_path)
+        if os.path.exists(candidate):
+            opponent_path = candidate
+
+    if opponent_path and not os.path.exists(opponent_path):
+        print(f"Error: opponent table not found: {opponent_path}")
+        sys.exit(1)
+
+    validate(table_path, args.games, workers=args.workers,
+             opponent_path=opponent_path)
 
 
 def _superleaves_dir():
