@@ -108,7 +108,7 @@ Games are stored in a two-tier persistent library under `crossplay/games/`:
 - Individual JSON files for in-progress games
 - Auto-saved on every `opp`, `play`, `rack` command
 - Clean git diffs (one file per game)
-- Loaded into slots 1-4 on startup via `games/index.json`
+- Loaded into slots 1-8 on startup via `games/index.json`
 
 **Completed games** (`games/archive.jsonl`):
 - Append-only JSONL for finished games
@@ -116,7 +116,7 @@ Games are stored in a two-tier persistent library under `crossplay/games/`:
 - Searchable by opponent name or word played
 
 **Index** (`games/index.json`):
-- Maps slots 1-4 to active game IDs
+- Maps slots 1-8 to active game IDs
 - Tracks per-opponent game counters (for sequential IDs)
 - Optional opponent notes
 
@@ -163,7 +163,7 @@ an orphaned game back into a slot.
 - **Post-validation** in `move_finder_c.py` -- all C-generated moves have
   main-axis words and cross-words re-validated in Python as a safety net
 - **Game library** persists all games as JSON/JSONL in `crossplay/games/`.
-  Slots 1-4 are a cache view into the active library. Auto-saved on every
+  Slots 1-8 are a cache view into the active library. Auto-saved on every
   state change. Completed games archived to JSONL. Git-tracked.
 - **Accuracy analysis** in `ACCURACY.md` -- documents all factors impacting
   move evaluation accuracy, improvement roadmap, and equity formula breakdown

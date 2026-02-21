@@ -2836,7 +2836,7 @@ def run_simulation(strategy1: Strategy, strategy2: Strategy, num_games: int = 10
 class GameManager:
     """Manages multiple concurrent games."""
     
-    MAX_GAMES = 4
+    MAX_GAMES = 8
     
     def __init__(self):
         self.games: Dict[int, Game] = {}
