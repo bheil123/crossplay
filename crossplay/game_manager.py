@@ -2138,6 +2138,9 @@ class Game:
         elif bag_before_play == 0 and self.state.final_turns_remaining is not None:
             self.state.final_turns_remaining = max(0, self.state.final_turns_remaining - 1)
 
+        # Toggle turn: after your move it's opponent's turn and vice versa
+        self.state.is_your_turn = is_opponent  # If opponent played, now it's your turn (True); if you played, their turn (False)
+
         self.state.updated_at = datetime.now().isoformat()
 
         # Update blocked square cache and invalidate threats cache
@@ -3312,7 +3315,6 @@ class GameManager:
                         game.play_move(word, row, col, horiz,
                                        rack=game.state.your_rack,
                                        new_rack=post_rack)
-                        game.state.is_your_turn = False
                     except Exception as e:
                         print(f"Error: {e}")
                 else:
