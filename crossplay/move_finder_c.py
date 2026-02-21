@@ -54,6 +54,19 @@ def _get_dict():
         _dictionary = get_dictionary()
     return _dictionary
 
+# Cache bytes(gaddag._data) to avoid 28MB copy per find_all_moves_c call.
+# The GADDAG is immutable after construction, so this is safe.
+_gdata_bytes_cache = None
+_gdata_source_id = None  # id() of the bytearray we cached from
+
+def _get_gdata_bytes(gdata):
+    """Return cached bytes view of GADDAG data (avoids 10ms copy per call)."""
+    global _gdata_bytes_cache, _gdata_source_id
+    if _gdata_source_id != id(gdata):
+        _gdata_bytes_cache = bytes(gdata)
+        _gdata_source_id = id(gdata)
+    return _gdata_bytes_cache
+
 
 def is_available():
     """Check if C acceleration is available."""
@@ -83,7 +96,7 @@ def find_all_moves_c(board, gaddag, rack_str: str,
 
     # Call C extension - returns list of (word, row_1idx, col_1idx, is_horiz, blanks_list)
     raw_moves = _accel.find_moves_c(
-        bytes(gdata),  # bytearray -> bytes for buffer protocol
+        _get_gdata_bytes(gdata),  # cached bytes (avoids 28MB copy per call)
         grid,          # list of lists
         rack_str,
         dictionary,

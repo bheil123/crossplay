@@ -136,7 +136,7 @@ def _play_batch(batch_size):
 
 def write_status(status, generation, games_completed, games_total,
                  games_per_sec, checkpoint_file, leave_table_size,
-                 single_tile_vals=None):
+                 single_tile_vals=None, batch_gps=None):
     """Write training status to JSON file."""
     if games_per_sec > 0 and games_completed < games_total:
         eta_minutes = (games_total - games_completed) / games_per_sec / 60
@@ -150,6 +150,7 @@ def write_status(status, generation, games_completed, games_total,
         'games_total': games_total,
         'pct_complete': round(100 * games_completed / max(games_total, 1), 1),
         'games_per_sec': round(games_per_sec, 1),
+        'batch_gps': round(batch_gps, 1) if batch_gps is not None else None,
         'eta_minutes': round(eta_minutes, 1),
         'checkpoint_file': checkpoint_file,
         'leave_table_size': leave_table_size,
@@ -380,6 +381,7 @@ def train(num_games, workers, generation=1, resume_from=None,
     status_label = 'smoke_test' if is_smoke_test else 'running'
     start_time = time.time()
     last_report_games = games_done
+    last_report_time = start_time
     total_s1, total_s2 = 0, 0
     total_obs_count = 0
 
@@ -479,8 +481,12 @@ def train(num_games, workers, generation=1, resume_from=None,
 
                     # Progress report
                     if games_done - last_report_games >= report_every or games_done >= num_games:
-                        elapsed = time.time() - start_time
+                        now = time.time()
+                        elapsed = now - start_time
                         gps = (games_done - resume_games) / max(elapsed, 0.01)
+                        batch_elapsed = now - last_report_time
+                        batch_games = games_done - last_report_games
+                        batch_gps = batch_games / max(batch_elapsed, 0.01)
                         pct = 100 * games_done / num_games
                         stv = table.single_tile_values()
                         top3 = sorted(stv.items(), key=lambda x: -x[1])[:3]
@@ -488,10 +494,12 @@ def train(num_games, workers, generation=1, resume_from=None,
 
                         print(
                             f"  [{pct:5.1f}%] {games_done:,}/{num_games:,}  "
-                            f"{gps:.1f} g/s  alpha={alpha:.4f}  "
+                            f"{gps:.1f} g/s (batch {batch_gps:.1f})  "
+                            f"alpha={alpha:.4f}  "
                             f"obs={total_obs_count:,}  top: {top3_str}"
                         )
                         last_report_games = games_done
+                        last_report_time = now
 
                         # Update status file
                         write_status(
@@ -499,7 +507,8 @@ def train(num_games, workers, generation=1, resume_from=None,
                             gps,
                             _checkpoint_path(generation, games_done),
                             table_size,
-                            stv
+                            stv,
+                            batch_gps=batch_gps
                         )
 
                     # Checkpoint (async to avoid blocking the training loop)

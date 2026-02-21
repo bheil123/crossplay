@@ -380,11 +380,12 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         std_opp = 0.0
         pct_beats = 0.0
     else:
-        avg_opp = sum(opp_scores) / n
+        avg_opp = _running_sum / n
         max_opp = max(opp_scores)
         min_opp = min(opp_scores)
-        mean = avg_opp
-        variance = sum((s - mean) ** 2 for s in opp_scores) / n
+        variance = (_running_sum_sq / n) - (avg_opp * avg_opp)
+        if variance < 0:
+            variance = 0.0  # numerical stability
         std_opp = variance ** 0.5
         pct_beats = sum(1 for s in opp_scores if s > move['score']) / n * 100
 
