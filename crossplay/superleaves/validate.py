@@ -1,21 +1,34 @@
 """
-CROSSPLAY V15 - SuperLeaves Validation
+CROSSPLAY V17 - SuperLeaves Validation (Multi-Worker)
 
 Head-to-head: SuperLeaves bot vs formula bot.
 Alternates first player. Reports win rate, avg score, spread.
+Parallel workers for fast validation with visible progress.
 
 Usage:
-    python -m crossplay.superleaves.validate --table gen1_100000.pkl --games 1000
+    python -m crossplay.superleaves.validate --table gen2_1000000.pkl --games 1000
+    python -m crossplay.superleaves.validate --table gen2_1000000.pkl --games 1000 --workers 5
 """
 
 import os
 import sys
+import time
 import random
 import argparse
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from ..board import Board
 from ..config import TILE_DISTRIBUTION, RACK_SIZE
 from .fast_bot import select_best_move
 from .leave_table import LeaveTable
+
+
+def _default_workers():
+    """Return sensible default worker count: cpu_count - 3 (min 1)."""
+    try:
+        cpus = os.cpu_count() or 4
+    except Exception:
+        cpus = 4
+    return max(1, cpus - 3)
 
 
 class FormulaLeaveAdapter:
@@ -114,29 +127,110 @@ def play_validation_game(gaddag, move_finder_cls, table_a, table_b):
     return score1, score2
 
 
-def validate(table_path, num_games, workers=1):
-    """Run head-to-head validation.
+# ---------------------------------------------------------------------------
+# Worker process init and batch play
+# ---------------------------------------------------------------------------
+
+_worker_gaddag = None
+_worker_move_finder_cls = None
+_worker_super_table = None
+_worker_formula_table = None
+
+
+def _init_worker(table_path):
+    """Load GADDAG and tables once per worker process."""
+    global _worker_gaddag, _worker_move_finder_cls
+    global _worker_super_table, _worker_formula_table
+    pid = os.getpid()
+
+    try:
+        t0 = time.time()
+        print(f"  [Worker {pid}] Loading GADDAG...", flush=True)
+        from ..gaddag import get_gaddag
+        _worker_gaddag = get_gaddag()
+        print(f"  [Worker {pid}] GADDAG loaded ({time.time()-t0:.1f}s)", flush=True)
+
+        t1 = time.time()
+        _worker_super_table = LeaveTable.load(table_path)
+        print(f"  [Worker {pid}] SuperLeaves table: {len(_worker_super_table):,} entries ({time.time()-t1:.1f}s)", flush=True)
+
+        _worker_formula_table = FormulaLeaveAdapter()
+
+        # Prefer C-accelerated move finder
+        from ..move_finder_c import is_available as c_available
+        if c_available():
+            from ..move_finder_c import CMoveFinder
+            _worker_move_finder_cls = CMoveFinder
+            print(f"  [Worker {pid}] Move finder: C-accelerated", flush=True)
+        else:
+            from ..move_finder_gaddag import GADDAGMoveFinder
+            _worker_move_finder_cls = GADDAGMoveFinder
+            print(f"  [Worker {pid}] Move finder: Python", flush=True)
+
+        print(f"  [Worker {pid}] Ready! ({time.time()-t0:.1f}s)", flush=True)
+    except Exception as e:
+        print(f"  [Worker {pid}] INIT FAILED: {type(e).__name__}: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+def _play_batch(batch):
+    """Play a batch of validation games in a worker.
+
+    Args:
+        batch: list of game_num ints (used for alternating first player)
+
+    Returns:
+        list of (game_num, super_score, formula_score)
+    """
+    results = []
+    for game_num in batch:
+        if game_num % 2 == 1:
+            s_a, s_b = play_validation_game(
+                _worker_gaddag, _worker_move_finder_cls,
+                _worker_super_table, _worker_formula_table
+            )
+            super_score, formula_score = s_a, s_b
+        else:
+            s_a, s_b = play_validation_game(
+                _worker_gaddag, _worker_move_finder_cls,
+                _worker_formula_table, _worker_super_table
+            )
+            formula_score, super_score = s_a, s_b
+        results.append((game_num, super_score, formula_score))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Main validation
+# ---------------------------------------------------------------------------
+
+def validate(table_path, num_games, workers=None):
+    """Run head-to-head validation with parallel workers.
 
     Args:
         table_path: path to trained SuperLeaves table
         num_games: number of games to play
-        workers: (unused, runs single-threaded for simplicity)
+        workers: number of parallel workers (default: cpu_count - 3)
     """
-    from ..gaddag import get_gaddag
-    from ..move_finder_gaddag import GADDAGMoveFinder
-
-    print(f"Loading GADDAG...")
-    gaddag = get_gaddag()
+    if workers is None:
+        workers = _default_workers()
 
     print(f"Loading SuperLeaves table: {table_path}")
     super_table = LeaveTable.load(table_path)
     print(f"  Table size: {len(super_table):,}")
 
-    formula_table = FormulaLeaveAdapter()
-
-    print(f"\nValidation: SuperLeaves vs Formula ({num_games:,} games)")
+    print(f"\nValidation: SuperLeaves vs Formula ({num_games:,} games, {workers} workers)")
     print(f"  Alternating first player each game")
-    print("="*60)
+    print("=" * 60)
+
+    # Divide games into batches for workers
+    batch_size = 10  # small batches for frequent progress updates
+    game_nums = list(range(1, num_games + 1))
+    batches = []
+    for i in range(0, len(game_nums), batch_size):
+        batches.append(game_nums[i:i + batch_size])
 
     super_wins = 0
     formula_wins = 0
@@ -144,44 +238,67 @@ def validate(table_path, num_games, workers=1):
     super_total = 0
     formula_total = 0
     spreads = []
+    games_done = 0
+    t_start = time.time()
+    last_checkpoint = 0
 
-    for game_num in range(1, num_games + 1):
-        # Alternate who goes first
-        if game_num % 2 == 1:
-            s_a, s_b = play_validation_game(
-                gaddag, GADDAGMoveFinder, super_table, formula_table
-            )
-            super_score, formula_score = s_a, s_b
-        else:
-            s_a, s_b = play_validation_game(
-                gaddag, GADDAGMoveFinder, formula_table, super_table
-            )
-            formula_score, super_score = s_a, s_b
+    print(f"\nStarting {workers} workers (30-90s init)...", flush=True)
 
-        super_total += super_score
-        formula_total += formula_score
-        spread = super_score - formula_score
-        spreads.append(spread)
+    with ProcessPoolExecutor(
+        max_workers=workers,
+        initializer=_init_worker,
+        initargs=(table_path,)
+    ) as executor:
+        futures = {}
+        for batch in batches:
+            fut = executor.submit(_play_batch, batch)
+            futures[fut] = batch
 
-        if super_score > formula_score:
-            super_wins += 1
-        elif formula_score > super_score:
-            formula_wins += 1
-        else:
-            ties += 1
+        for fut in as_completed(futures):
+            try:
+                results = fut.result()
+            except Exception as e:
+                print(f"  [ERROR] Batch failed: {e}", flush=True)
+                continue
 
-        if game_num % 100 == 0 or game_num == num_games:
-            win_pct = 100 * super_wins / game_num
-            avg_spread = sum(spreads) / len(spreads)
-            print(
-                f"  [{game_num:,}/{num_games:,}] "
-                f"SuperLeaves {super_wins}-{formula_wins}-{ties}  "
-                f"({win_pct:.1f}%)  "
-                f"avg spread: {avg_spread:+.1f}"
-            )
+            for game_num, super_score, formula_score in results:
+                super_total += super_score
+                formula_total += formula_score
+                spread = super_score - formula_score
+                spreads.append(spread)
 
-    print(f"\n{'='*60}")
-    print(f"RESULTS ({num_games:,} games)")
+                if super_score > formula_score:
+                    super_wins += 1
+                elif formula_score > super_score:
+                    formula_wins += 1
+                else:
+                    ties += 1
+
+                games_done += 1
+
+            # Print progress every 50 games
+            if games_done >= last_checkpoint + 50 or games_done == num_games:
+                elapsed = time.time() - t_start
+                gps = games_done / elapsed if elapsed > 0 else 0
+                win_pct = 100 * super_wins / games_done
+                avg_spread = sum(spreads) / len(spreads)
+                remaining = num_games - games_done
+                eta = remaining / gps if gps > 0 else 0
+                print(
+                    f"  [{games_done:,}/{num_games:,}] "
+                    f"Super {super_wins}-{formula_wins}-{ties}  "
+                    f"({win_pct:.1f}%)  "
+                    f"spread: {avg_spread:+.1f}  "
+                    f"({gps:.1f} g/s, ETA {eta:.0f}s)",
+                    flush=True
+                )
+                last_checkpoint = games_done
+
+    elapsed = time.time() - t_start
+    gps = num_games / elapsed if elapsed > 0 else 0
+
+    print(f"\n{'=' * 60}")
+    print(f"RESULTS ({num_games:,} games in {elapsed:.0f}s, {gps:.1f} games/sec)")
     print(f"  SuperLeaves wins: {super_wins} ({100*super_wins/num_games:.1f}%)")
     print(f"  Formula wins:     {formula_wins} ({100*formula_wins/num_games:.1f}%)")
     print(f"  Ties:             {ties}")
@@ -206,6 +323,8 @@ def main():
                         help='Path to trained SuperLeaves .pkl file')
     parser.add_argument('--games', type=int, default=1000,
                         help='Number of validation games (default: 1000)')
+    parser.add_argument('--workers', type=int, default=None,
+                        help='Number of workers (default: cpu_count - 3)')
     args = parser.parse_args()
 
     # Resolve table path relative to superleaves dir
@@ -220,7 +339,7 @@ def main():
         print(f"Error: table not found: {table_path}")
         sys.exit(1)
 
-    validate(table_path, args.games)
+    validate(table_path, args.games, workers=args.workers)
 
 
 def _superleaves_dir():
