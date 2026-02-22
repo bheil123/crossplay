@@ -82,6 +82,9 @@ game_manager.py          <- Entry point, game loop, AI orchestration
   |   |-- index.json     <- Slot assignments + per-opponent counters
   |   |-- active/        <- In-progress games (individual JSON)
   |   +-- archive.jsonl  <- Completed games (append-only JSONL)
+  |-- NYT/               <- NYT Crossplay analysis (screenshots + notes)
+  |   |-- games/         <- Screenshots organized by date/opponent (gitignored)
+  |   +-- analysis/      <- Comparison notes, findings
   +-- superleaves/       <- SuperLeaves training pipeline
       |-- leave_table.py <- LeaveTable class (sorted tuple -> float)
       |-- fast_bot.py    <- Greedy bot for self-play
@@ -220,6 +223,31 @@ are NOT flagged (NYT almost certainly keeps them).
 **Maintenance:** If Crossplay rejects a word not on the list, add it to
 `nyt_curated_words.txt`. If a flagged word is actually accepted, remove it.
 
+## NYT move analysis (screenshots)
+
+Game screenshots from NYT Crossplay are stored in `NYT/games/` organized
+by date or opponent (e.g., `20260220_session1/`, `20260222_vs_sophie/`).
+Screenshots are gitignored (large PNGs) but the directory structure and
+README are tracked.
+
+**Purpose:** Compare NYT's move recommendations against our engine to:
+- Identify where NYT plays differently (and whether it's better or worse)
+- Discover words NYT accepts/rejects that we don't expect
+- Understand NYT's strategic preferences (defensive play, tile management)
+- Find engine improvement opportunities
+
+**Move record fields for NYT tracking:**
+Each move in `board_moves` has these NYT-related fields:
+- `engine` -- our engine's top recommendation at the time (dict or null)
+- `nyt` -- NYT's suggested move if captured from screenshot (dict or null)
+- `win_pct` -- NYT's displayed win probability (float or null)
+- `engine_version` -- which engine version analyzed the position
+
+**Workflow:** After a completed game, take screenshots of NYT's move-by-move
+review (NYT shows its recommended move for each turn). Store in
+`NYT/games/YYYYMMDD_vs_OPPONENT/`. Use Claude to read the screenshots and
+compare NYT vs engine recommendations move-by-move.
+
 ## V17 changes: near-endgame evaluator + gen2 training
 
 **Near-endgame hybrid evaluator (`evaluate_near_endgame()` in `lookahead_3ply.py`):**
@@ -354,6 +382,21 @@ path matches.
 - `move_finder_c.py`: passes `dictionary._words` instead of `dictionary`
 - `self_play.py`: TD trajectories + backward pass, `td_gamma` parameter
 - `trainer.py`: `--td-gamma` CLI arg, threaded to workers
+
+**Gen3 training results (1M games, TD-learning):**
+- Completed at 27.6 g/s (9 workers), ~10.1 hours
+- 921K leave entries, final checkpoint: `gen3_1000000.pkl`
+- **Not yet deployed** -- awaiting validation (gen3 vs formula, gen3 vs gen2)
+- `deployed_leaves.pkl` is still gen2
+
+**`reload` command (multi-computer game sync):**
+`reload` / `reload N` -- re-reads game JSON files from disk after `git pull`
+or external edits. Reconstructs in-memory Game objects with correct board
+state, scores, rack, and bag. Essential when working from multiple computers
+since GameManager caches game state in memory at startup.
+
+`GameManager.reload_games(slot=None)` is the programmatic API. Reloads all
+slots if `slot` is None, or a single slot if specified.
 
 ## V19 roadmap: bingo -> sweep terminology
 
