@@ -58,6 +58,15 @@ crossplay/superleaves/gen3_*.pkl
 !crossplay/superleaves/deployed_leaves.pkl
 !crossplay/superleaves/gen1_350000.pkl
 
+# NYT screenshots (large binary files, keep locally)
+crossplay/NYT/games/
+crossplay/NYT/analysis/*.png
+crossplay/NYT/analysis/*.jpg
+!crossplay/NYT/README.md
+
+# Windows artifacts
+crossplay/nul
+
 # OS
 .DS_Store
 Thumbs.db
