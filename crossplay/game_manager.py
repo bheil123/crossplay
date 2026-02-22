@@ -2913,6 +2913,66 @@ class GameManager:
         except Exception:
             pass  # Non-critical -- don't block startup
 
+    def reload_games(self, slot=None):
+        """Reload game(s) from disk after git pull or external edits.
+
+        Re-reads game JSON files and reconstructs in-memory Game objects,
+        replacing any stale state. Use this after 'git pull' when game
+        files were updated on another computer.
+
+        Args:
+            slot: If provided, reload only that slot. Otherwise reload all slots.
+        """
+        from . import game_library as lib
+
+        # Re-read index (may have changed on the other computer)
+        index = lib.load_index()
+        slots_to_reload = {}
+
+        if slot is not None:
+            # Reload single slot
+            game_id = index.get('slots', {}).get(str(slot))
+            if game_id:
+                slots_to_reload[slot] = game_id
+            else:
+                print(f"Slot {slot}: no game assigned in index")
+                return
+        else:
+            # Reload all slots
+            for slot_str, game_id in index.get('slots', {}).items():
+                if game_id:
+                    s = int(slot_str)
+                    if s <= self.MAX_GAMES:
+                        slots_to_reload[s] = game_id
+
+        if not slots_to_reload:
+            print("No games to reload.")
+            return
+
+        print(f"\n[RELOAD] Reloading {len(slots_to_reload)} game(s) from disk...")
+        for s, game_id in sorted(slots_to_reload.items()):
+            try:
+                game = lib.load_active(game_id)
+                if game is None:
+                    # File might have been archived on the other computer
+                    print(f"  Slot {s}: {game_id} -- file not found (archived?)")
+                    self.games[s] = None
+                    continue
+                game.game_id = game_id
+                game.auto_save = True
+                self.games[s] = game
+                gs = game.state
+                spread = gs.your_score - gs.opp_score
+                sign = '+' if spread >= 0 else ''
+                moves = len(gs.board_moves)
+                turn = "Your turn" if gs.is_your_turn else f"{gs.opponent_name}'s turn"
+                print(f"  Slot {s}: {game_id} | {gs.your_score}-{gs.opp_score} "
+                      f"({sign}{spread}) | {moves} moves | {turn}")
+            except Exception as e:
+                print(f"  Slot {s}: {game_id} -- reload failed: {e}")
+
+        print("[RELOAD] Done.")
+
     def show_slots(self):
         """Show all game slots."""
         print(f"\n{'='*60}")
@@ -3241,7 +3301,7 @@ class GameManager:
                 game.show_status()
             
             print("\nCommands: slot N | new N NAME | load ID | games | board | rack TILES | analyze")
-            print("          play WORD R C H/V | opp WORD R C H/V SCORE | save | reset N | back")
+            print("          play WORD R C H/V | opp WORD R C H/V SCORE | save | reload | reset N | back")
             
             try:
                 cmd = input(f"\n[Slot {self.current_slot}]> ").strip().lower()
@@ -3353,6 +3413,16 @@ class GameManager:
                 except Exception as e:
                     print(f"Error: {e}")
                     print("Usage: end YOUR_SCORE OPP_SCORE [win/loss/tie]")
+
+            elif action == 'reload':
+                # Reload game(s) from disk after git pull or external edits
+                if len(parts) >= 2:
+                    try:
+                        self.reload_games(slot=int(parts[1]))
+                    except ValueError:
+                        print("Usage: reload [SLOT]")
+                else:
+                    self.reload_games()
 
             elif action == 'save':
                 if game:

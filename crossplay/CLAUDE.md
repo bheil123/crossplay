@@ -148,6 +148,31 @@ an orphaned game back into a slot.
 `list_active()`, `archive_completed()`, `search_archive()`,
 `get_opponent_stats()`, `ensure_library_initialized()`
 
+## Multi-computer workflow
+
+Games are git-tracked and can be played from multiple computers. The
+workflow to switch between machines:
+
+1. **Before leaving a computer:** Commit and push game state
+   (`git add crossplay/games/ && git commit -m "..." && git push`)
+2. **When starting on a new computer:** `git pull` to get latest game files
+3. **After pulling:** Use `reload` command to refresh in-memory game state
+   from the updated JSON files on disk. Without this, the engine uses
+   stale in-memory state from when it first loaded.
+
+**`reload` command:**
+- `reload` -- reloads all game slots from disk
+- `reload N` -- reloads only slot N
+
+**Why this is needed:** GameManager loads all games into memory at startup.
+If `git pull` overwrites the JSON files afterward, the in-memory Game
+objects still hold the old state. `reload` re-reads the JSON files and
+reconstructs the board, scores, rack, and bag from the current disk state.
+
+**For Claude Code sessions:** When the user says they pulled from another
+computer, always call `gm.reload_games()` before recording moves or
+analyzing. This prevents stale board state causing incorrect analysis.
+
 ## Key design decisions
 
 - **N=40 flat** for MC evaluation (early stopping makes per-candidate cost
