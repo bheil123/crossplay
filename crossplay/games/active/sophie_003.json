@@ -178,6 +178,50 @@
       "engine_version": "17.2.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "FACES",
+      "row": 4,
+      "col": 9,
+      "dir": "V",
+      "player": "opp",
+      "score": 31,
+      "bag": 57,
+      "blanks": [],
+      "cumulative": [
+        159,
+        152
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-21T20:32:12.796906",
+      "engine": null,
+      "engine_version": "17.3.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "PAW",
+      "row": 3,
+      "col": 10,
+      "dir": "V",
+      "player": "me",
+      "score": 40,
+      "bag": 57,
+      "blanks": [],
+      "cumulative": [
+        199,
+        152
+      ],
+      "rack": "RAUTNWP",
+      "drawn": "NAK",
+      "note": "",
+      "timestamp": "2026-02-21T20:34:25.739491",
+      "engine": null,
+      "engine_version": "17.3.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -187,9 +231,9 @@
       "G"
     ]
   ],
-  "your_score": 159,
-  "opp_score": 121,
-  "your_rack": "MYUTNPD",
+  "your_score": 199,
+  "opp_score": 152,
+  "your_rack": "NRUTNAK",
   "bag": [
     "R",
     "O",
@@ -259,11 +303,11 @@
   "is_your_turn": false,
   "opponent_name": "sophie",
   "created_at": "2026-02-20T09:48:10.909770",
-  "updated_at": "2026-02-20T21:56:29.647973",
+  "updated_at": "2026-02-21T20:34:26.765786",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "sophie_003",
   "status": "active",
-  "spread": 38,
-  "move_count": 8
+  "spread": 47,
+  "move_count": 10
 }
