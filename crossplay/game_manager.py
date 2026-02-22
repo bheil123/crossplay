@@ -149,6 +149,8 @@ class Game:
             self.board = Board()
             for move in state.board_moves:
                 if isinstance(move, dict):
+                    if move.get('is_exchange'):
+                        continue  # Skip exchange moves (no board placement)
                     word = move['word']
                     row, col = move['row'], move['col']
                     horiz = move.get('dir', 'H') == 'H' if 'dir' in move else move.get('horizontal', True)
