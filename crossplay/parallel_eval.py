@@ -291,6 +291,8 @@ def evaluate_with_lookahead_parallel(
     board_move_tuples = []
     for m in board_moves:
         if isinstance(m, dict):
+            if m.get('is_exchange'):
+                continue  # Skip exchange moves (no board placement)
             board_move_tuples.append((m['word'], m['row'], m['col'], m['dir'] == 'H'))
         else:
             board_move_tuples.append(m)
