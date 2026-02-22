@@ -289,6 +289,52 @@
       "engine_version": "17.3.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "EQUIP",
+      "row": 6,
+      "col": 14,
+      "dir": "V",
+      "player": "opp",
+      "score": 41,
+      "bag": 36,
+      "blanks": [],
+      "cumulative": [
+        275,
+        213
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-21T20:25:16.605417",
+      "engine": null,
+      "engine_version": "17.3.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "TANGENT",
+      "row": 9,
+      "col": 15,
+      "dir": "V",
+      "player": "me",
+      "score": 79,
+      "bag": 36,
+      "blanks": [
+        5
+      ],
+      "cumulative": [
+        354,
+        213
+      ],
+      "rack": "TATNGE?",
+      "drawn": "IPHTGNI",
+      "note": "bingo",
+      "timestamp": "2026-02-21T20:27:53.330943",
+      "engine": null,
+      "engine_version": "17.3.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -296,11 +342,16 @@
       11,
       1,
       "N"
+    ],
+    [
+      14,
+      15,
+      "N"
     ]
   ],
-  "your_score": 275,
-  "opp_score": 172,
-  "your_rack": "TATNGE?",
+  "your_score": 354,
+  "opp_score": 213,
+  "your_rack": "IPHTGNI",
   "bag": [
     "A",
     "A",
@@ -349,11 +400,11 @@
   "is_your_turn": false,
   "opponent_name": "katie",
   "created_at": "2026-02-20T22:05:12.797837",
-  "updated_at": "2026-02-21T19:49:32.812807",
+  "updated_at": "2026-02-21T20:27:54.019722",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "katie_001",
   "status": "active",
-  "spread": 103,
-  "move_count": 13
+  "spread": 141,
+  "move_count": 15
 }
