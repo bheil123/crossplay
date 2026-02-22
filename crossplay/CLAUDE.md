@@ -112,6 +112,10 @@ Games are stored in a two-tier persistent library under `crossplay/games/`:
 - Auto-saved on every `opp`, `play`, `rack` command
 - Clean git diffs (one file per game)
 - Loaded into slots 1-8 on startup via `games/index.json`
+- **No bag array stored** -- bag is reconstructed on load from tile
+  distribution minus board tiles minus your rack minus blanks (via
+  `Game._reconstruct_bag()`). This prevents stale bag state after
+  manual edits or multi-computer git syncs.
 
 **Completed games** (`games/archive.jsonl`):
 - Append-only JSONL for finished games

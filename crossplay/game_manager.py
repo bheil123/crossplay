@@ -87,7 +87,6 @@ class GameState:
     your_score: int
     opp_score: int
     your_rack: str
-    bag: List[str]
     is_your_turn: bool
     opponent_name: str
     created_at: str
@@ -97,7 +96,7 @@ class GameState:
 
     def to_dict(self):
         return asdict(self)
-    
+
     @classmethod
     def from_dict(cls, d):
         # Normalize board_moves: support both old tuple format and enriched dicts
@@ -123,6 +122,8 @@ class GameState:
                 normalized.append(m)
         d = dict(d)  # Don't mutate caller's dict
         d['board_moves'] = normalized
+        # Strip legacy 'bag' field (bag is now reconstructed from board state)
+        d.pop('bag', None)
         return cls(**d)
 
 
@@ -157,7 +158,8 @@ class Game:
                 else:
                     word, row, col, horiz = move[0], move[1], move[2], move[3]
                 self.board.place_word(word, row, col, horiz)
-            self.bag = state.bag.copy() if state.bag else self._new_bag()
+            # Reconstruct bag from board state (never trust stored bag)
+            self.bag = self._reconstruct_bag()
             # Infer final_turns_remaining for old saves missing it
             if state.final_turns_remaining is None:
                 _tracker = TileTracker()
@@ -178,7 +180,6 @@ class Game:
                 your_score=0,
                 opp_score=0,
                 your_rack="",
-                bag=[],
                 is_your_turn=True,
                 opponent_name="Opponent",
                 created_at=datetime.now().isoformat(),
@@ -196,7 +197,42 @@ class Game:
             bag.extend([letter] * count)
         random.shuffle(bag)
         return bag
-    
+
+    def _reconstruct_bag(self) -> List[str]:
+        """Reconstruct bag from tile distribution minus board tiles minus rack.
+
+        The bag is derived state: full distribution minus tiles on board
+        (adjusted for blanks) minus your rack. The result is the unseen
+        pool (bag + opponent rack), shuffled for random draws.
+        """
+        from collections import Counter
+        remaining = Counter(TILE_DISTRIBUTION)
+
+        # Subtract tiles on board
+        for r in range(1, 16):
+            for c in range(1, 16):
+                tile = self.board.get_tile(r, c)
+                if tile:
+                    remaining[tile] -= 1
+
+        # Adjust for blanks on board (they show as letters but are actually '?')
+        for (r, c, letter) in self.state.blank_positions:
+            remaining[letter] += 1   # Undo the letter subtraction
+            remaining['?'] -= 1      # Subtract a blank instead
+
+        # Subtract your rack
+        for tile in (self.state.your_rack or ""):
+            remaining[tile] -= 1
+
+        # Build bag list from remaining counts
+        bag = []
+        for letter, count in remaining.items():
+            if count > 0:
+                bag.extend([letter] * count)
+
+        random.shuffle(bag)
+        return bag
+
     def draw_tiles(self, n: int) -> List[str]:
         """Draw n tiles from bag."""
         drawn = []
@@ -246,7 +282,12 @@ class Game:
         - Notes explicitly say COMPLETED
         """
         s = self.state
-        remaining = len(self.bag)  # bag + opp_rack (unaccounted tiles)
+        # Compute remaining unseen tiles (bag + opp_rack) from board state
+        _trk = TileTracker()
+        _trk.sync_with_board(self.board, your_rack=s.your_rack or "",
+                             blanks_in_rack=(s.your_rack or "").count('?'),
+                             blank_positions=s.blank_positions)
+        remaining = _trk.get_unseen_count()  # bag + opp_rack
         # Explicit completion marker
         if 'COMPLETED' in s.notes.upper():
             return True
@@ -291,7 +332,7 @@ class Game:
 
         print(f"\n[INFO] {self.state.name} vs {self.state.opponent_name}")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score} ({spread_str})")
-        # Compute bag from tracker (self.bag is stale in assisted mode)
+        # Compute bag count from board state via TileTracker
         _tracker = TileTracker()
         _tracker.sync_with_board(self.board, your_rack=self.state.your_rack or "",
                                  blanks_in_rack=(self.state.your_rack or "").count('?'),
@@ -354,8 +395,7 @@ class Game:
         from .power_tiles import format_power_tile_display, get_power_tiles_in_pool
         power_tiles = get_power_tiles_in_pool(unseen_dict)
         if power_tiles:
-            bag_size = len(self.bag)
-            print(f"   {format_power_tile_display(unseen_dict, bag_size)}")
+            print(f"   {format_power_tile_display(unseen_dict, bag_tiles)}")
     
     def show_existing_threats(self, top_n: int = 10, force_refresh: bool = False):
         """Show threats that already exist on the current board.
@@ -2092,8 +2132,12 @@ class Game:
                 br, bc = row + wi, col
             self.state.blank_positions.append((br, bc, word[wi]))
 
-        # Compute bag count (tiles visible to opponent: bag minus their rack)
-        bag_count = max(0, len(self.bag) - RACK_SIZE)
+        # Compute bag count from board state (tiles in bag, not counting opp rack)
+        _trk_bag = TileTracker()
+        _trk_bag.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
+                                 blank_positions=self.state.blank_positions)
+        bag_count = _trk_bag.get_bag_count()
 
         # Build engine recommendation record (from last analyze())
         engine_rec = None
@@ -2476,8 +2520,12 @@ class Game:
                 if diff > 0:
                     print(f"    TIP: Missing tiles - check if blanks were reported")
 
-        # Compute bag count for enriched record
-        bag_count = max(0, len(self.bag) - RACK_SIZE)
+        # Compute bag count from board state for enriched record
+        _trk_bag = TileTracker()
+        _trk_bag.sync_with_board(self.board, your_rack=self.state.your_rack or "",
+                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
+                                 blank_positions=self.state.blank_positions)
+        bag_count = _trk_bag.get_bag_count()
 
         # Build enriched move record (after score/bag updates for accurate cumulative)
         enriched = {
@@ -2600,8 +2648,7 @@ class Game:
             quiet: If True, don't print confirmation message.
         """
         os.makedirs(SAVE_DIR, exist_ok=True)
-        
-        self.state.bag = self.bag
+
         self.state.updated_at = datetime.now().isoformat()
         
         if not filename:

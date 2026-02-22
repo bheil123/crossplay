@@ -83,18 +83,18 @@ def save_active(game_id: str, game) -> str:
 
     Args:
         game_id: e.g., 'canjam_002'
-        game: Game instance (has .state, .bag attributes)
+        game: Game instance (has .state attribute)
 
     Returns:
         Path to saved file.
     """
     _ensure_dirs()
 
-    # Sync bag into state before saving
-    game.state.bag = game.bag
     game.state.updated_at = datetime.now().isoformat()
 
     data = game.state.to_dict()
+    # Bag is reconstructed on load from board state -- never saved
+    data.pop('bag', None)
     data['game_id'] = game_id
     data['status'] = 'active'
     data['spread'] = game.state.your_score - game.state.opp_score
@@ -131,6 +131,7 @@ def load_active(game_id: str):
     data.pop('move_count', None)
     data.pop('result', None)
     data.pop('completed_at', None)
+    data.pop('bag', None)  # Bag is reconstructed from board state on load
 
     state = GameState.from_dict(data)
     game = Game(state)
@@ -188,8 +189,6 @@ def archive_completed(game_id: str, game) -> bool:
     """
     _ensure_dirs()
 
-    # Sync state
-    game.state.bag = game.bag
     game.state.updated_at = datetime.now().isoformat()
 
     # Build archive record
