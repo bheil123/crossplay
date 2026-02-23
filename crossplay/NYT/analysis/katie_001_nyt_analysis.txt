@@ -1,0 +1,219 @@
+Katie_001 NYT CrossBot Analysis
+================================
+Game: katie_001 | You 453 - Katie 317 | Win +136 | 20 moves
+Date: 2026-02-20 to 2026-02-22
+NYT Strategy: You 87/99, Katie 69/99
+NYT Luck: You 53/99, Katie 60/99
+Screenshots: NYT/games/Katie_001/ (43 files)
+
+Key Turns Flagged by NYT
+-------------------------
+Turn 5:  AIMFUL -- "Chance to learn" (should have played MULE)
+Turn 7:  ANCIENT -- "Your winning move"
+Turn 11: Swap CGPT -- "Chance to learn" (should have played PE)
+Turn 13: FLYERS -- "Your second-best turn" (FLYTES marginally better)
+
+Move-by-Move Analysis
+---------------------
+
+TURN 1 - YOU: DHOBI (R4C8 V) = 24 pts
+  Rack: BTIHIOD
+  NYT Best: DHOBI (different position) = 24, Strategy 99
+  NYT Alt: IDIOT (14), DHOTI (18)
+  Played: DHOBI = 24, Strategy 81 (Great)
+  Verdict: Same word, same score, but NYT preferred a position that
+           blocks opponent's moves better. Advanced details show both
+           positions give net +20 and 51% win chance. Minimal difference.
+
+TURN 2 - KATIE: ZEROS (R6C5 H) = 34 pts
+  Rack: SFRZACE (visible in screenshot)
+  NYT Best: ZOA = 35, Strategy 99
+  NYT Alt: ZOEAS (43, Excellent 95), ZOEA (40, Great 81)
+  Played: ZEROS = 34, Strategy 72 (Great)
+  Note: Katie missed ZOA (35) and ZOEAS (43). ZOEAS would have been
+        best play at 43 pts with 95 strategy. Katie's ZEROS was adequate
+        but left ~9 points on the table.
+
+TURN 3 - YOU: YEH (R5C6 H) = 31 pts
+  Rack: UTIAYEM
+  NYT Best: YAH = 31, Strategy 99
+  NYT Alt: MEH (25, Great 72), MANZY? (partial, visible)
+  Played: YEH = 31, Strategy 95 (Excellent)
+  Advanced: YEH net +32/53% win; YAH net +33/54% win
+  Verdict: Same score but YAH gives +1 net equity due to better leave
+           and slightly reduces opp's 3W/2W odds (36% vs 24%). Very
+           minor difference. Excellent play.
+
+TURN 4 - KATIE: FREAK (R4C2 H) = 25 pts
+  Rack: EFEKACR (visible)
+  NYT Best: FAKEER = 51, Strategy 99 (uses 3W!)
+  NYT Alt: FAKE (19, Good 54)
+  Played: FREAK = 25, Strategy 54 (Good)
+  Note: Katie missed FAKEER on the 3W square for 51 points -- a 26-point
+        miss! This was Katie's biggest blunder of the game.
+
+TURN 5 - YOU: AIMFUL (R1C2 V) = 26 pts  ** KEY TURN 1 of 4 **
+  Rack: UAITALM (visible: A,I,T,A,L,M)
+  NYT Best: MULE = 24, Strategy 99
+  NYT Alt: MALE (21, Great 82), MILE (21, Good 61)
+  Played: AIMFUL = 26, Strategy -- (not shown, but "Chance to learn")
+  Advanced: AIMFUL net +11/46% win; MULE net +26/54% win (+15 equity!)
+  Verdict: AIMFUL scores 2 more but gives opp a 50-pt response (88% 3W/2W
+           odds). MULE scores 2 less but limits opp to 28-pt response
+           (36% 3W/2W odds) and sets up your next turn for 35. Classic
+           score-vs-defense tradeoff. MULE wins by +15 net equity.
+  Lesson: Blocking high-value squares matters more than 2 extra points.
+
+TURN 6 - KATIE: RAISES (R1C1 H) = 24 pts
+  Rack: SSRAICE (visible)
+  NYT Best: RAISE = 21, Strategy 99
+  NYT Alt: EARS (18, Excellent 93), OASIS (24, 54 Good)
+  Played: RAISES = 24, Strategy 72 (Great)
+  Note: RAISE was better for blocking despite scoring 3 less.
+
+TURN 7 - YOU: ANCIENT (R6C1 V) = 76 pts  ** KEY TURN 2 of 4 **
+  Rack: CNTAEI? (blank used as N at position 5)
+  NYT Best: ANCIENT = 76, Strategy 99 -- "Flawless!"
+  NYT Alt: DISTANCE (73, Excellent 98), DANCIEST (73, Excellent 91),
+           INACTIVE (66, Excellent 90)
+  Played: ANCIENT = 76, Strategy 99 (Best)
+  Advanced: ANCIENT net +81/86% win; DISTANCE net +78/85% win
+  Verdict: Perfect play. "Of all your moves this game, this one
+           contributed the most to your win." Sweep with blank N.
+
+TURN 8 - KATIE: OVAL (R2C6 H) = 28 pts
+  Rack: JBELVAA (visible? partial)
+  NYT Best: OVAL = 28, Strategy 99
+  NYT Alt: JOVIAL (24, Excellent 89), JAVA (23, Great 70), AVAIL (17, Great 67)
+  Played: OVAL = 28, Strategy 99 (Best)
+  Note: Katie's best move of the game. Perfect play.
+
+TURN 9 - YOU: HEVEA (R1C8 H) = 55 pts
+  Rack: AGHVTEE
+  NYT Best: HEVEA = 55, Strategy 99 -- "Fantastic!"
+  NYT Alt: HEAVE (55, Best 98), CHEVET (32, Great 81), EAVE (30, Great 71)
+  Played: HEVEA = 55, Strategy 99 (Best)
+  Advanced: HEVEA net +52/94% win; HEAVE net +57/94% win
+  Verdict: Both HEVEA and HEAVE score 55 and both Best. HEAVE gives
+           slightly better net (+57 vs +52) but same win %. Perfect play.
+
+TURN 10 - KATIE: CAJON (R8C1 H) = 32 pts
+  Rack: JBNPUAO (visible)
+  NYT Best: PUNJI = 36, Strategy 99
+  NYT Alt: COUP (18, Good 54)
+  Played: CAJON = 32, Strategy 57 (Good)
+  Note: Missed PUNJI (36 pts, 99 strategy). 4-point miss.
+
+TURN 11 - YOU: Swap C,G,P,T = 0 pts  ** KEY TURN 3 of 4 **
+  Rack: TGPRTCE (visible)
+  NYT Best: PE = 20, Strategy 99
+  NYT Alt: TE (16, Great 69), ZEN (12, Good 60?)
+  Played: Swap CGPT = 0
+  Advanced: Swap net +2/86% win; PE net +12/91% win (+10 equity!)
+  Verdict: "Stronger moves, like TE, can make three words at once."
+           PE scores 20 and keeps a playable rack. The swap gained
+           nothing meaningful (+2 net) while PE would have given +12.
+  Lesson: Small scoring plays usually beat tile swaps, especially
+          when you're ahead. The swap wasted a turn.
+
+TURN 12 - KATIE: BOWL (R2C12 H) = 22 pts
+  Rack: NLOPUBW (visible)
+  NYT Best: BOW = 25, Strategy 99
+  NYT Alt: (partial -- 22, Great 83)
+  Played: BOWL = 22, Strategy -- (Great)
+  Note: BOW was better (25 vs 22) for both points and strategy.
+
+TURN 13 - YOU: FLYERS (R1C15 V) = 63 pts  ** KEY TURN 4 of 4 **
+  Rack: TFYRESE
+  NYT Best: FLYTES = 63, Strategy 99
+  NYT Alt: FLYERS = 63, Strategy 98 (Best); FLYTE = 60, Strategy 98 (Best)
+  Played: FLYERS = 63, Strategy 98 (Best)
+  Advanced: FLYERS net +63/96% win; FLYTES net +58/96% win
+  Verdict: "Your second-best move of the game." FLYTES was marginally
+           better in NYT's model but both score identically and both
+           rated Best. Negligible difference. FLYERS actually shows
+           +63 net vs FLYTES +58 in the advanced view -- our play may
+           actually have been slightly better!
+
+TURN 14 - KATIE: EQUIP (R6C14 V) = 41 pts
+  Rack: PQIENLU (visible)
+  NYT Best: EQUIP = 41, Strategy 99
+  NYT Alt: QUINS (35, Great 75), QUIPS (37, Good 61), QUIP (27, Good 47)
+  Played: EQUIP = 41, Strategy 99 (Best)
+  Note: Katie's second perfect play. Good find on the Q word.
+
+TURN 15 - YOU: TANGENT (R9C15 V) = 79 pts
+  Rack: TATNGE? (blank used as N at position 5)
+  NYT Best: TANGENT = 79, Strategy 99 -- "Fantastic!"
+  NYT Alt: TENTAGE (73, Best 98), EATING (52, Excellent 93),
+           AGENTS (34, Great 83)
+  Played: TANGENT = 79, Strategy 99 (Best)
+  Advanced: TANGENT net +78/>99% win; TENTAGE net +65/>99% win
+  Verdict: Perfect. +13 net equity over next best. Second sweep with
+           blank. Game essentially over at this point.
+
+TURN 16 - KATIE: RELEARNT (R15C8 H) = 67 pts
+  Rack: RAEONRL (visible, blank E)
+  NYT Best: RELEARNT (different position) = 67, Strategy 99
+  NYT Alt: LEARNER (52, Great 65)
+  Played: RELEARNT = 67, Strategy 59 (Good)
+  Note: Same word, same score, but NYT preferred a different board
+        position that gives "a tiny chance to win next turn." Katie's
+        placement was suboptimal positionally but scored the same.
+
+TURN 17 - YOU: PITHING (R8C7 V) = 66 pts
+  Rack: IPHTGNI
+  NYT Best: PITHING = 66, Strategy 99 -- "Fantastic!"
+  NYT Alt: HOPING (17, Best 98), THINGIE (21, Excellent 97),
+           NIGHT (18, Excellent 96)
+  Played: PITHING = 66, Strategy 99 (Best)
+  Advanced: PITHING net +64/>99% win; HOPING net +6/>99% win
+  Verdict: Perfect. Massive +58 equity advantage over next best move.
+           Third sweep of the game. Total domination.
+
+TURN 18 - KATIE: AMIGOS (R12C5 H) = 22 pts
+  Rack: GUSOTAM (visible)
+  NYT Best: GAUM = 34, Strategy 99
+  NYT Alt: MAT (25, Fair 13), MUGS (26, Weak 3)
+  Played: AMIGOS = 22, Strategy -- (not shown)
+  Note: Missed GAUM (34 pts). 12-point miss.
+
+TURN 19 - YOU: WINO (R13C5 H) = 33 pts
+  Rack: OIEDOOW
+  NYT Best: WED = 39, Strategy 99
+  NYT Alt: WE (35, Best 99), WINO (33, Best 99)
+  Played: WINO = 33, Strategy 99 (Best)
+  Advanced: WINO net +10/>99% win; WED net +9/>99% win
+  Verdict: "Great move. At this point, almost any move should lead to
+           victory." All top moves rated 99/Best. WED scores 6 more
+           but WINO's net (+10) is actually slightly better than WED's
+           net (+9). Endgame -- all roads lead to win.
+
+TURN 20 - KATIE: TUXES (R6C11 V) = 15 pts (final move)
+  Rack: CTDUTDX (visible)
+  NYT Best: TUX = 24, Strategy N/A
+  NYT Alt: DUCT (22), DUD (20)
+  Played: TUXES = 15, Strategy N/A
+  Note: Last move, all N/A strategy. TUX scored 24 vs TUXES 15.
+        Katie chose the longer word but scored 9 less. Didn't matter.
+
+Summary Statistics
+------------------
+Your moves rated Best (99):     5 of 10 (DHOBI, ANCIENT, HEVEA, TANGENT, PITHING)
+Your moves rated Excellent (95+): 2 of 10 (YEH 95, FLYERS 98)
+Your moves as Chance to Learn:  2 of 10 (AIMFUL, Swap)
+Your sweeps:                    3 (ANCIENT 76, TANGENT 79, PITHING 66) -- all Best!
+
+Katie moves rated Best (99):    2 of 10 (OVAL, EQUIP)
+Katie biggest misses:           FAKEER (-26), GAUM (-12), PUNJI (-4)
+
+Net equity lost by your suboptimal plays:
+  AIMFUL vs MULE: -15 equity
+  Swap vs PE:     -10 equity
+  Total:          -25 equity (still won by 136)
+
+Patterns to improve:
+  1. Defensive awareness: Both misses were score-vs-defense tradeoffs
+     where blocking high-value squares mattered more than 2 extra points
+  2. Avoid exchanges when small scoring plays exist, especially when ahead
+  3. When evaluating moves, consider opponent's response (2-ply thinking)

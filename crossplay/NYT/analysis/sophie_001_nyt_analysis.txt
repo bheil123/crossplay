@@ -1,0 +1,311 @@
+Sophie_001 NYT CrossBot Analysis
+==================================
+Game: sophie_001 | You 423 - Sophie 379 | Win +44 | 27 moves
+Date: 2026-02-12 to 2026-02-20
+NYT Strategy: You 88/99, Sophie 51/99
+NYT Luck: You 59/99, Sophie 71/99
+Screenshots: NYT/games/Sophie_001/ (40 files)
+
+Key Turns Flagged by NYT
+-------------------------
+Turn 1:  LYCEA -- "Chance to learn" (should have played LYCEA at different position)
+Turn 9:  MOGUL -- "Your best move" (strongest move of the game)
+Turn 13: AL -- "Chance to learn" (should have played ASLANT)
+Turn 17: TURBANS -- "Your winning move"
+
+Move-by-Move Analysis
+---------------------
+
+TURN 1 - YOU: LYCEA (R8C4 H) = 28 pts
+  Rack: F,L,A,A,Y,E,C (visible in tray)
+  NYT Best: LYCEA (different position) = 28, Strategy 99
+  NYT Alt: LYCEA (your position) = 28, Strategy 73 (Great)
+  Played: LYCEA = 28, Strategy 73 (Great)
+  Advanced: Your LYCEA net +25/54% win; Best LYCEA net +34/58% win (+9 eq)
+  Verdict: Same word, same score, but NYT preferred a position that blocks
+           opponent better. Their Turn response: 33 (yours) vs 27 (best, -6).
+           3W/2W odds: 16% (yours) vs 44% (best). The better position gives
+           opponent fewer bonus square opportunities.
+  Lesson: Board placement matters even at identical scores.
+
+TURN 2 - SOPHIE: ETHNIC (R3C6 V) = 16 pts
+  Rack: I,E,H,N,X,9,T (visible)
+  NYT Best: ANTHELIX = 90, Strategy 99 (sweep using 2W!)
+  NYT Alt: ANXIETY = 42/32 (Fair), TAXING = 26/28 (Fair)
+  Played: ETHNIC = 16, Strategy 7 (Weak)
+  Note: Sophie missed ANTHELIX (90 pts!) -- a massive 74-point miss.
+        This was Sophie's biggest blunder of the game. ANTHELIX is a sweep
+        through the 2W square.
+
+TURN 3 - YOU: YUK (R8C5 V) = 24 pts
+  Rack: U,K,S,A,E,S,R (visible)
+  NYT Best: YUK = 24, Strategy 99 -- "Fantastic!"
+  NYT Alt: SKATER = 34/96 (Excellent), SKATES = 34/96 (Excellent),
+           ASKERS = 34/95 (Excellent), TE = 2/1 (Weak)
+  Played: YUK = 24, Strategy 99 (Best)
+  Verdict: Perfect play. YUK at 24 beats the 34-pt alternatives in strategy
+           because it blocks better and sets up future turns.
+
+TURN 4 - SOPHIE: TAXI (R4C6 H) = 22 pts
+  Rack: X,T,F,A,I,D,O (visible)
+  NYT Best: FIXATED = 66, Strategy 99 (sweep!)
+  NYT Alt: ADRIFT = 30/44 (Good)
+  Played: TAXI = 22, Strategy 34 (Fair)
+  Note: Sophie missed FIXATED sweep (66 pts) -- a 44-point miss.
+        Second major miss in a row.
+
+TURN 5 - YOU: CREASES (R11C1 H) = 65 pts
+  Rack: C,E,S,A,E,S,R (visible)
+  NYT Best: CREASES (different position) = 67, Strategy 99
+  NYT Alt: CREASES (your position) = 65, Strategy 85 (Great)
+           CASERNES = 53/79 (Great)
+  Played: CREASES = 65, Strategy 85 (Great)
+  Advanced: Your CREASES net +64/82% win; Best CREASES net +80/87% win (+16 eq)
+  Verdict: Same word but NYT's position scored 2 more and had better defensive
+           properties. Their Turn: 35 (yours, 76% 3W/2W odds) vs 27 (best,
+           64% 3W/2W odds, -8). Your Next Turn: 33 vs 40 (+7).
+
+TURN 6 - SOPHIE: AWARE (R11C4 V) = 39 pts
+  Rack: R,F,D,T,A,W,O (visible)
+  NYT Best: FRACTED = 48, Strategy 99
+  NYT Alt: AWARD = 45/93 (Excellent), CROWD = 45/86 (Excellent)
+  Played: AWARE = 39, Strategy 51 (Good)
+  Note: Missed FRACTED (48 pts, 99). 9-point miss.
+
+TURN 7 - YOU: CEDED (R11C1 V) = 39 pts
+  Rack: E,D,D,A,E,M,U (visible)
+  NYT Best: DEUCED = 39, Strategy 99
+  NYT Alt: CEDED = 39, Strategy 86 (Excellent), ADDUCE = 39/86 (Excellent),
+           DEUCE = 33/84 (Great)
+  Played: CEDED = 39, Strategy 86 (Excellent)
+  Advanced: CEDED net +38/86% win; DEUCED net +52/89% win (+14 eq)
+  Verdict: Same score but DEUCED gives better defense. Their Turn: 28 (CEDED)
+           vs 27 (DEUCED, -1). 3W/2W odds: 24% (CEDED) vs 12% (DEUCED).
+           Your Next Turn: 27 vs 40 (+13). DEUCED's superior leave drives
+           the equity gap.
+
+TURN 8 - SOPHIE: EF (R13C2 V) = 23 pts
+  Rack: F,D,F,E,T,N,R (visible)
+  NYT Best: FRONTED = 59, Strategy 99 (sweep using 3L!)
+  NYT Alt: FERRET = 41/59 (Good), TURNED = 27/33 (Fair)
+  Played: EF = 23, Strategy 33 (Fair)
+  Note: Sophie missed FRONTED sweep (59 pts) -- 36-point miss.
+        Third sweep missed by Sophie.
+
+TURN 9 - YOU: MOGUL (R12C6 H) = 30 pts  ** KEY TURN - YOUR BEST MOVE **
+  Rack: O,G,O,A,L,M,U (visible)
+  NYT Best: MOGUL = 30, Strategy 99 -- "Your strongest move of the game!"
+  NYT Alt: ALMUG = 26/67 (Great), GLAM = 27/66 (Great)
+  Played: MOGUL = 30, Strategy 99 (Best)
+  Verdict: Perfect play. NYT says this contributed the most to the win.
+
+TURN 10 - SOPHIE: HET (R13C5 V) = 18 pts
+  Rack: E,D,T,N,R,H,O (visible)
+  NYT Best: THUNDER = 59, Strategy 99 (sweep!)
+  NYT Alt: USHER = 23/27 (Fair), SHED = 23/23 (Fair)
+  Played: HET = 18, Strategy 33 (Fair)
+  Note: Sophie missed THUNDER sweep (59 pts) -- 41-point miss!
+        Fourth sweep missed. This is a pattern.
+
+TURN 11 - YOU: PONGO (R6C4 H) = 13 pts
+  Rack: O,R,O,A,P,L,G (visible)
+  NYT Best: APOLOG = 27, Strategy 99
+  NYT Alt: POLAR = 18/95 (Excellent), OPAL = 22/84 (Great)
+  Played: PONGO = 13, Strategy 79 (Great)
+  Advanced: PONGO net +14/89% win; APOLOG net +19/92% win (+5 eq)
+  Verdict: PONGO scored 14 less than APOLOG. However, PONGO's advanced
+           details show Their Turn: 32 (68% 3W/2W), APOLOG's Their Turn:
+           39 but only <1% 3W/2W odds. APOLOG blocks the bonus squares
+           much better. Your Next Turn: 33 vs 30. Net: +14 vs +19.
+
+TURN 12 - SOPHIE: VENA (R3C5 H) = 26 pts
+  Rack: A,D,S,N,R,V,O (visible)
+  NYT Best: VENA = 26, Strategy 99
+  NYT Alt: DIVAS = 35/72 (Great), RAVES = 34/62 (Good),
+           VISARD = 37/49 (Good)
+  Played: VENA = 26, Strategy 99 (Best)
+  Note: Sophie's best move of the game. Perfect play.
+
+TURN 13 - YOU: AL (R2C7 H) = 21 pts  ** KEY TURN - CHANCE TO LEARN **
+  Rack: S,R,T,L,A,A,N (visible)
+  NYT Best: ASLANT = 28, Strategy 99
+  NYT Alt: SLANT = 23/82 (Great), LAST = 23/80 (Great)
+  Played: AL = 21, Strategy 51 (Good)
+  Advanced: AL net +18/88% win; ASLANT net +28/92% win (+10 eq)
+  Verdict: ASLANT scores 7 more and gives better defense. Their Turn: 34
+           (both). 3W/2W odds: 8% (AL) vs 40% (ASLANT, but higher Your
+           Next Turn: 34 vs 31). The key difference is ASLANT uses the S
+           to also make SAX, creating multiple words at once. AL wastes
+           the rack potential.
+  Lesson: Use high-value tiles (S) to create multiple words simultaneously.
+
+TURN 14 - SOPHIE: FEDORAS (R1C8 H) = 101 pts
+  Rack: F,D,E,R,A,O,S (visible)
+  NYT Best: FEDORAS = 101, Strategy 99
+  NYT Alt: FARSIDE = 101/94 (Excellent), FARDELS = 101/91 (Excellent),
+           FARED = 58/53 (Good)
+  Played: FEDORAS = 101, Strategy 99 (Best)
+  Note: Sophie's monster sweep! 101 points through the 3W square.
+        Perfect play. This was the highest-scoring move of the game.
+
+TURN 15 - YOU: EL (R1C9 V) = 16 pts
+  Rack: S,R,T,U,L,A,N (visible)
+  NYT Best: LITS = 27, Strategy 99
+  NYT Alt: EL = 16/96 (Excellent), LINS = 27/95 (Excellent),
+           SULTAN = 25/88 (Excellent)
+  Played: EL = 16, Strategy 96 (Excellent)
+  Advanced: EL net +21/38% win; LITS net +24/38% win (+3 eq)
+  Verdict: LITS scores 11 more but only +3 net equity difference.
+           EL Their Turn: 28 (28% 3W/2W), LITS Their Turn: 27 (40% 3W/2W).
+           Your Next Turn: 33 (EL, 40% 3W/2W) vs 26 (LITS, 28%). Very
+           close. EL preserves better rack leave (SRTUAN vs SUAN).
+           Excellent play.
+
+TURN 16 - SOPHIE: MOT (R13C7 H) = 18 pts
+  Rack: P,D,O,R,I,T,M (visible)
+  NYT Best: DOM = 20, Strategy 99
+  NYT Alt: MOD = 20/97 (Excellent), MID = 20/74 (Great)
+  Played: MOT = 18, Strategy -- (not shown, but likely Great/Good)
+  Note: Missed DOM/MOD (20 pts each). Small 2-point miss.
+
+TURN 17 - YOU: TURBANS (R6C11 V) = 68 pts  ** KEY TURN - YOUR WINNING MOVE **
+  Rack: S,R,T,U,B,A,N (visible)
+  NYT Best: NUTBARS = 68, Strategy 99
+  NYT Alt: TURBANS = 68, Strategy 95 (Excellent); ABS = 33/42 (Good),
+           REBARS = 33/36 (Fair)
+  Played: TURBANS = 68, Strategy 95 (Excellent)
+  Advanced: TURBANS net +64/79% win; NUTBARS net +68/83% win (+4 eq)
+  Verdict: "Of all your moves this game, this one contributed the most
+           to your win." Both score 68 (sweeps). NUTBARS marginally better:
+           Their Turn 30 (44% 3W/2W) vs 34 (60% 3W/2W). Your Next Turn:
+           30 vs 30 (same). Net: +64 vs +68. Very close -- both excellent.
+
+TURN 18 - SOPHIE: DINO (R5C10 V) = 18 pts
+  Rack: O,D,D,R,I,N,T (visible)
+  NYT Best: QI = 33, Strategy 99
+  NYT Alt: DOT = 15/35 (Fair)
+  Played: DINO = 18, Strategy 39 (Fair)
+  Note: Missed QI (33 pts). 15-point miss.
+
+TURN 19 - YOU: BI (R8C12 V) = 27 pts
+  Rack: B,O,I,Z,I,I,E (visible)
+  NYT Best: BIZ = 39, Strategy 99
+  NYT Alt: BO = 27/95 (Excellent)
+  Played: BI = 27, Strategy 88 (Excellent)
+  Advanced: BI net +25/92% win; BIZ net +29/94% win (+4 eq)
+  Verdict: BIZ scores 12 more but only +4 net equity. BI Their Turn:
+           31 (28% 3W/2W) vs BIZ Their Turn: 37 (72% 3W/2W). BI is more
+           defensive but BIZ still wins on net. Small miss.
+
+TURN 20 - SOPHIE: ETA (R14C7 H) = 27 pts
+  Rack: G,G,R,H,T,E,A (visible)
+  NYT Best: ETA = 27, Strategy 99
+  NYT Alt: ERA = 27/97 (Excellent), AREG = 31/88 (Excellent),
+           ARE = 27/73 (Great)
+  Played: ETA = 27, Strategy 99 (Best)
+  Note: Sophie's second perfect play. Well found.
+
+TURN 21 - YOU: SIZE (R15C9 H) = 40 pts (blank S)
+  Rack: J,O,I,E,I,Z,? (visible)
+  NYT Best: SIZE = 40, Strategy 99 -- "Fantastic!"
+  NYT Alt: JOKER = 33/99 (Best), JAR = 31/98 (Excellent),
+           ZOO = 37/97 (Excellent)
+  Played: SIZE = 40, Strategy 99 (Best)
+  Advanced: SIZE net +40/>99% win; JOKER net +33/>99% win
+  Verdict: Perfect play. SIZE with blank S on 3W square.
+
+TURN 22 - SOPHIE: GI (R2C13 H) = 19 pts
+  Rack: G,G,H,R,I,Y,R (visible)
+  NYT Best: GHI = 29, Strategy 99
+  NYT Alt: SIGH = 18/18 (Fair), HAG = 17/12 (Fair)
+  Played: GI = 19, Strategy -- (Fair likely)
+  Note: Missed GHI (29 pts). 10-point miss.
+
+TURN 23 - YOU: WO (R5C3 H) = 15 pts
+  Rack: P,O,O,T,V,I,W (visible)
+  NYT Best: TWO = 27, Strategy 99
+  NYT Alt: TOW = 27/98 (Best), JOT = 21/95 (Excellent)
+  Played: WO = 15, Strategy -- (Good/Fair likely)
+  Advanced: WO net +14/99% win; TWO net +33/>99% win (+19 eq)
+  Verdict: TWO scores 12 more and uses the 3W square. WO misses the
+           premium square. Significant equity miss but game already won.
+  Lesson: Use premium squares when available, even when ahead.
+
+TURN 24 - SOPHIE: PERRY (R2C15 V) = 38 pts
+  Rack: G,Y,R,H,P,R,E (visible)
+  NYT Best: Swap tiles (Q, R) = 0, Strategy 99
+  NYT Alt: PERRY = 38 (not rated -- NYT says PERRY doesn't give a way
+           to win, while swapping does)
+  Played: PERRY = 38, Strategy -- (not rated)
+  Note: Unusual NYT recommendation. NYT says swapping Q,R gives a small
+        chance to win next turn, while PERRY (38 pts) doesn't. This suggests
+        NYT's endgame model values tile improvement for a final push over
+        raw points when trailing significantly.
+
+TURN 25 - YOU: JOIST (R5C13 V) = 37 pts
+  Rack: V,T,J,O,I,S,O (visible)
+  NYT Best: JOIST = 37, Strategy 99 -- "Great move"
+  NYT Alt: JOIST (2W) = 35/99 (Best), JOUST = 31/99 (Best)
+  Played: JOIST = 37, Strategy 99 (Best)
+  Advanced: JOIST net +24/>99% win; JOIST(2W) net +1/>99% win
+  Verdict: Perfect play. "Almost any move should lead to victory."
+           Bag empty -- endgame. Their Turn: 13 (40% 3W/2W).
+
+TURN 26 - SOPHIE: HIN (R14C12 H) = 14 pts (final move)
+  Rack: Q,I,H,N (visible -- short rack, endgame)
+  NYT Best: HIN = 14, Strategy N/A
+  NYT Alt: NIL = 12, HI = 10, HOP = 10
+  Played: HIN = 14, Strategy N/A
+  Note: Final move. All N/A strategy. Sophie left with Q and blank.
+        HIN was the best available.
+
+TURN 27 - (Game ends -- no turn 27 played by you)
+  Note: Game ended after Sophie's HIN. You had OV remaining.
+  Final score: You 423 - Sophie 379.
+
+Summary Statistics
+------------------
+Your moves rated Best (99):     4 of 14 (YUK, MOGUL, SIZE, JOIST)
+Your moves rated Excellent (95+): 4 of 14 (CEDED 86, EL 96, TURBANS 95, BI 88)
+Your moves as Chance to Learn:  2 of 14 (LYCEA position, AL vs ASLANT)
+Your sweeps:                    2 (CREASES 65, TURBANS 68) -- both Great/Excellent
+
+Sophie moves rated Best (99):   2 of 13 (VENA, ETA)
+Sophie moves rated Excellent:   0
+Sophie biggest misses:          ANTHELIX (-74!), FIXATED (-44), THUNDER (-41),
+                                FRONTED (-36), QI (-15), GHI (-10)
+Sophie sweeps missed:           4 (ANTHELIX 90, FIXATED 66, FRONTED 59, THUNDER 59)
+
+Net equity lost by your suboptimal plays:
+  LYCEA position: -9 equity
+  CREASES position: -16 equity
+  CEDED vs DEUCED: -14 equity
+  AL vs ASLANT: -10 equity
+  PONGO vs APOLOG: -5 equity
+  WO vs TWO: -19 equity
+  BI vs BIZ: -4 equity
+  Total: -77 equity (still won by 44)
+
+Note: Several of these "misses" are positioning differences (same word,
+same score, different board location) rather than word-finding failures.
+The actual word-finding misses were AL (should be ASLANT) and WO (should
+be TWO). The engine found the right words 12/14 times.
+
+Patterns to improve:
+  1. Board positioning: 3 of 7 equity losses were same-word placement
+     differences. Consider opponent's access to bonus squares when choosing
+     WHERE to place a word, not just WHICH word to play.
+  2. Premium square usage: WO vs TWO (-19 eq) was the biggest single miss.
+     When a 3W square is available and you can use it, do so.
+  3. Multi-word creation: AL vs ASLANT -- using tiles to create multiple
+     words simultaneously (ASLANT makes SAX) extracts more value.
+  4. Leave quality: CEDED vs DEUCED (-14 eq) was a leave difference at
+     identical scores. DEUCED leaves better tiles for future turns.
+
+Sophie's patterns:
+  1. Missed 4 sweeps (ANTHELIX, FIXATED, FRONTED, THUNDER) -- all
+     7-letter words through premium squares. Vocabulary gap on
+     less common sweep words.
+  2. Strong on short tactical plays (VENA 99, ETA 99, FEDORAS 99)
+  3. FEDORAS (101 pts) was perfectly found -- Sophie CAN find sweeps
+     with common words, but misses unusual ones.

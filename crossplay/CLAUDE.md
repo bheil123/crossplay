@@ -245,12 +245,37 @@ Each move in `board_moves` has these NYT-related fields:
 - `engine` -- our engine's top recommendation at the time (dict or null)
 - `nyt` -- NYT's suggested move if captured from screenshot (dict or null)
 - `win_pct` -- NYT's displayed win probability (float or null)
-- `engine_version` -- which engine version analyzed the position
+- `engine_version` -- which engine version analyzed the position at play time
+- `nyt_rating` -- NYT's rating for the move ("Best", "Excellent", "Great",
+  "Good", "Fair", "Weak", "Chance to learn", or null)
+- `nyt_strategy` -- NYT's per-move strategy score (0-99, or null)
+
+**Game-level fields for NYT analysis:**
+- `engine_version` -- engine version at archival time (auto-set by
+  `archive_completed()`). Note: per-move `engine_version` may differ
+  if the engine was updated mid-game.
+- `nyt_analysis_version` -- engine version when post-game NYT comparison
+  was performed. Important because the engine's move finder improves
+  over time -- a "missed" recommendation may not have existed in the
+  engine version used during play.
+- `nyt_strategy_you` -- NYT's overall strategy score for you (0-99)
+- `nyt_strategy_opp` -- NYT's overall strategy score for opponent (0-99)
+- `nyt_luck_you` -- NYT's luck rating for you (0-100)
+- `nyt_luck_opp` -- NYT's luck rating for opponent (0-100)
+
+**Version tracking rationale:** The engine improves over time (e.g., the
+V16 move finder fix added moves that V15 missed entirely). When comparing
+"player vs engine recommendation," the relevant engine version is the one
+running at play time (`engine_version` on each move), not the current
+version. When doing post-game NYT comparison, `nyt_analysis_version`
+records which engine was available for that analysis. This prevents
+attributing "player ignored engine" when the engine hadn't found the move.
 
 **Workflow:** After a completed game, take screenshots of NYT's move-by-move
 review (NYT shows its recommended move for each turn). Store in
 `NYT/games/YYYYMMDD_vs_OPPONENT/`. Use Claude to read the screenshots and
-compare NYT vs engine recommendations move-by-move.
+compare NYT vs engine recommendations move-by-move. Record the current
+engine version as `nyt_analysis_version` on the archive record.
 
 ## V17 changes: near-endgame evaluator + gen2 training
 

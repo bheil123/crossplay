@@ -1,0 +1,277 @@
+Canjam_003 NYT CrossBot Analysis
+==================================
+Game: canjam_003 | You 372 - Canjam 378 | Loss -6 | 22 moves
+Date: 2026-02-17
+NYT Strategy: You 82/99, Canjam 80/99
+NYT Luck: You 41/99, Canjam 57/99
+Screenshots: NYT/games/Canjam_001/ (43 files, mislabeled folder)
+
+Key Turns Flagged by NYT
+-------------------------
+Turn 15: PYRROLS -- "Your best move" (strongest move of the game)
+Turn 17: STRONGER -- "Spotted a sweep" (best move, 99)
+Turn 21: EN -- "Chance to learn" (same word, wrong position -- 24% vs 64% win!)
+Turn 22: GAVELS -- "The winning move" (Canjam clinched it)
+
+Move-by-Move Analysis
+---------------------
+
+TURN 1 - YOU: PILAW (R8C8 V) = 28 pts
+  Rack: E,W,A,L,I,F,P (visible)
+  NYT Best: PILAW (different position) = 28, Strategy 99
+  NYT Alt: PILAF = 26/93 (Excellent)
+  Played: PILAW = 28, Strategy 87 (Excellent)
+  Advanced: Your PILAW net +31/57% win; Best PILAW net +33/58% win (+2 eq)
+  Verdict: Same word, same score, slightly suboptimal position. Minor.
+
+TURN 2 - CANJAM: PAWED (R8C8 H) = 34 pts
+  Rack: A,Y,D,E,W,B,O (visible)
+  NYT Best: PAWED = 34, Strategy 99
+  NYT Alt: PEDWAY = 36/71 (Great), DEWY = 29/70 (Great), YEOW = 32/64 (Good)
+  Played: PAWED = 34, Strategy 99 (Best)
+  Note: Canjam's best move of the game. Perfect play.
+
+TURN 3 - YOU: FOVEOLE (R5C11 V) = 22 pts
+  Rack: F,H,V,O,O,F,L (visible -- partial, inferred from tray)
+  NYT Best: HOOF = 27, Strategy 99
+  NYT Alt: VEAL = 22/82 (Great), HALVE = 25/82 (Great)
+  Played: FOVEOLE = 22, Strategy 73 (Great)
+  Advanced: FOVEOLE net +12/45% win; HOOF net +19/48% win (+7 eq)
+  Verdict: "Stronger moves like HOOF can make three words at once."
+           HOOF scores 5 more AND blocks better. Their Turn: 41 (40% 3W/2W)
+           vs 38 (28%). HOOF creates multiple crosswords simultaneously.
+  Lesson: Multi-word plays extract more value than long single words.
+
+TURN 4 - CANJAM: YOGI (R11C10 V) = 31 pts
+  Rack: C,B,X,Y,G,I,A (visible)
+  NYT Best: BOXY = 38, Strategy 99
+  NYT Alt: YOGI = 31/91 (Excellent), BOX = 34/88 (Excellent)
+  Played: YOGI = 31, Strategy 91 (Excellent)
+  Note: Missed BOXY by 7 pts. Still Excellent.
+
+TURN 5 - YOU: HAKU (R12C9 V) = 57 pts
+  Rack: H,U,R,R,A,H,K (visible)
+  NYT Best: HAKU = 57, Strategy 99 -- "Fantastic!"
+  NYT Alt: HURRAH = 45/77 (Great), HAH = 37/48 (Good), KA = 38/39 (Fair)
+  Played: HAKU = 57, Strategy 99 (Best)
+  Advanced: HAKU net +57/66% win; HURRAH net +42/58%
+  Verdict: Perfect play. +15 equity over next best.
+
+TURN 6 - CANJAM: ZONAE (R11C12 V) = 60 pts
+  Rack: B,C,E,N,A,X,Z (visible)
+  NYT Best: BONZE = 86, Strategy 99 (through 3W!)
+  NYT Alt: AXONE = 66/85 (Excellent), UNBOX = 59/82 (Great)
+  Played: ZONAE = 60, Strategy 64 (Good)
+  Note: Canjam missed BONZE (86 pts!) -- a massive 26-point miss through
+        the 3W square. This was Canjam's biggest blunder of the game.
+
+TURN 7 - YOU: RHO (R3C10 V) = 14 pts
+  Rack: I,H,R,R,H,L,O (visible)
+  NYT Best: RHO = 14, Strategy 99 -- "Fantastic!"
+  NYT Alt: ROIL = 17/89 (Excellent), OH = 17/70 (Great), HILLO = 15/62 (Good)
+  Played: RHO = 14, Strategy 99 (Best)
+  Advanced: RHO net +12/37%; ROIL net +9/35%
+  Verdict: Perfect play. RHO blocks better despite scoring 3 less than ROIL.
+           Classic defense-over-score trade that NYT rewards.
+
+TURN 8 - CANJAM: QUEST (R1C12 V) = 54 pts
+  Rack: U,S,X,Q,B,T,E (visible)
+  NYT Best: QUEST = 54, Strategy 99
+  NYT Alt: OXES = 33/63 (Good), QUA = 33/58 (Good), EX = 20/51 (Good)
+  Played: QUEST = 54, Strategy 99 (Best)
+  Note: Perfect play. Strong Q disposal through 3W.
+
+TURN 9 - YOU: SIDH (R4C12 H) = 21 pts
+  Rack: I,H,A,R,O,L,D (visible)
+  NYT Best: HAVIOR = 28, Strategy 99
+  NYT Alt: SIDH = 21/64 (Good), ODAH = 21/54 (Good)
+  Played: SIDH = 21, Strategy 64 (Good)
+  Advanced: SIDH net +22/19%; HAVIOR net +31/25% (+9 eq)
+  Verdict: "Best moves like HAVIOR can make four words at once." HAVIOR
+           scores 7 more. Their Turn: 30 (40% 3W/2W) vs 33 (64%). Your
+           Next Turn: 30 (40%) vs 36 (52%). HAVIOR dominates on all axes.
+  Lesson: Multi-word creation remains a consistent miss pattern.
+
+TURN 10 - CANJAM: BACH (R1C15 V) = 19 pts
+  Rack: L,A,U,S,X,B,C (visible)
+  NYT Best: BEAUX = 32, Strategy 99
+  NYT Alt: BLUSH = 24/97 (Excellent), AX = 20/91 (Excellent)
+  Played: BACH = 19, Strategy 83 (Great)
+  Note: Missed BEAUX by 13 pts. BEAUX uses the X on premium squares.
+
+TURN 11 - YOU: BAAL (R2C9 V) = 30 pts
+  Rack: B,E,A,R,O,L,A (visible)
+  NYT Best: LAVABO = 29, Strategy 99
+  NYT Alt: BEAL = 30/98 (Excellent), BEVOR = 27/82 (Great)
+  Played: BAAL = 30, Strategy 75 (Great)
+  Advanced: BAAL net +27/22%; LAVABO net +29/25% (+2 eq)
+  Verdict: Very close. LAVABO scores 1 less but gives better leave for
+           next turn. Only +2 equity difference. Minimal miss.
+
+TURN 12 - CANJAM: MUX (R12C13 V) = 29 pts
+  Rack: L,N,U,S,X,E,M (visible)
+  NYT Best: MUX = 29, Strategy 99
+  NYT Alt: OXEN = 33/98 (Best), OXES = 33/83 (Great), XIS = 30/81 (Great)
+  Played: MUX = 29, Strategy 99 (Best)
+  Note: Perfect play. MUX blocks despite scoring 4 less than OXEN.
+
+TURN 13 - YOU: IRATE (R10C14 V) = 39 pts
+  Rack: Y,E,I,R,O,T,A (visible)
+  NYT Best: YAR = 39, Strategy 99
+  NYT Alt: TRAY = 44/91 (Excellent), RAY = 39/82 (Great)
+  Played: IRATE = 39, Strategy ~82 (Great)
+  Advanced: IRATE net +32/25%; YAR net +42/32% (+10 eq)
+  Verdict: "YAR scores the same points but helps you score more next turn."
+           Their Turn: 35 vs 34 (similar). Your Next Turn: 28 (44% 3W/2W)
+           vs 38 (60% 3W/2W). YAR leaves better tiles for a stronger follow-up.
+  Lesson: Leave quality matters -- same score, +10 equity from better leave.
+
+TURN 14 - CANJAM: MINES (R8C15 V) = 52 pts
+  Rack: E,N,I,S,L,M,E (visible)
+  NYT Best: MINES = 52, Strategy 99
+  NYT Alt: LENES = 46/86 (Excellent), LINES = 46/85 (Great), LEVIES = 26/65 (Good)
+  Played: MINES = 52, Strategy 99 (Best)
+  Note: Perfect play.
+
+TURN 15 - YOU: PYRROLS (R6C3 H) = 62 pts  ** KEY TURN 1 - YOUR BEST MOVE **
+  Rack: Y,R,S,O,P,R,? (visible, blank used as L)
+  NYT Best: PYRROLS = 62, Strategy 99 -- "Your strongest move of the game!"
+  NYT Alt: PRAY = 47/77 (Great), PYLORUS = 50/67 (Great)
+  Played: PYRROLS = 62, Strategy 99 (Best)
+  Advanced: PYRROLS net +60/36%; PRAY net +54/28%
+  Verdict: Perfect sweep. +6 net equity over PRAY. Their Turn 35 (44% 3W/2W)
+           vs 26 (<1% 3W/2W for PRAY). PYRROLS opens some lines but the score
+           differential more than compensates.
+
+TURN 16 - CANJAM: JO (R7C14 V) = 35 pts
+  Rack: T,S,L,E,E,J,O (visible)
+  NYT Best: JEESLY = 60, Strategy 99 (through 3W!)
+  NYT Alt: STEELY = 33/85 (Great), JELL = 35/83 (Great)
+  Played: JO = 35, Strategy not shown
+  Note: Canjam missed JEESLY (60 pts) -- 25-point miss! Second huge miss.
+        JEESLY and STEELY both use the 3W bonus square.
+
+TURN 17 - YOU: STRONGER (R4C6 V) = 55 pts  ** KEY TURN 2 - SWEEP **
+  Rack: R,N,O,T,E,G,? (visible, blank used as S)
+  NYT Best: STRONGER = 55, Strategy 99 -- "A sweep! It was the best move."
+  NYT Alt: STRONGER (different position) = 52/92 (Excellent),
+           GENTRY = 39/63 (Good), STOGEY = 45/59 (Good), OW = 1/1 (Weak)
+  Played: STRONGER = 55, Strategy 99 (Best)
+  Advanced: STRONGER net +57/64%; alt STRONGER net +55/59%
+  Verdict: Perfect. Better position than the alternative STRONGER placement.
+           Sweep Odds 12% vs <1%. 3W/2W Odds 40% vs 68%. Your position
+           gives better balance of opportunity and defense.
+
+TURN 18 - CANJAM: CEE (R7C2 H) = 20 pts
+  Rack: E,L,E,T,C,S,E (visible)
+  NYT Best: SLEETY = 33, Strategy 99
+  NYT Alt: STEELY = 33/98 (Best), ELECTS = 33/90 (Excellent)
+  Played: CEE = 20, Strategy 47 (Good)
+  Note: Missed SLEETY/STEELY by 13 pts. All three best moves score 33.
+
+TURN 19 - YOU: FRITTS (R4C1 H) = 27 pts
+  Rack: F,N,R,T,T,I,I (visible)
+  NYT Best: INTI = 20, Strategy 99
+  NYT Alt: FRITTS = 27/98 (Best), TIN = 18/88 (Excellent)
+  Played: FRITTS = 27, Strategy 98 (Best)
+  Advanced: FRITTS net +23/70%; INTI net +21/70%
+  Verdict: Both rated Best. Both give 70% win chance. FRITTS scores 7 more
+           with nearly identical net equity (+23 vs +21). "INTI scores fewer
+           points but gives you a real chance to win next turn" -- but the
+           data shows FRITTS is essentially equivalent. Negligible difference.
+
+TURN 20 - CANJAM: DELT (R1C4 V) = 18 pts
+  Rack: E,D,D,S,T,D,L (visible)
+  NYT Best: TELEDUS = 44, Strategy 99
+  NYT Alt: DEALT = 21/42 (Good), THEN = 21/36 (Fair)
+  Played: DELT = 18, Strategy not shown
+  Note: Canjam missed TELEDUS (44 pts) -- 26-point miss! This was the
+        game-losing blunder. "Best moves like TELEDUS can make multiple
+        words at once." With 3 D's in rack, Canjam couldn't find the
+        premium play.
+
+TURN 21 - YOU: EN (R3C8 V) = 17 pts  ** KEY TURN 3 - CHANCE TO LEARN **
+  Rack: I,N,E,E,S,N,I (visible)
+  NYT Best: EN (different position) = 21, Strategy 99
+  NYT Alt: SIN = 18/59 (Good)
+  Played: EN = 17, Strategy not shown
+  Advanced: Your EN net -7/24% win; Best EN net -7/64% win
+  Verdict: THIS IS THE CRITICAL MOVE. Same word, same net score (-7), but
+           the better EN position gives **64% win chance vs 24% win chance**.
+           A 40-percentage-point swing from position alone! The better EN
+           position "can use the N to also make the word YEN," creating a
+           multi-word play that scores 4 more AND blocks opponent's winning
+           lines. This single positional error may have cost the game.
+  Lesson: In close endgames, word placement is everything. The difference
+          between winning and losing can be which square you place a 2-letter
+          word on.
+
+TURN 22 - CANJAM: GAVELS (R2C1 H) = 26 pts  ** KEY TURN 4 - WINNING MOVE **
+  Rack: D,V,?,A,G,S,T (visible, blank used as L)
+  NYT Best: GAEN = 32/99 (Best), ADVERTS = 28/99 (Best), GUAVA = 28/99 (Best)
+  Played: GAVELS = 26, Strategy not shown
+  Note: "Your opponent clinched a last-minute win by playing GAVELS."
+        GAEN would have scored 6 more. All three NYT recommendations scored
+        higher. But Canjam won regardless -- the 6-point margin was enough.
+
+Summary Statistics
+------------------
+Your moves rated Best (99):     4 of 11 (HAKU, RHO, PYRROLS, STRONGER)
+Your moves rated Excellent:     1 of 11 (PILAW 87)
+Your moves rated Great:         4 of 11 (FOVEOLE 73, SIDH 64, BAAL 75, IRATE ~82)
+Your moves as Chance to Learn:  1 of 11 (EN position)
+Your sweeps:                    2 (PYRROLS 62, STRONGER 55) -- both Best!
+
+Canjam moves rated Best (99):   4 of 11 (PAWED, QUEST, MUX, MINES)
+Canjam moves rated Excellent:   1 of 11 (YOGI 91)
+Canjam biggest misses:          BONZE (-26!), TELEDUS (-26!), JEESLY (-25),
+                                BEAUX (-13), CEE vs SLEETY (-13)
+
+Net equity lost by your suboptimal plays:
+  PILAW position:       -2 equity
+  FOVEOLE vs HOOF:      -7 equity
+  SIDH vs HAVIOR:       -9 equity
+  BAAL vs LAVABO:       -2 equity
+  IRATE vs YAR:         -10 equity
+  EN position:          ~0 equity (same net) but -40% win probability!
+  Total:                -30 equity (lost by only 6 points)
+
+Canjam's equity lost:
+  YOGI vs BOXY:         -7
+  ZONAE vs BONZE:       -26
+  BACH vs BEAUX:        -13
+  JO vs JEESLY:         -25
+  CEE vs SLEETY:        -13
+  DELT vs TELEDUS:      -26
+  Total:                -110 equity (still won by 6!)
+
+The Luck Factor:
+  Your luck: 41/99 (very unlucky draws)
+  Canjam luck: 57/99 (above average draws)
+  Despite Canjam losing 110 equity to suboptimal plays (vs your 30),
+  Canjam's superior tile luck (57 vs 41) more than compensated.
+  This game perfectly illustrates how luck can overcome a strategy gap.
+
+Patterns to improve:
+  1. Multi-word creation: FOVEOLE vs HOOF (-7), SIDH vs HAVIOR (-9) --
+     both misses involved playing a single word when multi-word plays
+     were available. This is the #1 pattern across all 3 analyzed games.
+  2. Leave quality: IRATE vs YAR (-10) -- same score, much worse leave.
+     When multiple moves score equally, evaluate what tiles remain.
+  3. Endgame positioning: EN placement (-40% win probability) -- in tight
+     endgames, the exact square matters more than the word or score.
+     A 2-letter word placed 1 square differently swung the game.
+  4. Your sweeps remain elite: PYRROLS and STRONGER both Best (99),
+     continuing the pattern from Katie_001 and Sophie_001.
+
+Cross-Game Comparison (3 games analyzed):
+  Game         Strategy  Luck  Spread  Equity Lost  Result
+  Katie_001    87/99     53    +136    -25          Win
+  Sophie_001   88/99     59    +44     -77          Win
+  Canjam_003   82/99     41    -6      -30          Loss
+
+  Your strategy is consistently 82-88/99 across all games.
+  The loss came from worst luck (41 vs 53-59 in wins) despite
+  the smallest equity leak (-30 vs -25 to -77 in wins).
+  This was your best-played game by equity efficiency, but the
+  tile draws didn't cooperate.

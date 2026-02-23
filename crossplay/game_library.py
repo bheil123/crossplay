@@ -20,6 +20,8 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
+from . import __version__
+
 # Paths relative to this module
 _MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 GAMES_DIR = os.path.join(_MODULE_DIR, 'games')
@@ -213,6 +215,7 @@ def archive_completed(game_id: str, game) -> bool:
         'blank_positions': [list(bp) for bp in game.state.blank_positions],
         'created_at': game.state.created_at,
         'completed_at': datetime.now().isoformat(),
+        'engine_version': __version__,
         'notes': game.state.notes,
     }
 

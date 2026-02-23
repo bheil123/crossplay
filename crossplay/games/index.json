@@ -2,9 +2,9 @@
   "slots": {
     "1": "joybells27_001",
     "2": "melain_002",
-    "3": null,
+    "3": "piph_001",
     "4": "sophie_003",
-    "5": null
+    "5": "katie_002"
   },
   "counters": {
     "canjam": 3,
@@ -15,7 +15,8 @@
     "melain": 3,
     "pkp8": 2,
     "joybells27": 1,
-    "katie": 1
+    "katie": 2,
+    "piph": 1
   },
   "opponent_notes": {}
 }
