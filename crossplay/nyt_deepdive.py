@@ -171,16 +171,32 @@ def analyze_position(record, turn_num, game_obj, quiet=False):
     engine_top3 = None
     mc_ran = False
     eval_type = 'unknown'
+    engine_recommended_exchange = False
 
-    if game_obj.last_analysis and game_obj.last_analysis.get('top3'):
-        top3 = game_obj.last_analysis['top3']
-        if len(top3) >= 1:
-            engine_top = top3[0]
-        if len(top3) >= 2:
-            engine_top2 = top3[1]
-        if len(top3) >= 3:
-            engine_top3 = top3[2]
-        mc_ran = True
+    if game_obj.last_analysis:
+        # Prefer mc_top (includes exchanges) over top3 (filters exchanges)
+        mc_top = game_obj.last_analysis.get('mc_top') or []
+        top3 = game_obj.last_analysis.get('top3') or []
+
+        # Check if engine recommended exchange (mc_top[0] is exchange)
+        if mc_top and mc_top[0].get('is_exchange', False):
+            engine_recommended_exchange = True
+
+        # For engine recommendation, use first non-exchange from mc_top,
+        # falling back to top3 (which already filters exchanges)
+        non_exch = [m for m in mc_top if not m.get('is_exchange', False)]
+        best_list = non_exch if non_exch else top3
+
+        if len(best_list) >= 1:
+            engine_top = best_list[0]
+        if len(best_list) >= 2:
+            engine_top2 = best_list[1]
+        if len(best_list) >= 3:
+            engine_top3 = best_list[2]
+
+        if engine_top or top3 or mc_top:
+            mc_ran = True
+
         # Determine eval type
         if bag_size == 0:
             eval_type = 'endgame_exact'
@@ -211,6 +227,29 @@ def analyze_position(record, turn_num, game_obj, quiet=False):
     if nyt_word and not is_exchange:
         nyt_agrees_played = (nyt_word == played_word)
 
+    # Move finder diagnostic: check if NYT word is in full candidate list
+    nyt_in_movefinder = None
+    nyt_movefinder_rank = None
+    nyt_movefinder_score = None
+    if nyt_word and nyt_word != '?' and not is_exchange:
+        try:
+            from .move_finder_c import find_all_moves_c
+            all_candidates = find_all_moves_c(
+                game_obj.board, game_obj.gaddag, rack)
+            nyt_matches = [m for m in all_candidates if m['word'] == nyt_word]
+            nyt_in_movefinder = len(nyt_matches) > 0
+            if nyt_matches:
+                best_nyt = max(nyt_matches, key=lambda m: m['score'])
+                nyt_movefinder_score = best_nyt['score']
+                # Find rank by raw score
+                all_candidates.sort(key=lambda x: -x['score'])
+                for i, m in enumerate(all_candidates):
+                    if m['word'] == nyt_word:
+                        nyt_movefinder_rank = i + 1
+                        break
+        except Exception:
+            pass  # diagnostic is best-effort
+
     result = {
         'turn': turn_num,
         'skipped': False,
@@ -230,12 +269,13 @@ def analyze_position(record, turn_num, game_obj, quiet=False):
         'nyt_score': nyt_score,
         'nyt_rating': nyt_rating,
         'nyt_strategy': nyt_strategy,
-        # Engine recommendation (MC/endgame top pick)
+        # Engine recommendation (best non-exchange move)
         'engine_word': eng_word,
         'engine_score': eng_score,
         'engine_equity': round(eng_equity, 1) if eng_equity is not None else None,
         'engine_risk_eq': round(eng_risk_eq, 1) if eng_risk_eq is not None else None,
-        # Engine top 3
+        'engine_recommended_exchange': engine_recommended_exchange,
+        # Engine top 3 (non-exchange)
         'engine_top3': [
             {
                 'word': t['word'],
@@ -249,6 +289,10 @@ def analyze_position(record, turn_num, game_obj, quiet=False):
             for t in [engine_top, engine_top2, engine_top3]
             if t is not None
         ],
+        # Move finder diagnostic
+        'nyt_in_movefinder': nyt_in_movefinder,
+        'nyt_movefinder_rank': nyt_movefinder_rank,
+        'nyt_movefinder_score': nyt_movefinder_score,
         # Agreements
         'engine_agrees_nyt': engine_agrees_nyt,
         'engine_agrees_played': engine_agrees_played,
@@ -416,22 +460,91 @@ def print_aggregate(game_results):
     print("  All three agree:         %d/%d (%.1f%%)" % (all3, n, 100*all3/n))
     print()
 
-    # Top disagreements by equity gap
+    # Disagreement category breakdown
     if eng_diff_nyt:
-        print("  Engine-vs-NYT disagreements (top 15 by equity):")
-        # Sort by engine equity descending (engine's confidence in its pick)
+        # Categorize each disagreement
+        cat_exchange = []     # engine recommended exchange
+        cat_not_found = []    # NYT word not in move finder
+        cat_lower_eq = []     # NYT word found but lower equity
+        cat_unknown = []      # no diagnostic data
+        cat_engine_higher = [] # engine scores same/higher than NYT
+
+        for r in eng_diff_nyt:
+            if r.get('engine_recommended_exchange'):
+                cat_exchange.append(r)
+            elif r.get('nyt_in_movefinder') is False:
+                cat_not_found.append(r)
+            elif r.get('nyt_in_movefinder') is True:
+                eng_s = r.get('engine_score') or 0
+                nyt_s = r.get('nyt_score') or 0
+                if eng_s >= nyt_s:
+                    cat_engine_higher.append(r)
+                else:
+                    cat_lower_eq.append(r)
+            elif r.get('eval_type') == 'unknown':
+                cat_unknown.append(r)
+            else:
+                # No diagnostic data but not unknown eval type
+                cat_lower_eq.append(r)
+
+        print("  Disagreement categories (%d total):" % len(eng_diff_nyt))
+        if cat_exchange:
+            print("    Engine recommended EXCHANGE:  %d" % len(cat_exchange))
+            for r in cat_exchange:
+                print("      %s T%d: NYT=%s(%s) | Engine top non-exch=%s(%s)" % (
+                    r.get('game_id', '?'), r['turn'],
+                    r.get('nyt_word', '?'), r.get('nyt_score', '?'),
+                    r.get('engine_word', '?'), r.get('engine_score', '?')))
+        if cat_not_found:
+            print("    NYT word NOT in move finder:  %d  ** MOVE FINDER BUG **" % len(cat_not_found))
+            for r in cat_not_found:
+                print("      %s T%d: NYT=%s(%s) not generated by engine" % (
+                    r.get('game_id', '?'), r['turn'],
+                    r.get('nyt_word', '?'), r.get('nyt_score', '?')))
+        if cat_lower_eq:
+            print("    NYT word found, lower equity: %d  (strategic diff)" % len(cat_lower_eq))
+            for r in cat_lower_eq:
+                rank = r.get('nyt_movefinder_rank', '?')
+                print("      %s T%d: Engine=%s(%s) vs NYT=%s(%s, rank #%s by score)" % (
+                    r.get('game_id', '?'), r['turn'],
+                    r.get('engine_word', '?'), r.get('engine_score', '?'),
+                    r.get('nyt_word', '?'), r.get('nyt_score', '?'), rank))
+        if cat_engine_higher:
+            print("    Engine scores >= NYT:         %d  (engine correct)" % len(cat_engine_higher))
+            for r in cat_engine_higher:
+                print("      %s T%d: Engine=%s(%s) vs NYT=%s(%s)" % (
+                    r.get('game_id', '?'), r['turn'],
+                    r.get('engine_word', '?'), r.get('engine_score', '?'),
+                    r.get('nyt_word', '?'), r.get('nyt_score', '?')))
+        if cat_unknown:
+            print("    Unknown (no engine data):     %d" % len(cat_unknown))
+            for r in cat_unknown:
+                print("      %s T%d: NYT=%s(%s) | eval_type=%s" % (
+                    r.get('game_id', '?'), r['turn'],
+                    r.get('nyt_word', '?'), r.get('nyt_score', '?'),
+                    r.get('eval_type', '?')))
+        print()
+
+    # Top disagreements by score gap (for reference)
+    if eng_diff_nyt:
+        print("  Top disagreements by score gap:")
         sorted_dis = sorted(eng_diff_nyt,
-                            key=lambda r: abs((r.get('engine_equity') or 0) - (r.get('nyt_score') or 0)),
+                            key=lambda r: abs((r.get('nyt_score') or 0) - (r.get('engine_score') or 0)),
                             reverse=True)
-        for r in sorted_dis[:15]:
+        for r in sorted_dis[:10]:
             gid = r.get('game_id', '?')
-            print("    %s T%d: Engine=%s(%s/%.1feq) vs NYT=%s(%s) | Played=%s(%d) | %s" % (
+            exch_tag = " [EXCH]" if r.get('engine_recommended_exchange') else ""
+            diag_tag = ""
+            if r.get('nyt_in_movefinder') is True:
+                diag_tag = " [found #%s]" % (r.get('nyt_movefinder_rank', '?'))
+            elif r.get('nyt_in_movefinder') is False:
+                diag_tag = " [NOT FOUND]"
+            print("    %s T%d: Engine=%s(%s) vs NYT=%s(%s) | gap=%d%s%s" % (
                 gid, r['turn'],
                 r.get('engine_word') or '?', r.get('engine_score') or '?',
-                r.get('engine_equity') or 0,
                 r.get('nyt_word') or '?', r.get('nyt_score') or '?',
-                r.get('played') or '?', r.get('played_score') or 0,
-                r.get('eval_type', '?')))
+                abs((r.get('nyt_score') or 0) - (r.get('engine_score') or 0)),
+                exch_tag, diag_tag))
 
     # Eval type breakdown
     types = {}

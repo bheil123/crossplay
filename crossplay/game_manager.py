@@ -1271,7 +1271,20 @@ class Game:
                         }
                         for r in results[:3]
                         if not r.get('is_exchange', False)
-                    ]
+                    ],
+                    'mc_top': [
+                        {
+                            'word': r.get('word', 'EXCHANGE'),
+                            'row': r.get('row', 0),
+                            'col': r.get('col', 0),
+                            'dir': r.get('direction', '-'),
+                            'score': r['score'],
+                            'equity': r.get('total_equity', 0),
+                            'risk_eq': r.get('risk_adj_equity', r.get('total_equity', 0)),
+                            'is_exchange': r.get('is_exchange', False),
+                        }
+                        for r in results[:5]
+                    ],
                 }
 
             # Bingo blocking analysis
@@ -1624,6 +1637,23 @@ class Game:
             print(f"    -> Opp plays {best['opp_word']} ({best['opp_score']} pts)")
             print(f"    -> Net: {best['net_2ply']:+d}")
 
+            # Store endgame recommendation for deep dive / play_move()
+            self.last_analysis = {
+                'top3': [
+                    {
+                        'word': r['word'],
+                        'row': r['row'],
+                        'col': r['col'],
+                        'dir': r['direction'],
+                        'score': r['score'],
+                        'equity': r['net_2ply'],
+                        'risk_eq': r['net_2ply'],
+                    }
+                    for r in results[:3]
+                ],
+                'mc_top': None,  # Not MC-based, exact endgame evaluation
+            }
+
         except Exception as e:
             print(f"Endgame 2-ply error: {e}")
             import traceback
@@ -1764,7 +1794,8 @@ class Game:
                             'risk_eq': r.get('net_equity', 0),
                         }
                         for r in results[:3]
-                    ]
+                    ],
+                    'mc_top': None,  # Not MC-based, near-endgame evaluation
                 }
 
         except Exception as e:
