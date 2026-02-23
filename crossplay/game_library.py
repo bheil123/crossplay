@@ -179,12 +179,13 @@ def delete_active(game_id: str) -> bool:
 # Archive (completed games)
 # ---------------------------------------------------------------------------
 
-def archive_completed(game_id: str, game) -> bool:
+def archive_completed(game_id: str, game, resignation: bool = False) -> bool:
     """Archive a completed game: append to archive.jsonl, delete active JSON.
 
     Args:
         game_id: e.g., 'canjam_002'
         game: Game instance
+        resignation: If True, opponent resigned
 
     Returns:
         True if archived successfully.
@@ -217,6 +218,7 @@ def archive_completed(game_id: str, game) -> bool:
         'completed_at': datetime.now().isoformat(),
         'engine_version': __version__,
         'notes': game.state.notes,
+        'resignation': resignation,
     }
 
     # Append to archive

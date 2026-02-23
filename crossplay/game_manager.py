@@ -3256,7 +3256,8 @@ class GameManager:
         print(f"[OK] New game created in Slot {slot} vs {opponent_name} [{game_id}]")
     
     def end_game(self, slot: int = None, result: str = None,
-                 your_score: int = None, opp_score: int = None):
+                 your_score: int = None, opp_score: int = None,
+                 resignation: bool = False):
         """Complete a game: update final scores, archive, and clear slot.
 
         Args:
@@ -3264,6 +3265,7 @@ class GameManager:
             result: 'win', 'loss', or 'tie' (auto-detected from scores if omitted)
             your_score: Final score (updates game state if provided)
             opp_score: Final opponent score (updates game state if provided)
+            resignation: If True, opponent resigned
         """
         if slot is None:
             slot = self.current_slot
@@ -3297,12 +3299,20 @@ class GameManager:
         game.state.is_your_turn = False
         game.state.your_rack = ''
 
+        # Record resignation in notes
+        if resignation:
+            resign_note = "Opponent resigned"
+            if game.state.notes:
+                game.state.notes = f"{game.state.notes}; {resign_note}"
+            else:
+                game.state.notes = resign_note
+
         # Save final state then archive
         from .game_library import save_active, archive_completed, load_index, save_index
         save_active(game_id, game)
 
         # Archive (appends to archive.jsonl, deletes active JSON)
-        archive_completed(game_id, game)
+        archive_completed(game_id, game, resignation=resignation)
 
         # Clear slot in index
         index = load_index()
@@ -3312,7 +3322,8 @@ class GameManager:
         # Clear in-memory slot
         self.games[slot] = None
 
-        print(f"[OK] Game over: {result.upper()} {game.state.your_score}-{game.state.opp_score} "
+        result_label = f"{result.upper()} (resignation)" if resignation else result.upper()
+        print(f"[OK] Game over: {result_label} {game.state.your_score}-{game.state.opp_score} "
               f"({'+' if spread >= 0 else ''}{spread}) vs {game.state.opponent_name}")
         print(f"     Archived as {game_id}, Slot {slot} is now free")
         return True
@@ -3562,6 +3573,17 @@ class GameManager:
                 except Exception as e:
                     print(f"Error: {e}")
                     print("Usage: end YOUR_SCORE OPP_SCORE [win/loss/tie]")
+
+            elif action == 'resign':
+                # resign [SLOT] -- opponent resigned, end game with current scores
+                # e.g.: resign      -> current slot
+                # e.g.: resign 3    -> specific slot
+                try:
+                    resign_slot = int(parts[1]) if len(parts) >= 2 else None
+                    self.end_game(slot=resign_slot, result='win', resignation=True)
+                except Exception as e:
+                    print(f"Error: {e}")
+                    print("Usage: resign [SLOT]")
 
             elif action == 'reload':
                 # Reload game(s) from disk after git pull or external edits

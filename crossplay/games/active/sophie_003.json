@@ -400,6 +400,53 @@
       "engine_version": "18.0.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "EGAD",
+      "row": 5,
+      "col": 15,
+      "dir": "V",
+      "player": "opp",
+      "score": 18,
+      "bag": 9,
+      "blanks": [],
+      "cumulative": [
+        360,
+        290
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-23T06:38:05.672585",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "EXCHANGE",
+      "row": 0,
+      "col": 0,
+      "dir": "-",
+      "player": "me",
+      "score": 0,
+      "is_exchange": true,
+      "exchange_dump": "QHOTT",
+      "exchange_keep": "RI",
+      "bag": 9,
+      "blanks": [],
+      "cumulative": [
+        360,
+        290
+      ],
+      "rack": "QHOTTRI",
+      "drawn": "DGINE",
+      "note": "exchanged 5 tiles",
+      "timestamp": "2026-02-23T06:52:45.030723",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -415,16 +462,16 @@
     ]
   ],
   "your_score": 360,
-  "opp_score": 272,
-  "your_rack": "QHOTTRI",
+  "opp_score": 290,
+  "your_rack": "IDGINRE",
   "is_your_turn": false,
   "opponent_name": "sophie",
   "created_at": "2026-02-20T09:48:10.909770",
-  "updated_at": "2026-02-22T21:52:32.110720",
+  "updated_at": "2026-02-23T06:52:45.030723",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "sophie_003",
   "status": "active",
-  "spread": 88,
-  "move_count": 18
+  "spread": 70,
+  "move_count": 20
 }

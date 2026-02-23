@@ -447,6 +447,50 @@
       "engine_version": "17.3.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "ZERO",
+      "row": 4,
+      "col": 3,
+      "dir": "H",
+      "player": "opp",
+      "score": 18,
+      "bag": 1,
+      "blanks": [],
+      "cumulative": [
+        430,
+        268
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-22T23:04:59.705555",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "AN",
+      "row": 5,
+      "col": 3,
+      "dir": "H",
+      "player": "me",
+      "score": 17,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        447,
+        268
+      ],
+      "rack": "NATDONE",
+      "drawn": "RA",
+      "note": "",
+      "timestamp": "2026-02-22T23:18:20.647971",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -466,17 +510,17 @@
       "O"
     ]
   ],
-  "your_score": 430,
-  "opp_score": 250,
-  "your_rack": "NATDONE",
+  "your_score": 447,
+  "opp_score": 268,
+  "your_rack": "RADTNOE",
   "is_your_turn": false,
   "opponent_name": "joybells27",
   "created_at": "2026-02-18T20:31:54.615959",
-  "updated_at": "2026-02-22T19:30:00.000000",
+  "updated_at": "2026-02-22T23:18:20.758762",
   "notes": "",
-  "final_turns_remaining": null,
+  "final_turns_remaining": 2,
   "game_id": "joybells27_001",
   "status": "active",
-  "spread": 180,
-  "move_count": 21
+  "spread": 179,
+  "move_count": 23
 }
