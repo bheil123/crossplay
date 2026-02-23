@@ -68,6 +68,7 @@ version changes.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 18.0.0 | 2026-02 | Gen3 SuperLeaves deployed (TD-learning, 1M games), Cython word_set optimization (68% training speedup), gen3 validates at 513-484 vs formula (+2.1), 510-486 vs gen2 (+1.0) |
 | 17.2.0 | 2026-02 | HVT premium bonus (high-value tiles on premium squares), TW/DW exposure penalty (penalizes opening 3W/2W) |
 | 17.0.0 | 2026-02 | Near-endgame hybrid evaluator (bag 1-7), SuperLeaves gen1 deployed, gen2 training with equity-based signal |
 | 16.1.0 | 2026-02 | `end` command for game completion (archive + clear slot), archive format cleanup |

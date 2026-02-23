@@ -415,8 +415,8 @@ path matches.
 **Gen3 training results (1M games, TD-learning):**
 - Completed at 27.6 g/s (9 workers), ~10.1 hours
 - 921K leave entries, final checkpoint: `gen3_1000000.pkl`
-- **Not yet deployed** -- awaiting validation (gen3 vs formula, gen3 vs gen2)
-- `deployed_leaves.pkl` is still gen2
+- **Deployed** as `deployed_leaves.pkl` (V18.0.0)
+- Validation: 513-484 vs formula (+2.1 spread), 510-486 vs gen2 (+1.0 spread)
 
 **`reload` command (multi-computer game sync):**
 `reload` / `reload N` -- re-reads game JSON files from disk after `git pull`
@@ -752,7 +752,7 @@ python -m crossplay.superleaves.validate --table superleaves/gen2_1000000.pkl --
 
 **Deployment:** Copy a checkpoint to `deployed_leaves.pkl` in the superleaves
 directory. `leave_eval.py` lazy-loads this file and uses trained values before
-falling back to formula. **Gen2 is currently deployed** (1M games, 921K entries).
+falling back to formula. **Gen3 is currently deployed** (1M games, TD-learning, 921K entries).
 
 **Validation (`validate.py`):** Multi-worker head-to-head bot matches.
 Uses `ProcessPoolExecutor` with `cpu_count - 3` default workers (same as
@@ -782,8 +782,8 @@ This allows MC speed tuning without killing workers mid-batch.
 
 **Training data in Git (LFS):** Two pkl files are tracked via Git LFS and
 pushed to GitHub so the engine works immediately after cloning:
-- `deployed_leaves.pkl` -- the live leave table used by the engine (gen2)
-- `gen2_1000000.pkl` -- final gen2 output (1M games)
+- `deployed_leaves.pkl` -- the live leave table used by the engine (gen3)
+- `gen3_1000000.pkl` -- final gen3 output (1M games, TD-learning)
 
 All other pkl files (intermediate checkpoints, worker tables) are gitignored.
 After training a new generation, update deployed_leaves.pkl and commit:
