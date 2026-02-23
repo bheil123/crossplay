@@ -2230,6 +2230,94 @@ class Game:
 
         return True, score
 
+    def record_exchange(self, tiles_dumped: str, new_rack: str):
+        """Record a tile exchange in assisted play mode.
+
+        Args:
+            tiles_dumped: Letters exchanged away (e.g. 'UYI')
+            new_rack: Full rack after drawing replacement tiles (e.g. 'DTPAISE')
+        """
+        tiles_dumped = tiles_dumped.upper()
+        new_rack = new_rack.upper()
+
+        old_rack = self.state.your_rack or ''
+
+        # Validate: tiles_dumped must exist in current rack
+        rack_list = list(old_rack)
+        for tile in tiles_dumped:
+            if tile in rack_list:
+                rack_list.remove(tile)
+            elif '?' in rack_list:
+                rack_list.remove('?')
+            else:
+                print(f"[X] You don't have '{tile}' to exchange!")
+                return False
+
+        # Compute bag count before exchange
+        _trk = TileTracker()
+        _trk.sync_with_board(self.board, your_rack=old_rack,
+                             blanks_in_rack=old_rack.count('?'),
+                             blank_positions=self.state.blank_positions)
+        bag_count = _trk.get_bag_count()
+
+        if bag_count < 7:
+            print(f"[X] Not enough tiles in bag to exchange! (bag={bag_count})")
+            return False
+
+        # Compute kept tiles and drawn tiles
+        kept = ''.join(rack_list)  # old rack minus dumped
+        # drawn = new_rack minus kept
+        new_list = list(new_rack)
+        for t in kept:
+            if t in new_list:
+                new_list.remove(t)
+        drawn_tiles = ''.join(new_list)
+
+        # Build engine recommendation record (from last analyze())
+        engine_rec = None
+        if self.last_analysis:
+            engine_rec = {
+                'top3': self.last_analysis.get('top3', []),
+                'followed': 'exchange',
+            }
+            self.last_analysis = None
+
+        # Build enriched move record
+        enriched = {
+            'word': 'EXCHANGE',
+            'row': 0, 'col': 0, 'dir': '-',
+            'player': 'me',
+            'score': 0,
+            'is_exchange': True,
+            'exchange_dump': tiles_dumped,
+            'exchange_keep': kept,
+            'bag': bag_count,
+            'blanks': [],
+            'cumulative': [self.state.your_score, self.state.opp_score],
+            'rack': old_rack,
+            'drawn': drawn_tiles,
+            'note': f'exchanged {len(tiles_dumped)} tiles',
+            'timestamp': datetime.now().isoformat(),
+            'engine': engine_rec,
+            'engine_version': __version__,
+            'win_pct': None,
+            'nyt': None,
+        }
+        self.state.board_moves.append(enriched)
+
+        # Update rack and toggle turn
+        self.state.your_rack = new_rack
+        self.state.is_your_turn = False
+        self.state.updated_at = datetime.now().isoformat()
+
+        print(f"[OK] Exchanged {tiles_dumped} (kept {kept}), drew {drawn_tiles}")
+        print(f"   New rack: {new_rack}")
+        print(f"   Score: You {self.state.your_score} - "
+              f"{self.state.opponent_name} {self.state.opp_score}")
+
+        self._auto_save()
+        return True
+
     # -----------------------------------------------------------------
     # Opponent move validation (V17.2)
     # -----------------------------------------------------------------
@@ -3424,6 +3512,20 @@ class GameManager:
                         game.play_move(word, row, col, horiz,
                                        rack=game.state.your_rack,
                                        new_rack=post_rack)
+                    except Exception as e:
+                        print(f"Error: {e}")
+                else:
+                    print("No game in current slot")
+
+            elif action in ('exchange', 'swap') and len(parts) >= 3:
+                if game:
+                    if not game.state.is_your_turn:
+                        print("[!] It's not your turn. Use 'opp' to record opponent's move first.")
+                        continue
+                    try:
+                        tiles_dumped = parts[1].upper()
+                        new_rack = parts[2].upper()
+                        game.record_exchange(tiles_dumped, new_rack)
                     except Exception as e:
                         print(f"Error: {e}")
                 else:
