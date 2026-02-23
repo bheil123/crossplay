@@ -1,14 +1,19 @@
-"""Deep dive diagnostic: Run full MC analysis on positions where engine disagrees with NYT.
+"""Deep dive: Run full MC analysis on all positions across archived NYT games.
 
 Reconstructs board positions from archive data and runs the complete
-analyze() pipeline (1-ply + risk + MC 2-ply) to compare engine vs NYT
-recommendations.
+analyze() pipeline (1-ply + risk + MC 2-ply) to compare engine
+recommendations vs NYT vs actual play.
+
+Since MC evaluation is already parallelized internally (multi-worker),
+positions run sequentially to avoid CPU contention.
 
 Usage:
-    python -m crossplay.nyt_deepdive [--position N]
+    python -m crossplay.nyt_deepdive [--game GAME_ID] [--save] [--quiet]
 
-    Without args: runs all positions sequentially
-    --position N: run only position N (1-indexed)
+    Without --game: runs all games with NYT data
+    --game ID: run only the specified game
+    --save: write JSON results to games/analysis/
+    --quiet: suppress per-position analyze() output (show summary only)
 """
 
 import json
@@ -67,102 +72,465 @@ def reconstruct_position(record, turn_num):
     return state, move
 
 
-# Positions to investigate
-POSITIONS = [
-    # Leave overvaluation: engine picks lower score + better leave
-    ('piph_001', 14, 'Engine JO(26/34eq) vs NYT EMOJI(30)', 'leave'),
-    ('sophie_001', 15, 'Engine ALL(16/30.6eq) vs NYT LITS(27)', 'leave'),
-    ('pkp8_002', 9, 'Engine FER(6/24.7eq) vs NYT SYN(24)', 'leave'),
-    ('pkp8_002', 7, 'Engine NEW(7/20.3eq) vs NYT SYN(24)', 'leave'),
-    ('sophie_001', 24, 'Engine JO(25/23.5eq) vs NYT TWO(27)', 'leave'),
-    ('katie_001', 19, 'Engine WOODIE(32/32eq) vs NYT WED(39)', 'leave'),
-    # Exchange positions
-    ('piph_001', 8, 'Swapped IUY vs NYT SAIYID(32)', 'exchange'),
-    ('katie_001', 11, 'Swapped vs NYT PE(20)', 'exchange'),
-]
+def moves_match(word_a, row_a, col_a, dir_a, word_b, row_b, col_b, dir_b):
+    """Check if two moves are the same play."""
+    return (word_a == word_b and row_a == row_b
+            and col_a == col_b and dir_a == dir_b)
 
 
-def run_position(pos_idx, records):
-    """Run full analyze() on a single position."""
-    from .game_manager import Game
+def analyze_position(record, turn_num, game_obj, quiet=False):
+    """Run full analyze() on a single position and capture structured results.
 
-    gid, turn, desc, cat = POSITIONS[pos_idx]
-    rec = records[gid]
-    state, move = reconstruct_position(rec, turn)
+    Args:
+        record: Archive record dict
+        turn_num: 1-indexed turn number
+        game_obj: Reusable Game object (board will be rebuilt)
+        quiet: If True, suppress analyze() console output
 
+    Returns dict with analysis results.
+    """
+    move = record['moves'][turn_num - 1]
     played_word = move.get('word', '?')
     played_score = move.get('score', 0)
+    played_row = move.get('row', 0)
+    played_col = move.get('col', 0)
+    played_dir = move.get('dir', 'H')
+    is_exchange = move.get('is_exchange', False)
+    rack = move.get('rack', '')
+    bag = move.get('bag', 0)
     nyt = move.get('nyt', {})
-    nyt_word = nyt.get('word', '?') if nyt else '?'
-    nyt_score = nyt.get('score', 0) if nyt else 0
+    nyt_word = nyt.get('word', '?') if nyt else None
+    nyt_score = nyt.get('score', 0) if nyt else None
+    nyt_rating = move.get('nyt_rating')
+    nyt_strategy = move.get('nyt_strategy')
 
-    print()
-    print("=" * 70)
-    print("POSITION %d/%d: %s T%d [%s]" % (pos_idx + 1, len(POSITIONS), gid, turn, cat))
-    print("  %s" % desc)
-    print("  Played: %s(%d)  NYT best: %s(%d)  Rack: %s" % (
-        played_word, played_score, nyt_word, nyt_score, state.your_rack))
-    print("  Scores: You %d - Opp %d  Bag: ~%d" % (
-        state.your_score, state.opp_score, move.get('bag', 0)))
-    if move.get('is_exchange'):
-        print("  Exchange: dumped %s, kept %s" % (
-            move.get('exchange_dump', '?'), move.get('exchange_keep', '?')))
-    print("=" * 70)
+    if not rack:
+        return {
+            'turn': turn_num,
+            'skipped': True,
+            'reason': 'no rack data',
+            'played': played_word,
+            'played_score': played_score,
+        }
 
-    # Create game (suppress init output)
-    old_stdout = sys.stdout
-    sys.stdout = io.StringIO()
-    game = Game(state)
-    sys.stdout = old_stdout
+    # Reconstruct position
+    state, _ = reconstruct_position(record, turn_num)
 
-    print("  Board tiles: %d  Bag: %d tiles" % (
-        sum(1 for r in range(15) for c in range(15) if game.board.get_tile(r+1, c+1)),
-        len(game.bag)))
-    print()
+    # Rebuild game object with new state
+    from .game_manager import GameState, Game
+    from .board import Board
+
+    game_obj.state = state
+    game_obj.board = Board()
+    for m in state.board_moves:
+        if isinstance(m, dict):
+            if m.get('is_exchange'):
+                continue
+            word = m['word']
+            row, col = m['row'], m['col']
+            horiz = m.get('dir', 'H') == 'H' if 'dir' in m else m.get('horizontal', True)
+        else:
+            word, row, col, horiz = m[0], m[1], m[2], m[3]
+        game_obj.board.place_word(word, row, col, horiz)
+    game_obj.bag = game_obj._reconstruct_bag()
+    game_obj.blocked_cache.initialize(game_obj.board, game_obj.dictionary)
+    game_obj._threats_cache = None
+    game_obj._cached_baseline_risk = 0.0
+    game_obj._cached_baseline_threats = []
+    game_obj.last_analysis = None
+
+    bag_size = len(game_obj.bag)
 
     # Run full analysis
     t0 = time.time()
-    result = game.analyze(rack=state.your_rack, top_n=10)
+    if quiet:
+        old_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+
+    try:
+        game_obj.analyze(rack=rack, top_n=10)
+    except Exception as e:
+        if quiet:
+            sys.stdout = old_stdout
+        return {
+            'turn': turn_num,
+            'skipped': True,
+            'reason': 'analyze error: %s' % str(e),
+            'played': played_word,
+            'played_score': played_score,
+        }
+
+    if quiet:
+        sys.stdout = old_stdout
+
     elapsed = time.time() - t0
 
-    print()
-    print("  [Position %d complete in %.1fs]" % (pos_idx + 1, elapsed))
-    print()
+    # Extract engine recommendation from last_analysis
+    engine_top = None
+    engine_top2 = None
+    engine_top3 = None
+    mc_ran = False
+    eval_type = 'unknown'
+
+    if game_obj.last_analysis and game_obj.last_analysis.get('top3'):
+        top3 = game_obj.last_analysis['top3']
+        if len(top3) >= 1:
+            engine_top = top3[0]
+        if len(top3) >= 2:
+            engine_top2 = top3[1]
+        if len(top3) >= 3:
+            engine_top3 = top3[2]
+        mc_ran = True
+        # Determine eval type
+        if bag_size == 0:
+            eval_type = 'endgame_exact'
+        elif 1 <= bag_size <= 8:
+            eval_type = 'near_endgame'
+        else:
+            eval_type = 'mc_2ply'
+
+    # Check agreements
+    eng_word = engine_top['word'] if engine_top else None
+    eng_row = engine_top['row'] if engine_top else None
+    eng_col = engine_top['col'] if engine_top else None
+    eng_dir = engine_top.get('dir') if engine_top else None
+    eng_score = engine_top['score'] if engine_top else None
+    eng_equity = engine_top.get('equity', 0) if engine_top else None
+    eng_risk_eq = engine_top.get('risk_eq', 0) if engine_top else None
+
+    engine_agrees_nyt = False
+    engine_agrees_played = False
+    nyt_agrees_played = False
+
+    if eng_word and nyt_word:
+        engine_agrees_nyt = (eng_word == nyt_word)
+    if eng_word and not is_exchange:
+        engine_agrees_played = moves_match(
+            eng_word, eng_row, eng_col, eng_dir,
+            played_word, played_row, played_col, played_dir)
+    if nyt_word and not is_exchange:
+        nyt_agrees_played = (nyt_word == played_word)
+
+    result = {
+        'turn': turn_num,
+        'skipped': False,
+        'rack': rack,
+        'bag_size': bag_size,
+        'eval_type': eval_type,
+        'elapsed_s': round(elapsed, 1),
+        # What was played
+        'played': played_word,
+        'played_score': played_score,
+        'played_row': played_row,
+        'played_col': played_col,
+        'played_dir': played_dir,
+        'is_exchange': is_exchange,
+        # NYT recommendation
+        'nyt_word': nyt_word,
+        'nyt_score': nyt_score,
+        'nyt_rating': nyt_rating,
+        'nyt_strategy': nyt_strategy,
+        # Engine recommendation (MC/endgame top pick)
+        'engine_word': eng_word,
+        'engine_score': eng_score,
+        'engine_equity': round(eng_equity, 1) if eng_equity is not None else None,
+        'engine_risk_eq': round(eng_risk_eq, 1) if eng_risk_eq is not None else None,
+        # Engine top 3
+        'engine_top3': [
+            {
+                'word': t['word'],
+                'score': t['score'],
+                'equity': round(t.get('equity', 0), 1),
+                'risk_eq': round(t.get('risk_eq', t.get('equity', 0)), 1),
+                'row': t['row'],
+                'col': t['col'],
+                'dir': t.get('dir'),
+            }
+            for t in [engine_top, engine_top2, engine_top3]
+            if t is not None
+        ],
+        # Agreements
+        'engine_agrees_nyt': engine_agrees_nyt,
+        'engine_agrees_played': engine_agrees_played,
+        'nyt_agrees_played': nyt_agrees_played,
+        'all_three_agree': engine_agrees_nyt and engine_agrees_played and nyt_agrees_played,
+    }
 
     return result
 
 
+def run_game(game_id, records, quiet=False):
+    """Run full analysis on all your-move positions in a game."""
+    from .game_manager import Game
+
+    rec = records[game_id]
+    moves = rec['moves']
+
+    # Find all analyzable positions (your moves with rack)
+    positions = []
+    for i, m in enumerate(moves):
+        if m.get('player') == 'me' and m.get('rack'):
+            positions.append(i + 1)  # 1-indexed
+
+    if not positions:
+        print("  No analyzable positions in %s" % game_id)
+        return {'game_id': game_id, 'positions': [], 'skipped': True}
+
+    print("=" * 70)
+    print("GAME: %s vs %s -- %s %d-%d (%+d)" % (
+        game_id, rec.get('opponent', '?'),
+        rec.get('result', '?').upper(),
+        rec.get('your_score', 0), rec.get('opp_score', 0),
+        rec.get('spread', 0)))
+    print("  NYT Strategy: %s/%s" % (
+        rec.get('nyt_strategy_you', '?'), rec.get('nyt_strategy_opp', '?')))
+    print("  Positions to analyze: %d" % len(positions))
+    print("=" * 70)
+
+    # Create ONE Game object, reuse for all positions (avoid re-loading GADDAG)
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    game = Game()
+    sys.stdout = old_stdout
+
+    results = []
+    for pos_num, turn in enumerate(positions):
+        move = moves[turn - 1]
+        played = move.get('word', '?')
+        score = move.get('score', 0)
+        nyt = move.get('nyt', {})
+        nyt_word = nyt.get('word', '?') if nyt else '?'
+        nyt_rating = move.get('nyt_rating', '')
+
+        print("\n  [%d/%d] T%d: %s(%d) | NYT: %s | Rating: %s | Rack: %s" % (
+            pos_num + 1, len(positions), turn, played, score,
+            nyt_word, nyt_rating, move.get('rack', '?')))
+
+        t0 = time.time()
+        result = analyze_position(rec, turn, game, quiet=quiet)
+        elapsed = time.time() - t0
+
+        if result.get('skipped'):
+            print("    SKIPPED: %s" % result.get('reason', '?'))
+        else:
+            eng = result.get('engine_word') or '?'
+            eng_eq = result.get('engine_equity') or 0
+            eng_score = result.get('engine_score') or 0
+            e_n = "Y" if result.get('engine_agrees_nyt') else "N"
+            e_p = "Y" if result.get('engine_agrees_played') else "N"
+            print("    -> Engine: %s(%d, %.1feq) | E=NYT:%s E=Play:%s | %.1fs" % (
+                eng, eng_score, eng_eq, e_n, e_p, elapsed))
+
+        results.append(result)
+
+    # Compute game summary
+    analyzed = [r for r in results if not r.get('skipped')]
+    if analyzed:
+        eng_nyt = sum(1 for r in analyzed if r.get('engine_agrees_nyt'))
+        eng_play = sum(1 for r in analyzed if r.get('engine_agrees_played'))
+        nyt_play = sum(1 for r in analyzed if r.get('nyt_agrees_played'))
+        all3 = sum(1 for r in analyzed if r.get('all_three_agree'))
+        n = len(analyzed)
+
+        # Equity over played: engine equity - played score (approximation)
+        # More meaningful: how often engine top pick != played
+        engine_different = sum(1 for r in analyzed
+                               if not r.get('engine_agrees_played') and not r.get('is_exchange'))
+
+        # Avg time
+        avg_time = sum(r.get('elapsed_s', 0) for r in analyzed) / n
+
+        summary = {
+            'game_id': game_id,
+            'opponent': rec.get('opponent'),
+            'result': rec.get('result'),
+            'your_score': rec.get('your_score'),
+            'opp_score': rec.get('opp_score'),
+            'spread': rec.get('spread'),
+            'nyt_strategy_you': rec.get('nyt_strategy_you'),
+            'nyt_strategy_opp': rec.get('nyt_strategy_opp'),
+            'positions_analyzed': n,
+            'positions_skipped': len(results) - n,
+            'engine_agrees_nyt': eng_nyt,
+            'engine_agrees_nyt_pct': round(100 * eng_nyt / n, 1),
+            'engine_agrees_played': eng_play,
+            'engine_agrees_played_pct': round(100 * eng_play / n, 1),
+            'nyt_agrees_played': nyt_play,
+            'nyt_agrees_played_pct': round(100 * nyt_play / n, 1),
+            'all_three_agree': all3,
+            'all_three_agree_pct': round(100 * all3 / n, 1),
+            'engine_would_change': engine_different,
+            'avg_time_per_position': round(avg_time, 1),
+            'total_time': round(sum(r.get('elapsed_s', 0) for r in analyzed), 1),
+        }
+
+        print()
+        print("-" * 70)
+        print("  GAME SUMMARY: %s" % game_id)
+        print("  Analyzed: %d positions" % n)
+        print("  Engine agrees with NYT:  %d/%d (%.1f%%)" % (eng_nyt, n, 100*eng_nyt/n))
+        print("  Engine agrees with play: %d/%d (%.1f%%)" % (eng_play, n, 100*eng_play/n))
+        print("  NYT agrees with play:    %d/%d (%.1f%%)" % (nyt_play, n, 100*nyt_play/n))
+        print("  All three agree:         %d/%d (%.1f%%)" % (all3, n, 100*all3/n))
+        print("  Engine would change:     %d moves" % engine_different)
+        print("  Avg time/position:       %.1fs" % avg_time)
+        print("-" * 70)
+    else:
+        summary = {'game_id': game_id, 'positions_analyzed': 0, 'skipped': True}
+
+    return {
+        'summary': summary,
+        'positions': results,
+    }
+
+
+def print_aggregate(game_results):
+    """Print aggregate summary across all games."""
+    all_positions = []
+    for gr in game_results:
+        all_positions.extend([r for r in gr.get('positions', []) if not r.get('skipped')])
+
+    if not all_positions:
+        print("No positions analyzed.")
+        return
+
+    n = len(all_positions)
+    eng_nyt = sum(1 for r in all_positions if r.get('engine_agrees_nyt'))
+    eng_play = sum(1 for r in all_positions if r.get('engine_agrees_played'))
+    nyt_play = sum(1 for r in all_positions if r.get('nyt_agrees_played'))
+    all3 = sum(1 for r in all_positions if r.get('all_three_agree'))
+
+    # Disagreement breakdown
+    eng_diff_nyt = [r for r in all_positions
+                    if not r.get('engine_agrees_nyt') and r.get('nyt_word')]
+
+    print()
+    print("#" * 70)
+    print("  AGGREGATE DEEP DIVE -- %d games, %d positions" % (
+        len(game_results), n))
+    print("#" * 70)
+    print()
+    print("  Engine agrees with NYT:  %d/%d (%.1f%%)" % (eng_nyt, n, 100*eng_nyt/n))
+    print("  Engine agrees with play: %d/%d (%.1f%%)" % (eng_play, n, 100*eng_play/n))
+    print("  NYT agrees with play:    %d/%d (%.1f%%)" % (nyt_play, n, 100*nyt_play/n))
+    print("  All three agree:         %d/%d (%.1f%%)" % (all3, n, 100*all3/n))
+    print()
+
+    # Top disagreements by equity gap
+    if eng_diff_nyt:
+        print("  Engine-vs-NYT disagreements (top 15 by equity):")
+        # Sort by engine equity descending (engine's confidence in its pick)
+        sorted_dis = sorted(eng_diff_nyt,
+                            key=lambda r: abs((r.get('engine_equity') or 0) - (r.get('nyt_score') or 0)),
+                            reverse=True)
+        for r in sorted_dis[:15]:
+            gid = r.get('game_id', '?')
+            print("    %s T%d: Engine=%s(%s/%.1feq) vs NYT=%s(%s) | Played=%s(%d) | %s" % (
+                gid, r['turn'],
+                r.get('engine_word') or '?', r.get('engine_score') or '?',
+                r.get('engine_equity') or 0,
+                r.get('nyt_word') or '?', r.get('nyt_score') or '?',
+                r.get('played') or '?', r.get('played_score') or 0,
+                r.get('eval_type', '?')))
+
+    # Eval type breakdown
+    types = {}
+    for r in all_positions:
+        t = r.get('eval_type', 'unknown')
+        types[t] = types.get(t, 0) + 1
+    print()
+    print("  Evaluation types: %s" % ', '.join('%s=%d' % (k, v) for k, v in sorted(types.items())))
+
+    # Total time
+    total_t = sum(r.get('elapsed_s', 0) for r in all_positions)
+    print("  Total analysis time: %.1fs (%.1f min)" % (total_t, total_t / 60))
+
+
+def save_results(game_results, output_dir=None):
+    """Save results to JSON."""
+    if output_dir is None:
+        output_dir = os.path.join(os.path.dirname(__file__), 'games', 'analysis')
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Per-game files
+    for gr in game_results:
+        gid = gr.get('summary', {}).get('game_id', 'unknown')
+        path = os.path.join(output_dir, '%s_deepdive.json' % gid)
+        with open(path, 'w') as f:
+            json.dump(gr, f, indent=2)
+        print("  Saved: %s" % path)
+
+    # Aggregate summary
+    summaries = [gr['summary'] for gr in game_results if 'summary' in gr]
+    agg_path = os.path.join(output_dir, 'deepdive_summary.json')
+    with open(agg_path, 'w') as f:
+        json.dump({
+            'generated': datetime.now().isoformat(),
+            'engine_version': '18.0.0',
+            'games': summaries,
+        }, f, indent=2)
+    print("  Saved: %s" % agg_path)
+
+
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description='Deep dive on engine vs NYT disagreements')
-    parser.add_argument('--position', type=int, default=None,
-                        help='Run only position N (1-indexed)')
+    parser = argparse.ArgumentParser(description='Full MC deep dive on NYT games')
+    parser.add_argument('--game', type=str, default=None,
+                        help='Run only the specified game ID')
+    parser.add_argument('--save', action='store_true',
+                        help='Save JSON results to games/analysis/')
+    parser.add_argument('--quiet', action='store_true',
+                        help='Suppress per-position analyze() output')
     args = parser.parse_args()
 
     records = load_archive()
 
-    if args.position:
-        idx = args.position - 1
-        if idx < 0 or idx >= len(POSITIONS):
-            print("Position must be 1-%d" % len(POSITIONS))
+    # Find games with NYT data
+    nyt_games = [gid for gid, rec in records.items() if rec.get('nyt_strategy_you')]
+
+    if args.game:
+        if args.game not in records:
+            print("Game %s not found in archive" % args.game)
             return
-        run_position(idx, records)
-    else:
-        print("NYT DEEP DIVE ANALYSIS")
-        print("Running full MC 2-ply on %d positions" % len(POSITIONS))
-        print("This will take several minutes...")
-        print()
+        nyt_games = [args.game]
 
-        t_total = time.time()
-        for i in range(len(POSITIONS)):
-            run_position(i, records)
+    if not nyt_games:
+        print("No games with NYT data found")
+        return
 
-        elapsed = time.time() - t_total
+    print("NYT DEEP DIVE ANALYSIS (FULL MC 2-PLY)")
+    print("Games: %s" % ', '.join(nyt_games))
+
+    # Count total positions
+    total_pos = 0
+    for gid in nyt_games:
+        rec = records[gid]
+        total_pos += sum(1 for m in rec['moves']
+                         if m.get('player') == 'me' and m.get('rack'))
+    print("Total positions: %d (estimated %d-%d minutes)" % (
+        total_pos, total_pos * 20 // 60, total_pos * 40 // 60))
+    print()
+
+    t_total = time.time()
+    game_results = []
+    for gid in nyt_games:
+        result = run_game(gid, records, quiet=args.quiet)
+        # Tag positions with game_id for aggregate reporting
+        for pos in result.get('positions', []):
+            pos['game_id'] = gid
+        game_results.append(result)
+
+    elapsed = time.time() - t_total
+    print_aggregate(game_results)
+
+    print()
+    print("=" * 70)
+    print("ALL GAMES COMPLETE in %.1fs (%.1f min)" % (elapsed, elapsed / 60))
+    print("=" * 70)
+
+    if args.save:
         print()
-        print("=" * 70)
-        print("ALL %d POSITIONS COMPLETE in %.1fs (%.1f min)" % (
-            len(POSITIONS), elapsed, elapsed / 60))
-        print("=" * 70)
+        save_results(game_results)
 
 
 if __name__ == '__main__':
