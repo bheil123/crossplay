@@ -74,7 +74,30 @@ class TileTracker:
         for tile in self.your_rack:
             self.remaining[tile] -= 1
         self.remaining['?'] -= blanks_in_rack
-    
+
+        # Validate: total accounted tiles must not exceed TOTAL_TILES (100)
+        # If any remaining count is negative, more tiles are accounted for
+        # than exist -- likely a missing blank in blank_positions
+        tiles_on_board = sum(self.on_board.values()) + len(self.blanks_on_board)
+        tiles_in_rack = len(self.your_rack) + self.blanks_in_rack
+        tiles_unseen = sum(v for v in self.remaining.values() if v > 0)
+        total_accounted = tiles_on_board + tiles_in_rack + tiles_unseen
+
+        negative_tiles = {k: v for k, v in self.remaining.items() if v < 0}
+        if negative_tiles:
+            over_letters = ", ".join(
+                f"{k}(over by {-v})" for k, v in sorted(negative_tiles.items())
+            )
+            print(f"[!] TILE TRACKING ERROR: Over-counted tiles: {over_letters}")
+            print(f"    Board: {tiles_on_board}, Rack: {tiles_in_rack}, "
+                  f"Unseen: {tiles_unseen}, Total: {total_accounted} "
+                  f"(max {TOTAL_TILES})")
+            print(f"    -> Check blank_positions: are all blanks on the board tracked?")
+            print(f"    -> Blanks tracked: {len(self.blanks_on_board)} on board, "
+                  f"{self.blanks_in_rack} in rack, "
+                  f"{self.remaining.get('?', 0)} unseen "
+                  f"(should sum to {TILE_DISTRIBUTION['?']})")
+
     def get_unseen_count(self) -> int:
         """Total unseen tiles (bag + opponent rack)."""
         return sum(self.remaining.values())

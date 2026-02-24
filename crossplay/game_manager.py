@@ -272,34 +272,35 @@ class Game:
         """Check if this game is complete, using game-over rules.
 
         A game is over when:
-        - Bag is empty and one player has no tiles, OR
-        - 6 consecutive passes (detected via notes)
-
-        For saved games, remaining = bag + opp_rack. We detect:
-        - your_rack < RACK_SIZE means bag was empty on last draw
-        - remaining = 0 means opponent also has no tiles (they went out)
-        - your_rack empty means you went out
+        - Both players have taken their final turns after the bag emptied, OR
+        - 6 consecutive passes (detected via notes), OR
         - Notes explicitly say COMPLETED
+
+        Crossplay endgame: both players get one final turn after the bag
+        empties. final_turns_remaining tracks this: None = mid-game,
+        2 = bag just emptied (2 final turns left), 1 = one final turn
+        left, 0 = game over. We must NOT archive while final turns remain.
         """
         s = self.state
+        # Explicit completion marker
+        if 'COMPLETED' in s.notes.upper():
+            return True
+        # If final_turns_remaining is actively tracking endgame, respect it
+        if s.final_turns_remaining is not None:
+            return s.final_turns_remaining <= 0
+        # Mid-game checks (final_turns_remaining is None = bag not empty yet)
         # Compute remaining unseen tiles (bag + opp_rack) from board state
         _trk = TileTracker()
         _trk.sync_with_board(self.board, your_rack=s.your_rack or "",
                              blanks_in_rack=(s.your_rack or "").count('?'),
                              blank_positions=s.blank_positions)
         remaining = _trk.get_unseen_count()  # bag + opp_rack
-        # Explicit completion marker
-        if 'COMPLETED' in s.notes.upper():
-            return True
-        # You went out (empty rack, bag was already empty)
-        if len(s.your_rack) == 0:
+        # You went out (empty rack AND bag was already empty)
+        # Note: empty rack with tiles remaining just means rack hasn't been set
+        if len(s.your_rack or "") == 0 and remaining <= RACK_SIZE:
             return True
         # Opponent went out (no unaccounted tiles remain)
-        if remaining == 0 and len(s.your_rack) > 0:
-            return True
-        # Rack below full size means bag was empty on last draw;
-        # if remaining tiles fit in one rack, game is in final stage
-        if len(s.your_rack) < RACK_SIZE and remaining <= RACK_SIZE:
+        if remaining == 0 and len(s.your_rack or "") > 0:
             return True
         return False
 
@@ -3267,7 +3268,6 @@ class GameManager:
             your_score=0,
             opp_score=0,
             your_rack="",
-            bag=[],
             is_your_turn=True,
             opponent_name=opponent_name,
             created_at=datetime.now().isoformat(),

@@ -119,7 +119,9 @@
       "player": "me",
       "score": 48,
       "bag": 57,
-      "blanks": [5],
+      "blanks": [
+        5
+      ],
       "cumulative": [
         106,
         66
@@ -178,6 +180,50 @@
       "engine_version": "18.0.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "MINK",
+      "row": 7,
+      "col": 5,
+      "dir": "V",
+      "player": "opp",
+      "score": 23,
+      "bag": 46,
+      "blanks": [],
+      "cumulative": [
+        138,
+        116
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-23T22:16:54.565604",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "VEGA",
+      "row": 11,
+      "col": 4,
+      "dir": "H",
+      "player": "me",
+      "score": 32,
+      "bag": 42,
+      "blanks": [],
+      "cumulative": [
+        170,
+        116
+      ],
+      "rack": "IVAGYOE",
+      "drawn": "BLAE",
+      "note": "",
+      "timestamp": "2026-02-23T22:20:42.966808",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -192,17 +238,17 @@
       "I"
     ]
   ],
-  "your_score": 138,
-  "opp_score": 93,
-  "your_rack": "IVAGYOE",
+  "your_score": 170,
+  "opp_score": 116,
+  "your_rack": "IBLAYOE",
   "is_your_turn": false,
   "opponent_name": "katie",
   "created_at": "2026-02-22T13:00:00.000000",
-  "updated_at": "2026-02-23T07:31:55.814783",
+  "updated_at": "2026-02-23T22:20:43.451808",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "katie_002",
   "status": "active",
-  "spread": 45,
-  "move_count": 8
+  "spread": 54,
+  "move_count": 10
 }
