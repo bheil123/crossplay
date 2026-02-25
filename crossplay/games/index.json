@@ -1,6 +1,6 @@
 {
   "slots": {
-    "1": null,
+    "1": "dforb_001",
     "2": "melain_002",
     "3": "joybells27_004",
     "4": "sophie_003",
@@ -16,7 +16,8 @@
     "pkp8": 2,
     "joybells27": 4,
     "katie": 2,
-    "piph": 1
+    "piph": 1,
+    "dforb": 1
   },
   "opponent_notes": {}
 }

@@ -88,20 +88,250 @@
       "engine_version": "18.0.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "WAIR",
+      "row": 2,
+      "col": 9,
+      "dir": "V",
+      "player": "opp",
+      "score": 24,
+      "bag": 66,
+      "blanks": [],
+      "cumulative": [
+        48,
+        75
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-24T14:39:46.768550",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "BEG",
+      "row": 5,
+      "col": 10,
+      "dir": "V",
+      "player": "me",
+      "score": 31,
+      "bag": 63,
+      "blanks": [],
+      "cumulative": [
+        79,
+        75
+      ],
+      "rack": "EVEPVGB",
+      "drawn": "OPDR",
+      "note": "",
+      "timestamp": "2026-02-24T14:42:09.762710",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "QUESTS",
+      "row": 9,
+      "col": 2,
+      "dir": "V",
+      "player": "opp",
+      "score": 32,
+      "bag": 58,
+      "blanks": [],
+      "cumulative": [
+        79,
+        107
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-24T15:43:52.993131",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "VERVE",
+      "row": 7,
+      "col": 2,
+      "dir": "H",
+      "player": "me",
+      "score": 35,
+      "bag": 54,
+      "blanks": [],
+      "cumulative": [
+        114,
+        107
+      ],
+      "rack": "EVOPVDR",
+      "drawn": "AIN?",
+      "note": "",
+      "timestamp": "2026-02-24T15:46:52.130806",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "FOE",
+      "row": 11,
+      "col": 1,
+      "dir": "V",
+      "player": "opp",
+      "score": 31,
+      "bag": 50,
+      "blanks": [],
+      "cumulative": [
+        114,
+        138
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-24T16:04:24.123251",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "DIPNOAN",
+      "row": 6,
+      "col": 11,
+      "dir": "V",
+      "player": "me",
+      "score": 67,
+      "bag": 44,
+      "blanks": [
+        12,
+        11,
+        "N"
+      ],
+      "cumulative": [
+        181,
+        138
+      ],
+      "rack": "AOPIDN?",
+      "drawn": "OAARALF",
+      "note": "bingo",
+      "timestamp": "2026-02-24T16:08:10.069069",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "TAXED",
+      "row": 11,
+      "col": 12,
+      "dir": "V",
+      "player": "opp",
+      "score": 46,
+      "bag": 39,
+      "blanks": [],
+      "cumulative": [
+        181,
+        184
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-24T17:47:39.745486",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "ALFA",
+      "row": 9,
+      "col": 10,
+      "dir": "V",
+      "player": "me",
+      "score": 37,
+      "bag": 35,
+      "blanks": [],
+      "cumulative": [
+        218,
+        184
+      ],
+      "rack": "OAARALF",
+      "drawn": "NEIY",
+      "note": "",
+      "timestamp": "2026-02-24T17:54:03.861738",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "ZONE",
+      "row": 14,
+      "col": 9,
+      "dir": "H",
+      "player": "opp",
+      "score": 33,
+      "bag": 32,
+      "blanks": [],
+      "cumulative": [
+        218,
+        217
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-24T17:58:24.542495",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "NAY",
+      "row": 7,
+      "col": 12,
+      "dir": "V",
+      "player": "me",
+      "score": 32,
+      "bag": 29,
+      "blanks": [],
+      "cumulative": [
+        250,
+        217
+      ],
+      "rack": "ONAREIY",
+      "drawn": "GMT",
+      "note": "",
+      "timestamp": "2026-02-24T18:06:19.627632",
+      "engine": null,
+      "engine_version": "18.0.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
-  "blank_positions": [],
-  "your_score": 48,
-  "opp_score": 51,
-  "your_rack": "EVEPVGB",
+  "blank_positions": [
+    [
+      12,
+      11,
+      "N"
+    ]
+  ],
+  "your_score": 250,
+  "opp_score": 217,
+  "your_rack": "OGMREIT",
   "is_your_turn": false,
   "opponent_name": "joybells27",
   "created_at": "2026-02-24T08:55:51.252021",
-  "updated_at": "2026-02-24T14:10:07.481826",
+  "updated_at": "2026-02-24T18:06:20.058201",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "joybells27_004",
   "status": "active",
-  "spread": -3,
-  "move_count": 4
+  "spread": 33,
+  "move_count": 14
 }
