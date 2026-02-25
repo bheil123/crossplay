@@ -41,6 +41,7 @@ from .config import (
     TILE_VALUES, VALID_TWO_LETTER, BINGO_BONUS, RACK_SIZE,
     MC_ES_MIN_SIMS, MC_ES_CHECK_EVERY, MC_ES_SE_THRESHOLD,
     MC_CEILING_K, MC_PROBE_COUNT, MC_SLOW_BOARD_MS, MC_TOTAL_TIMEOUT,
+    BLANK_3PLY_K_SIMS, BLANK_3PLY_TIME_BUDGET,
 )
 
 
@@ -1263,3 +1264,325 @@ def quick_mc_analysis(board: Board, rack: str, unseen_str: str,
         for resp in best['top_opp_responses'][:3]:
             pos = f"R{resp['row']}C{resp['col']} {resp['direction']}"
             print(f"  {resp['word']} @ {pos} = {resp['score']} pts")
+
+
+# ---------------------------------------------------------------------------
+# Blank Strategy 3-Ply: MC evaluation with ply 3 (your follow-up move)
+# ---------------------------------------------------------------------------
+
+def _mc_eval_3ply_blank_candidate(args: tuple) -> dict:
+    """
+    MC 3-ply evaluation of one candidate for blank strategy analysis.
+
+    For each simulation:
+      1. Reconstruct board, place candidate move
+      2. Sample opponent rack from unseen
+      3. Find opponent's best response (ply 2)
+      4. Place opponent's move on the board
+      5. Simulate your tile draw (leave + drawn from remaining bag)
+      6. Find your best follow-up (ply 3) on the double-modified board
+      7. Record net: your_score - opp_score + followup_score
+      8. Undo both moves
+
+    Args (packed as tuple):
+        board_moves:    list of (word, row, col, horizontal) to reconstruct board
+        move:           dict with word, row, col, direction, score, tiles_used, leave
+        unseen_pool:    list of individual unseen tile characters
+        your_rack:      your rack string
+        board_blanks:   list of (row, col, letter) for blanks on board
+        k_sims:         number of MC iterations
+        seed:           random seed
+        bag_size:       tiles in bag (unseen - 7)
+
+    Returns:
+        dict with 3-ply MC statistics
+    """
+    (board_moves, move, unseen_pool, your_rack, board_blanks,
+     k_sims, seed, bag_size) = args
+
+    if seed is not None:
+        random.seed(seed)
+
+    # Use module-level cached GADDAG
+    global _mc_worker_gaddag, _mc_worker_gdata_bytes, _mc_worker_set_dict
+    if _mc_worker_gaddag is None:
+        from .gaddag import get_gaddag
+        _mc_worker_gaddag = get_gaddag()
+        _mc_worker_gdata_bytes = bytes(_mc_worker_gaddag._data)
+        from .move_finder_c import _get_dict
+        _d = _get_dict()
+        class _SetDict:
+            __slots__ = ('is_valid',)
+            def __init__(self, s): self.is_valid = s.__contains__
+        _mc_worker_set_dict = _SetDict(_d._words)
+    gaddag = _mc_worker_gaddag
+
+    # Reconstruct board
+    from .board import Board
+    board = Board()
+    for word, row, col, horiz in board_moves:
+        board.place_word(word, row, col, horiz)
+
+    # Place our candidate move (ply 1)
+    horizontal = move['direction'] == 'H'
+    placed_1 = board.place_move(move['word'], move['row'], move['col'], horizontal)
+
+    # Compute leave and tiles used
+    tiles_used = move.get('tiles_used', move.get('used', move['word']))
+    leave = _get_leave(your_rack, tiles_used)
+    tiles_used_count = len(tiles_used)
+
+    # Update blank set after our move (blanks we placed)
+    blanks_after_1 = set()
+    for r, c, _ in (board_blanks or []):
+        blanks_after_1.add((r - 1, c - 1))
+    blanks_used_indices = move.get('blanks_used', [])
+    for idx in blanks_used_indices:
+        if horizontal:
+            br, bc = move['row'] - 1, move['col'] - 1 + idx
+        else:
+            br, bc = move['row'] - 1 + idx, move['col'] - 1
+        blanks_after_1.add((br, bc))
+
+    # Build ply-2 board context (after our move)
+    global _mc_worker_cython_fast, _mc_worker_word_set
+    _use_cython = _mc_worker_cython_fast and _mc_worker_gdata_bytes is not None
+
+    _grid = board._grid
+    pool_size = len(unseen_pool)
+    rack_size = min(7, pool_size)
+
+    if _use_cython:
+        import gaddag_accel as _accel
+        ctx_ply2 = _accel.prepare_board_context(
+            _grid, _mc_worker_gdata_bytes, blanks_after_1,
+            _mc_worker_word_set, VALID_TWO_LETTER,
+            _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
+    else:
+        from .move_finder_opt import find_best_score_opt
+        from .dictionary import get_dictionary as _get_dict_py
+        _dict_py = _get_dict_py()
+
+    # Early stopping tracking
+    _running_sum = 0.0
+    _running_sum_sq = 0.0
+    opp_score_total = 0.0
+    followup_score_total = 0.0
+    n_sims = 0
+
+    sim_i = 0
+    effective_k = k_sims
+
+    while sim_i < effective_k:
+        # Early stopping convergence check (SE < 2.0 for 3-ply higher variance)
+        if sim_i >= MC_ES_MIN_SIMS and sim_i % MC_ES_CHECK_EVERY == 0:
+            _variance = (_running_sum_sq / sim_i) - (_running_sum / sim_i) ** 2
+            if _variance > 0:
+                _se = (_variance / sim_i) ** 0.5
+                if _se < 2.0:
+                    break
+
+        # Sample opponent rack (ply 2)
+        opp_rack_list = random.sample(unseen_pool, rack_size)
+        opp_rack = ''.join(opp_rack_list)
+
+        # Find opponent's best move on post-ply1 board
+        if _use_cython:
+            opp_score, opp_word, opp_row, opp_col, opp_dir = _accel.find_best_score_c(
+                ctx_ply2, opp_rack)
+        else:
+            opp_score, opp_word, opp_row, opp_col, opp_dir = find_best_score_opt(
+                _grid, gaddag._data, opp_rack, blanks_after_1,
+                dictionary=_dict_py)
+
+        # Place opponent's move (ply 2) if they scored
+        placed_2 = None
+        if opp_score > 0 and opp_word:
+            opp_horiz = (opp_dir == 'H' if isinstance(opp_dir, str) else opp_dir)
+            try:
+                placed_2 = board.place_move(opp_word, opp_row, opp_col, opp_horiz)
+            except Exception:
+                placed_2 = None
+
+        # Simulate tile draw for ply 3
+        # Bag = unseen minus opponent's rack
+        opp_rack_set = list(opp_rack_list)  # copy for removal
+        bag_tiles = list(unseen_pool)
+        for t in opp_rack_list:
+            if t in bag_tiles:
+                bag_tiles.remove(t)
+
+        draw_count = min(tiles_used_count, len(bag_tiles))
+        if draw_count > 0:
+            drawn = random.sample(bag_tiles, draw_count)
+        else:
+            drawn = []
+        ply3_rack = leave + ''.join(drawn)
+
+        # Find our best follow-up (ply 3) on the double-modified board
+        followup_score = 0
+        if ply3_rack and placed_2 is not None:
+            # Need fresh context for the board with both moves placed
+            blanks_ply3 = set(blanks_after_1)
+            # Add opponent blanks if they used any
+            # (simplified: opponent blanks are rare, skip tracking for perf)
+            if _use_cython:
+                ctx_ply3 = _accel.prepare_board_context(
+                    _grid, _mc_worker_gdata_bytes, blanks_ply3,
+                    _mc_worker_word_set, VALID_TWO_LETTER,
+                    _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
+                followup_score, _, _, _, _ = _accel.find_best_score_c(
+                    ctx_ply3, ply3_rack)
+            else:
+                followup_score, _, _, _, _ = find_best_score_opt(
+                    _grid, gaddag._data, ply3_rack, blanks_ply3,
+                    dictionary=_dict_py)
+        elif ply3_rack:
+            # Opponent didn't play (score 0) -- find our move on post-ply1 board
+            if _use_cython:
+                followup_score, _, _, _, _ = _accel.find_best_score_c(
+                    ctx_ply2, ply3_rack)
+            else:
+                followup_score, _, _, _, _ = find_best_score_opt(
+                    _grid, gaddag._data, ply3_rack, blanks_after_1,
+                    dictionary=_dict_py)
+
+        # Undo opponent's move
+        if placed_2 is not None:
+            board.undo_move(placed_2)
+
+        # Net equity for this sim
+        net = move['score'] - opp_score + followup_score
+        _running_sum += net
+        _running_sum_sq += net * net
+        opp_score_total += opp_score
+        followup_score_total += followup_score
+        n_sims += 1
+        sim_i += 1
+
+    # Undo our move
+    board.undo_move(placed_1)
+
+    # Compute stats
+    if n_sims == 0:
+        return {
+            'word': move['word'], 'row': move['row'], 'col': move['col'],
+            'direction': move['direction'], 'score': move['score'],
+            'blanks_used': len(blanks_used_indices),
+            'leave': leave, 'leave_has_blank': '?' in leave,
+            'avg_opp': 0.0, 'avg_followup': 0.0, 'net_3ply': float(move['score']),
+            'k_sims': 0,
+        }
+
+    avg_net = _running_sum / n_sims
+    avg_opp = opp_score_total / n_sims
+    avg_followup = followup_score_total / n_sims
+
+    return {
+        'word': move['word'],
+        'row': move['row'],
+        'col': move['col'],
+        'direction': move['direction'],
+        'score': move['score'],
+        'blanks_used': len(blanks_used_indices),
+        'leave': leave,
+        'leave_has_blank': '?' in leave,
+        'avg_opp': round(avg_opp, 1),
+        'avg_followup': round(avg_followup, 1),
+        'net_3ply': round(avg_net, 1),
+        'k_sims': n_sims,
+    }
+
+
+def mc_evaluate_3ply_blanks(
+    board: Board,
+    your_rack: str,
+    unseen_tiles_str: str,
+    candidates: List[Dict],
+    board_moves: List = None,
+    gaddag=None,
+    board_blanks: List[Tuple[int, int, str]] = None,
+    k_sims: int = BLANK_3PLY_K_SIMS,
+    time_budget: float = BLANK_3PLY_TIME_BUDGET,
+    max_workers: int = None,
+) -> List[Dict]:
+    """
+    3-ply MC evaluation for blank strategy analysis.
+
+    For each candidate, simulates: your move -> opp response -> your follow-up.
+    Compares net equity across blank-spending vs blank-saving plays.
+
+    Args:
+        board: Current board state
+        your_rack: Your rack string (with '?' for blanks)
+        unseen_tiles_str: All unseen tiles as string
+        candidates: Pre-selected candidate moves (from 2-ply MC results)
+        board_moves: Move history for board reconstruction in workers
+        gaddag: GADDAG instance (optional, for board_moves generation)
+        board_blanks: Blank positions on board
+        k_sims: Simulations per candidate
+        time_budget: Max seconds for the entire pass
+        max_workers: Worker count (None = auto)
+
+    Returns:
+        List of result dicts sorted by net_3ply descending
+    """
+    if not candidates:
+        return []
+
+    # Build board_moves tuples for worker board reconstruction
+    if board_moves is not None:
+        bm_tuples = []
+        for m in board_moves:
+            word = m.get('word', '')
+            row = m.get('row', 0)
+            col = m.get('col', 0)
+            d = m.get('dir', m.get('direction', 'H'))
+            horiz = d in ('H', True)
+            if word and row > 0 and col > 0:
+                bm_tuples.append((word, row, col, horiz))
+    else:
+        bm_tuples = []
+
+    unseen_pool = _expand_unseen_to_pool(unseen_tiles_str)
+    bag_size = len(unseen_pool) - 7  # unseen minus opponent rack
+
+    # Build args for each candidate
+    args_list = []
+    for i, move in enumerate(candidates):
+        args_list.append((
+            bm_tuples, move, unseen_pool, your_rack,
+            board_blanks, k_sims, i * 31337, bag_size
+        ))
+
+    # Run in parallel using existing pool
+    t0 = time.time()
+    try:
+        pool = _get_mc_pool(max_workers)
+        total = len(args_list)
+        futures = {pool.submit(_mc_eval_3ply_blank_candidate, args): i
+                   for i, args in enumerate(args_list)}
+        results = []
+        try:
+            for i, future in enumerate(as_completed(futures, timeout=time_budget)):
+                results.append(future.result())
+                elapsed = time.time() - t0
+                pct = (i + 1) / total
+                filled = int(20 * pct)
+                bar = '#' * filled + '-' * (20 - filled)
+                if i + 1 == total or int(pct * 4) > int(i / total * 4):
+                    print(f"  3ply [{bar}] {i+1}/{total}  {elapsed:.0f}s")
+        except TimeoutError:
+            for f in futures:
+                f.cancel()
+            elapsed = time.time() - t0
+            print(f"  3ply timeout after {elapsed:.0f}s -- {len(results)}/{total}")
+
+        results.sort(key=lambda x: -x['net_3ply'])
+        return results
+
+    except Exception as e:
+        print(f"[!] Blank 3-ply eval failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return []

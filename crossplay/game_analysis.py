@@ -24,6 +24,8 @@ from .config import (
     LATE_GAME_UNSEEN_THRESHOLD, CATCHUP_DEFICIT_THRESHOLD,
     HIGH_VARIANCE_DEFICIT_THRESHOLD, POWER_TILE_PROB_THRESHOLD,
     BLOCKING_BONUSES,
+    BLANK_3PLY_MIN_BLANKS, BLANK_3PLY_MIN_BAG,
+    BLANK_3PLY_TOP_N, BLANK_3PLY_FORCE_SAVERS,
 )
 from .nyt_filter import nyt_warning, is_nyt_curated
 from .analysis_lock import acquire_lock, release_lock
@@ -917,10 +919,15 @@ class GameAnalysisMixin:
             
             # Catch-up advice for late game when far behind
             self._show_catchup_advice(unseen, total_unseen, results)
-            
+
+            # Blank strategy 3-ply: when rack has 2+ blanks, compare spend vs save
+            bag_size = total_unseen - 7  # unseen minus opponent rack
+            blanks_in_rack = rack.count('?')
+            if blanks_in_rack >= BLANK_3PLY_MIN_BLANKS and bag_size > BLANK_3PLY_MIN_BAG:
+                self._show_blank_3ply_analysis(rack, unseen_str, total_unseen, results, bag_size)
+
             # 3-ply analysis for late game (<=12 in bag)
             # Budget: 20s total minus MC time already spent
-            bag_size = total_unseen - 7  # unseen minus opponent rack
             if bag_size <= 12 and bag_size >= 0:
                 remaining_budget = max(2.0, THREE_PLY_TIME_BUDGET - t_mc)
                 self._show_3ply_analysis(rack, unseen_str, total_unseen, time_budget=remaining_budget)
@@ -1132,6 +1139,139 @@ class GameAnalysisMixin:
             print("   [INFO] DOWN 50-100: Balance scoring with power tile chances.")
             print("      Plays that empty your rack give more lottery tickets.")
     
+    def _show_blank_3ply_analysis(self, rack: str, unseen_str: str, total_unseen: int,
+                                   mc_results: list, bag_size: int):
+        """Show 3-ply blank strategy comparison when rack has 2+ blanks.
+
+        Compares spending both blanks now vs saving one for next turn.
+        Runs after MC 2-ply to provide supplementary 3-ply insight.
+        """
+        from .mc_eval import mc_evaluate_3ply_blanks, _get_leave
+        from .board import tiles_used as _board_tiles_used
+
+        blanks_total = rack.count('?')
+
+        # Select candidates: top N from MC + force-include blank-savers
+        top_mc = mc_results[:BLANK_3PLY_TOP_N]
+        top_mc_keys = {(m['word'], m['row'], m['col']) for m in top_mc}
+
+        blank_savers = []
+        for m in mc_results:
+            if len(blank_savers) >= BLANK_3PLY_FORCE_SAVERS:
+                break
+            key = (m['word'], m['row'], m['col'])
+            if key not in top_mc_keys and '?' in m.get('leave', ''):
+                blank_savers.append(m)
+
+        # If no blank-savers in MC results, generate them from the move finder
+        if not blank_savers:
+            try:
+                finder = GADDAGMoveFinder(self.board, self.gaddag,
+                                          board_blanks=self.state.blank_positions)
+                all_moves = finder.find_all_moves(rack)
+                # Find moves that leave at least one blank
+                saver_candidates = []
+                for m in all_moves:
+                    horizontal = m['direction'] == 'H'
+                    used = _board_tiles_used(self.board, m['word'], m['row'],
+                                             m['col'], horizontal)
+                    used_str = ''.join(used)
+                    leave = _get_leave(rack, used_str)
+                    if '?' in leave:
+                        m['tiles_used'] = used_str
+                        m['leave'] = leave
+                        saver_candidates.append(m)
+                # Take best by score
+                saver_candidates.sort(key=lambda x: -x['score'])
+                for m in saver_candidates[:BLANK_3PLY_FORCE_SAVERS]:
+                    key = (m['word'], m['row'], m['col'])
+                    if key not in top_mc_keys:
+                        blank_savers.append(m)
+            except Exception:
+                pass  # If move generation fails, proceed without savers
+
+        candidates = top_mc + blank_savers
+        if not candidates:
+            return
+
+        n_cands = len(candidates)
+        print(f"\n{'='*70}")
+        print(f"BLANK STRATEGY 3-PLY ({blanks_total} blanks in rack, {n_cands} candidates)")
+        print(f"  Should you spend both blanks or save one?")
+        print("=" * 70)
+
+        try:
+            results = mc_evaluate_3ply_blanks(
+                self.board, rack, unseen_str, candidates,
+                board_moves=self.state.board_moves,
+                gaddag=self.gaddag,
+                board_blanks=self.state.blank_positions,
+            )
+        except Exception as e:
+            print(f"  [!] Blank 3-ply failed: {e}")
+            return
+
+        if not results:
+            print("  No results.")
+            return
+
+        # Build lookup for MC 2-ply equity
+        mc_eq_lookup = {}
+        for m in mc_results:
+            key = (m['word'], m['row'], m['col'])
+            mc_eq_lookup[key] = m.get('total_equity', 0)
+
+        # Display table
+        print()
+        print(f"{'#':<3} {'Word':<13} {'Pos':<11} {'Pts':>4} {'Blanks':>6} "
+              f"{'AvgOpp':>6} {'Follow':>6} {'3ply Net':>8} {'vs MC':>7}")
+        print("-" * 73)
+
+        best_3ply = results[0]['net_3ply']
+        best_saver = None
+        best_spender = None
+
+        for i, r in enumerate(results[:15]):
+            pos = f"R{r['row']}C{r['col']} {r['direction']}"
+            blanks_used = r.get('blanks_used', 0)
+            blanks_str = f"{blanks_used}/{blanks_total}"
+            mc_key = (r['word'], r['row'], r['col'])
+            mc_eq = mc_eq_lookup.get(mc_key, 0)
+            delta = r['net_3ply'] - mc_eq
+
+            marker = ''
+            if r['leave_has_blank'] and best_saver is None:
+                best_saver = r
+                marker = ' <-- saves blank'
+            elif not r['leave_has_blank'] and best_spender is None:
+                best_spender = r
+
+            print(f"{i+1:<3} {r['word']:<13} {pos:<11} {r['score']:>4} {blanks_str:>6} "
+                  f"{r['avg_opp']:>6.1f} {r['avg_followup']:>6.1f} "
+                  f"{r['net_3ply']:>+8.1f} {delta:>+7.1f}{marker}")
+
+        # Summary comparison
+        if best_saver and best_spender:
+            saver_net = best_saver['net_3ply']
+            spender_net = best_spender['net_3ply']
+            diff = saver_net - spender_net
+            print()
+            if diff > 2.0:
+                print(f"  ** SAVE A BLANK: {best_saver['word']} nets {diff:+.1f} more over 2 turns"
+                      f" than {best_spender['word']}")
+                print(f"     {best_spender['word']} scores +{best_spender['score'] - best_saver['score']}"
+                      f" more now but loses on follow-up ({best_saver['avg_followup']:.0f}"
+                      f" vs {best_spender['avg_followup']:.0f} avg next turn)")
+            elif diff < -2.0:
+                print(f"  ** SPEND BOTH: {best_spender['word']} nets {-diff:+.1f} more over 2 turns"
+                      f" than saving with {best_saver['word']}")
+            else:
+                print(f"  ** CLOSE CALL: Spending vs saving blanks within {abs(diff):.1f} pts"
+                      f" -- either approach is viable")
+        elif not blank_savers:
+            print()
+            print("  [INFO] No blank-saving moves in top candidates -- all plays use both blanks")
+
     def _show_3ply_analysis(self, rack: str, unseen_str: str, total_unseen: int, time_budget: float = 30.0):
         """Show 3-ply lookahead analysis for endgame (<=12 in bag)."""
         from .lookahead_3ply import evaluate_3ply

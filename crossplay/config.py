@@ -224,6 +224,17 @@ MC_SLOW_BOARD_MS: int = 20         # threshold (ms) for slow board detection
 MC_TOTAL_TIMEOUT: int = 90         # max seconds for entire MC phase (cancels stuck candidates)
 
 # =============================================================================
+# BLANK STRATEGY 3-PLY (triggered when rack has 2+ blanks)
+# =============================================================================
+
+BLANK_3PLY_MIN_BLANKS: int = 2       # blanks needed to trigger
+BLANK_3PLY_MIN_BAG: int = 9          # skip if bag <= 8 (near-endgame handles it)
+BLANK_3PLY_K_SIMS: int = 200         # MC sims per candidate
+BLANK_3PLY_TOP_N: int = 8            # top MC candidates to include
+BLANK_3PLY_FORCE_SAVERS: int = 4     # additional blank-saving candidates to force-include
+BLANK_3PLY_TIME_BUDGET: float = 25.0 # max seconds for entire blank 3-ply pass
+
+# =============================================================================
 # EXCHANGE EVALUATION
 # =============================================================================
 
