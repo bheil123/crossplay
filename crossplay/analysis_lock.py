@@ -12,13 +12,26 @@ LOCK_TIMEOUT = 300  # 5 minutes - stale lock detection
 
 
 def acquire_lock(purpose='game_analysis'):
-    """Request pause from training. Self-healing with timeout."""
+    """Request pause from training. Self-healing with timeout.
+
+    Uses exclusive file creation (O_CREAT | O_EXCL via 'x' mode) to avoid
+    TOCTOU race conditions. If the lock already exists (stale or active),
+    falls back to overwriting it since game analysis takes priority.
+    """
     LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LOCK_FILE.write_text(json.dumps({
+    lock_data = json.dumps({
         'acquired_at': time.time(),
         'purpose': purpose,
         'pid': os.getpid(),
-    }))
+    })
+    try:
+        # Atomic exclusive create -- fails if file already exists
+        with open(LOCK_FILE, 'x') as f:
+            f.write(lock_data)
+    except FileExistsError:
+        # Lock already held (stale or active) -- overwrite since analysis
+        # takes priority and stale locks should be replaced
+        LOCK_FILE.write_text(lock_data)
 
 
 def release_lock():

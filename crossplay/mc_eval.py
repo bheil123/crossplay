@@ -37,7 +37,14 @@ from .board import Board
 from .move_finder_gaddag import GADDAGMoveFinder
 from .gaddag import get_gaddag
 from .leave_eval import evaluate_leave
-from .config import TILE_VALUES, VALID_TWO_LETTER, BINGO_BONUS, RACK_SIZE
+from .config import (
+    TILE_VALUES, VALID_TWO_LETTER, BINGO_BONUS, RACK_SIZE,
+    MC_ES_MIN_SIMS, MC_ES_CHECK_EVERY, MC_ES_SE_THRESHOLD,
+    MC_CEILING_K, MC_PROBE_COUNT, MC_SLOW_BOARD_MS,
+)
+from .log import get_logger
+
+logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -312,35 +319,31 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
     # Target: each candidate completes in <=8s so 15 candidates / 10 workers
     # finishes in ~12s total (2 waves of work).
     _PER_CANDIDATE_BUDGET = 8.0  # seconds
-    _PROBE_COUNT = 3             # sims to time before adapting
     effective_k = k_sims
     _t_sim_start = time.perf_counter()
 
     # Early stopping: if avg_opp has converged (SE < threshold), stop early.
     # Running stats for O(1) SE computation (no list re-scan).
-    _ES_MIN_SIMS = 100       # minimum sims before checking convergence
-    _ES_CHECK_EVERY = 10     # check every N sims (amortize overhead)
-    _ES_SE_THRESHOLD = 1.0   # stop when SE of mean < 1 pt (95% CI +/-2 pts)
     _running_sum = 0.0
     _running_sum_sq = 0.0
 
     sim_i = 0
     while sim_i < effective_k:
         # After probe sims, check if we need to reduce K
-        if sim_i == _PROBE_COUNT and not _use_cython_fast:
+        if sim_i == MC_PROBE_COUNT and not _use_cython_fast:
             elapsed = time.perf_counter() - _t_sim_start
-            ms_per_sim = elapsed / _PROBE_COUNT * 1000
-            if ms_per_sim > 20:  # slow board (>20ms/sim)
+            ms_per_sim = elapsed / MC_PROBE_COUNT * 1000
+            if ms_per_sim > MC_SLOW_BOARD_MS:
                 max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
                 if max_k < effective_k:
                     effective_k = max_k
 
         # Early stopping convergence check
-        if (sim_i >= _ES_MIN_SIMS and sim_i % _ES_CHECK_EVERY == 0):
+        if (sim_i >= MC_ES_MIN_SIMS and sim_i % MC_ES_CHECK_EVERY == 0):
             _variance = (_running_sum_sq / sim_i) - (_running_sum / sim_i) ** 2
             if _variance > 0:
                 _se = (_variance / sim_i) ** 0.5
-                if _se < _ES_SE_THRESHOLD:
+                if _se < MC_ES_SE_THRESHOLD:
                     break  # converged -- more sims won't change avg_opp meaningfully
 
         # Sample random opponent rack
@@ -522,33 +525,29 @@ def _mc_eval_exchange_candidate(args: tuple) -> dict:
 
     # Adaptive K (same logic as _mc_eval_single_candidate)
     _PER_CANDIDATE_BUDGET = 8.0
-    _PROBE_COUNT = 3
     effective_k = k_sims
     _t_sim_start = time.perf_counter()
 
     # Early stopping (same as _mc_eval_single_candidate)
-    _ES_MIN_SIMS = 100
-    _ES_CHECK_EVERY = 10
-    _ES_SE_THRESHOLD = 1.0
     _running_sum = 0.0
     _running_sum_sq = 0.0
 
     sim_i = 0
     while sim_i < effective_k:
-        if sim_i == _PROBE_COUNT and not _use_cython_fast:
+        if sim_i == MC_PROBE_COUNT and not _use_cython_fast:
             elapsed = time.perf_counter() - _t_sim_start
-            ms_per_sim = elapsed / _PROBE_COUNT * 1000
-            if ms_per_sim > 20:
+            ms_per_sim = elapsed / MC_PROBE_COUNT * 1000
+            if ms_per_sim > MC_SLOW_BOARD_MS:
                 max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
                 if max_k < effective_k:
                     effective_k = max_k
 
         # Early stopping convergence check
-        if (sim_i >= _ES_MIN_SIMS and sim_i % _ES_CHECK_EVERY == 0):
+        if (sim_i >= MC_ES_MIN_SIMS and sim_i % MC_ES_CHECK_EVERY == 0):
             _variance = (_running_sum_sq / sim_i) - (_running_sum / sim_i) ** 2
             if _variance > 0:
                 _se = (_variance / sim_i) ** 0.5
-                if _se < _ES_SE_THRESHOLD:
+                if _se < MC_ES_SE_THRESHOLD:
                     break
 
         # 1. Sample opponent rack from unseen pool
@@ -844,6 +843,11 @@ def shutdown_mc_pool():
         _mc_pool = None
 
 
+# Register atexit handler to clean up MC pool on interpreter exit
+import atexit
+atexit.register(shutdown_mc_pool)
+
+
 # ---------------------------------------------------------------------------
 # Sequential fallback
 # ---------------------------------------------------------------------------
@@ -905,33 +909,29 @@ def _mc_eval_sequential(
 
         # Adaptive K for sequential path
         _PER_CANDIDATE_BUDGET = 8.0
-        _PROBE_COUNT = 3
         effective_k = k_sims
         _t_cand_start = time.perf_counter()
 
         # Early stopping (same as parallel path)
-        _ES_MIN_SIMS = 100
-        _ES_CHECK_EVERY = 10
-        _ES_SE_THRESHOLD = 1.0
         _running_sum = 0.0
         _running_sum_sq = 0.0
 
         sim_i = 0
         while sim_i < effective_k:
-            if sim_i == _PROBE_COUNT and not _use_cython_fast:
+            if sim_i == MC_PROBE_COUNT and not _use_cython_fast:
                 elapsed_probe = time.perf_counter() - _t_cand_start
-                ms_per_sim = elapsed_probe / _PROBE_COUNT * 1000
-                if ms_per_sim > 20:
+                ms_per_sim = elapsed_probe / MC_PROBE_COUNT * 1000
+                if ms_per_sim > MC_SLOW_BOARD_MS:
                     max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
                     if max_k < effective_k:
                         effective_k = max_k
 
             # Early stopping convergence check
-            if (sim_i >= _ES_MIN_SIMS and sim_i % _ES_CHECK_EVERY == 0):
+            if (sim_i >= MC_ES_MIN_SIMS and sim_i % MC_ES_CHECK_EVERY == 0):
                 _variance = (_running_sum_sq / sim_i) - (_running_sum / sim_i) ** 2
                 if _variance > 0:
                     _se = (_variance / sim_i) ** 0.5
-                    if _se < _ES_SE_THRESHOLD:
+                    if _se < MC_ES_SE_THRESHOLD:
                         break
 
             opp_rack_list = random.sample(unseen_pool, rack_size)
@@ -1211,7 +1211,7 @@ def mc_evaluate_2ply(
         return results
 
     except Exception as e:
-        print(f"  (MC parallel eval failed: {e} -- falling back to sequential)")
+        logger.warning("MC parallel eval failed: %s -- falling back to sequential", e)
         return _mc_eval_sequential(
             board, candidates, unseen_pool, your_rack, board_blanks,
             gaddag, k_sims, blank_corr

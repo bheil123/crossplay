@@ -11,10 +11,12 @@ from typing import List, Tuple
 
 from .board import Board, tiles_used as _board_tiles_used
 from .scoring import calculate_move_score, find_crosswords
-from .config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE, BOARD_SIZE, CENTER_ROW, CENTER_COL
-from .tile_tracker import TileTracker
+from .config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE, BOARD_SIZE, CENTER_ROW, CENTER_COL, ENDGAME_FINAL_TURNS
 from .nyt_filter import is_nyt_curated
+from .log import get_logger
 from . import __version__
+
+logger = get_logger(__name__)
 
 
 class GameMovesMixin:
@@ -26,7 +28,7 @@ class GameMovesMixin:
     
     def play_move(self, word: str, row: int, col: int, horizontal: bool,
                   is_opponent: bool = False, rack: str = None,
-                  new_rack: str = None) -> Tuple[bool, int]:
+                  new_rack: str = None, engine_rec: dict = None) -> Tuple[bool, int]:
         """Play a move. Returns (success, score).
 
         Args:
@@ -35,6 +37,9 @@ class GameMovesMixin:
                 set to this value after the move instead of simulating a draw.
                 This supports the assisted-play workflow where the user reports
                 their new rack after playing on the real board.
+            engine_rec: Engine recommendation from analyze(). If None, falls
+                back to self.last_analysis. Pass explicitly to avoid stale
+                recommendations when switching between game slots.
         """
         word = word.upper()
 
@@ -85,11 +90,7 @@ class GameMovesMixin:
             print("[WIN] BINGO! (40 bonus included in score)")
 
         # Compute bag count BEFORE placing the move (for final_turns tracking)
-        _trk_pre = TileTracker()
-        _trk_pre.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                 blank_positions=self.state.blank_positions)
-        bag_before_play = _trk_pre.get_bag_count()
+        _, _, bag_before_play = self._get_tile_context()
 
         # Place word on board
         self.board.place_word(word, row, col, horizontal)
@@ -140,18 +141,15 @@ class GameMovesMixin:
             self.state.blank_positions.append((br, bc, word[wi]))
 
         # Compute bag count from board state (tiles in bag, not counting opp rack)
-        _trk_bag = TileTracker()
-        _trk_bag.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                 blank_positions=self.state.blank_positions)
-        bag_count = _trk_bag.get_bag_count()
+        _, _, bag_count = self._get_tile_context()
 
-        # Build engine recommendation record (from last analyze())
-        engine_rec = None
-        if not is_opponent and self.last_analysis:
-            top_word = self.last_analysis['top3'][0]['word'] if self.last_analysis.get('top3') else None
-            engine_rec = {
-                'top3': self.last_analysis.get('top3', []),
+        # Build engine recommendation record (from explicit param or last analyze())
+        analysis_source = engine_rec if engine_rec is not None else self.last_analysis
+        engine_rec_out = None
+        if not is_opponent and analysis_source:
+            top_word = analysis_source['top3'][0]['word'] if analysis_source.get('top3') else None
+            engine_rec_out = {
+                'top3': analysis_source.get('top3', []),
                 'followed': (word.upper() == top_word.upper()) if top_word else None,
             }
             self.last_analysis = None  # Clear after use
@@ -172,22 +170,17 @@ class GameMovesMixin:
             'drawn': drawn_tiles,
             'note': 'bingo' if len(tiles_used) >= RACK_SIZE else '',
             'timestamp': datetime.now().isoformat(),
-            'engine': engine_rec,
+            'engine': engine_rec_out,
             'engine_version': __version__,
             'win_pct': None,
             'nyt': None,
         }
         self.state.board_moves.append(enriched)
 
-        # Track final_turns_remaining
-        _trk_post = TileTracker()
-        _trk_post.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                  blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                  blank_positions=self.state.blank_positions)
-        bag_after_play = _trk_post.get_bag_count()
-        if bag_before_play > 0 and bag_after_play == 0:
+        # Track final_turns_remaining (bag_count already reflects post-move state)
+        if bag_before_play > 0 and bag_count == 0:
             # Bag just emptied: both players get one final turn each = 2 turns remain
-            self.state.final_turns_remaining = 2
+            self.state.final_turns_remaining = ENDGAME_FINAL_TURNS
         elif bag_before_play == 0 and self.state.final_turns_remaining is not None:
             self.state.final_turns_remaining = max(0, self.state.final_turns_remaining - 1)
 
@@ -224,7 +217,7 @@ class GameMovesMixin:
         elif ftr == 1 and is_opponent:
             # Opponent just played -- user's final move, no opp response
             print("\n[ENDGAME] Bag empty -- your final move (no opponent response). Use 'analyze' for 1-ply ranking.")
-        elif bag_after_play == 0:
+        elif bag_count == 0:
             print("\n[ENDGAME] Bag empty -- use 'analyze' for endgame solver.")
         else:
             self.show_existing_threats(top_n=5)
@@ -261,11 +254,7 @@ class GameMovesMixin:
                 return False
 
         # Compute bag count before exchange
-        _trk = TileTracker()
-        _trk.sync_with_board(self.board, your_rack=old_rack,
-                             blanks_in_rack=old_rack.count('?'),
-                             blank_positions=self.state.blank_positions)
-        bag_count = _trk.get_bag_count()
+        _, _, bag_count = self._get_tile_context(rack=old_rack)
 
         if bag_count < 7:
             print(f"[X] Not enough tiles in bag to exchange! (bag={bag_count})")
@@ -565,11 +554,7 @@ class GameMovesMixin:
                 expected_score = no_blank_score
         
         # Compute bag count BEFORE placing the move (for final_turns tracking)
-        _trk_pre = TileTracker()
-        _trk_pre.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                 blank_positions=self.state.blank_positions)
-        bag_before = _trk_pre.get_bag_count()
+        _, _, bag_before = self._get_tile_context()
 
         # Place the word on board
         self.board.place_word(word, row, col, horizontal)
@@ -599,11 +584,10 @@ class GameMovesMixin:
         # Validate bag count
         if new_bag_count is not None:
             # Sync tracker to get current count
-            tracker = TileTracker()
-            tracker.sync_with_board(self.board, self.state.your_rack, 0, self.state.blank_positions)
+            _trk_val, _, _ = self._get_tile_context()
 
             # Expected: unseen - 7 (opp rack) = bag
-            unseen = tracker.get_unseen_count()
+            unseen = _trk_val.get_unseen_count()
             expected_bag = unseen - 7  # Assuming opp has 7 tiles
 
             if expected_bag != new_bag_count:
@@ -616,11 +600,7 @@ class GameMovesMixin:
                     print(f"    TIP: Missing tiles - check if blanks were reported")
 
         # Compute bag count from board state for enriched record
-        _trk_bag = TileTracker()
-        _trk_bag.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                 blank_positions=self.state.blank_positions)
-        bag_count = _trk_bag.get_bag_count()
+        _, _, bag_count = self._get_tile_context()
 
         # Build enriched move record (after score/bag updates for accurate cumulative)
         enriched = {
@@ -644,15 +624,10 @@ class GameMovesMixin:
         }
         self.state.board_moves.append(enriched)
 
-        # Track final_turns_remaining
-        _trk_post = TileTracker()
-        _trk_post.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                  blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                  blank_positions=self.state.blank_positions)
-        bag_after = _trk_post.get_bag_count()
-        if bag_before > 0 and bag_after == 0:
+        # Track final_turns_remaining (bag_count already reflects post-move state)
+        if bag_before > 0 and bag_count == 0:
             # Bag just emptied: both players get one final turn each = 2 turns remain
-            self.state.final_turns_remaining = 2
+            self.state.final_turns_remaining = ENDGAME_FINAL_TURNS
         elif bag_before == 0 and self.state.final_turns_remaining is not None:
             self.state.final_turns_remaining = max(0, self.state.final_turns_remaining - 1)
 
@@ -691,7 +666,7 @@ class GameMovesMixin:
             elif ftr == 1 and not self.state.is_your_turn:
                 print("\n[ENDGAME] Your final turn done -- opponent gets last move.")
                 self.show_existing_threats(top_n=5)
-            elif bag_after == 0:
+            elif bag_count == 0:
                 print("\n[ENDGAME] Bag empty.")
             else:
                 self.show_existing_threats(top_n=5)

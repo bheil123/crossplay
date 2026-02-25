@@ -48,10 +48,17 @@ class Board:
     # Tile access (1-indexed interface)
     # -------------------------------------------------------------------------
     
+    def __repr__(self) -> str:
+        tile_count = sum(
+            1 for r in range(BOARD_SIZE) for c in range(BOARD_SIZE)
+            if self._grid[r][c] is not None
+        )
+        return f"Board({tile_count} tiles)"
+
     def get_tile(self, row: int, col: int) -> Optional[str]:
         """
         Get tile at position (1-indexed).
-        
+
         Returns:
             Letter at position, or None if empty.
         """

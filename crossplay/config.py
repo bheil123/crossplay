@@ -192,6 +192,73 @@ RACK_QUALITY_GOOD: int = 4
 RACK_QUALITY_AMAZING: int = 5
 
 
+# =============================================================================
+# ANALYSIS TIME BUDGETS (seconds)
+# =============================================================================
+
+RISK_TIME_BUDGET_EXHAUSTIVE: float = 90.0   # bag <= 5: exhaustive opponent enumeration
+RISK_TIME_BUDGET_NORMAL: float = 3.0        # bag > 5: probabilistic risk sampling
+MC_TIME_BUDGET: float = 27.0                # main MC 2-ply evaluation budget
+THREE_PLY_TIME_BUDGET: float = 20.0         # 3-ply endgame analysis budget
+
+# =============================================================================
+# ANALYSIS CANDIDATE SELECTION
+# =============================================================================
+
+ANALYSIS_MIN_CANDIDATES_MC: int = 130       # min candidates to pass to MC pipeline
+ANALYSIS_MIN_CANDIDATES_RISK: int = 115     # min moves to analyze for risk
+ANALYSIS_DEFAULT_TOP_N: int = 15            # default number of moves to display
+ANALYSIS_DEFAULT_THREATS: int = 10          # default threat count to display
+ANALYSIS_ENDGAME_THREATS: int = 5           # threat count at endgame
+
+# =============================================================================
+# MC EARLY STOPPING
+# =============================================================================
+
+MC_ES_MIN_SIMS: int = 100          # min sims before convergence check
+MC_ES_CHECK_EVERY: int = 10        # check convergence every N sims
+MC_ES_SE_THRESHOLD: float = 1.0    # std error target (95% CI +/- 2 pts)
+MC_CEILING_K: int = 2000           # max simulations per candidate
+MC_PROBE_COUNT: int = 3            # initial probes before adaptive K
+MC_SLOW_BOARD_MS: int = 20         # threshold (ms) for slow board detection
+
+# =============================================================================
+# EXCHANGE EVALUATION
+# =============================================================================
+
+EXCHANGE_EQUITY_THRESHOLD: float = 35.0     # consider exchange only if best play < 35
+EXCHANGE_TOP_CANDIDATES: int = 5            # exchange options to generate
+EXCHANGE_QUICK_MC_SIMS: int = 500           # quick MC sims per exchange option
+
+# =============================================================================
+# BINGO DETECTION / ENDGAME
+# =============================================================================
+
+BINGO_SCORE_THRESHOLD: int = 41     # 7-tile play >= 41 pts (7*1 + 40 bonus)
+BINGO_BLOCKING_DELTA: int = 20      # block detected if opp avg < baseline - 20
+ENDGAME_FINAL_TURNS: int = 2        # turns remaining when bag empties (both get 1)
+
+# =============================================================================
+# STRATEGIC THRESHOLDS
+# =============================================================================
+
+CATCHUP_DEFICIT_THRESHOLD: int = 50         # show catch-up advice if down by 50+
+HIGH_VARIANCE_DEFICIT_THRESHOLD: int = 100  # "down 100+" advice trigger
+POWER_TILE_PROB_THRESHOLD: float = 0.05     # show power tile chance only if > 5%
+LATE_GAME_UNSEEN_THRESHOLD: int = 21        # unseen <= 21 = late game
+
+# =============================================================================
+# DEFENSIVE BLOCKING BONUSES
+# =============================================================================
+
+BLOCKING_BONUSES: Dict[str, int] = {
+    '3W': 15,   # defensive bonus for blocking triple word
+    '2W': 8,    # defensive bonus for blocking double word
+    '3L': 3,    # defensive bonus for blocking triple letter
+    '2L': 2,    # defensive bonus for blocking double letter
+}
+
+
 if __name__ == "__main__":
     print("CROSSPLAY V15 CONFIGURATION")
     print("=" * 50)

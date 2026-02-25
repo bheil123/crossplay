@@ -15,12 +15,23 @@ from typing import List, Optional
 
 from .board import Board, tiles_used as _board_tiles_used
 from .move_finder_gaddag import GADDAGMoveFinder
-from .config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE, BOARD_SIZE
-from .tile_tracker import TileTracker
+from .config import (
+    TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE, BOARD_SIZE,
+    RISK_TIME_BUDGET_EXHAUSTIVE, RISK_TIME_BUDGET_NORMAL, MC_TIME_BUDGET,
+    THREE_PLY_TIME_BUDGET, ANALYSIS_MIN_CANDIDATES_MC, ANALYSIS_MIN_CANDIDATES_RISK,
+    ANALYSIS_ENDGAME_THREATS, EXCHANGE_EQUITY_THRESHOLD, EXCHANGE_TOP_CANDIDATES,
+    EXCHANGE_QUICK_MC_SIMS, BINGO_SCORE_THRESHOLD, BINGO_BLOCKING_DELTA,
+    LATE_GAME_UNSEEN_THRESHOLD, CATCHUP_DEFICIT_THRESHOLD,
+    HIGH_VARIANCE_DEFICIT_THRESHOLD, POWER_TILE_PROB_THRESHOLD,
+    BLOCKING_BONUSES,
+)
 from .nyt_filter import nyt_warning, is_nyt_curated
 from .analysis_lock import acquire_lock, release_lock
 from .leave_eval import evaluate_leave
+from .log import get_logger
 from .mc_eval import mc_evaluate_2ply
+
+logger = get_logger(__name__)
 
 
 class GameAnalysisMixin:
@@ -43,16 +54,7 @@ class GameAnalysisMixin:
             risk_str, expected_dmg, max_dmg, threats = self._threats_cache
         else:
             # Build unseen tiles
-            tracker = TileTracker()
-            tracker.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                    blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                    blank_positions=self.state.blank_positions)
-            
-            unseen = {}
-            for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ?':
-                remaining = tracker.get_remaining(letter)
-                if remaining > 0:
-                    unseen[letter] = remaining
+            _, unseen, _ = self._get_tile_context()
             
             risk_str, expected_dmg, max_dmg, threats = analyze_existing_threats(
                 self.board, unseen, self.dictionary,
@@ -150,8 +152,8 @@ class GameAnalysisMixin:
         ftr = self.state.final_turns_remaining
         skip_threats = (ftr == 1 and self.state.is_your_turn) or (ftr is not None and ftr <= 0)
         if not skip_threats:
-            self.show_existing_threats(top_n=5)
-        
+            self.show_existing_threats(top_n=ANALYSIS_ENDGAME_THREATS)
+
         # Move generation — prefer C-accelerated, fallback to Python
         try:
             from .move_finder_c import find_all_moves_c, is_available
@@ -160,7 +162,7 @@ class GameAnalysisMixin:
                 moves = find_all_moves_c(self.board, self.gaddag, rack,
                                           board_blanks=self.state.blank_positions)
                 t_mg = time.time() - t_mg
-                print(f"  {len(moves)} moves found in {t_mg*1000:.0f}ms (C accel)")
+                logger.debug("%d moves found in %dms (C accel)", len(moves), t_mg*1000)
             else:
                 raise ImportError("C not available")
         except ImportError:
@@ -168,25 +170,14 @@ class GameAnalysisMixin:
             t_mg = time.time()
             moves = finder.find_all_moves(rack)
             t_mg = time.time() - t_mg
-            print(f"  {len(moves)} moves found in {t_mg*1000:.0f}ms (Python)")
+            logger.debug("%d moves found in %dms (Python)", len(moves), t_mg*1000)
         
         if not moves:
             print("No valid moves found!")
             return []
         
         # Build tile tracker to know what's unseen
-        tracker = TileTracker()
-        tracker.sync_with_board(self.board, your_rack=rack, blanks_in_rack=rack.count('?'),
-                                blank_positions=self.state.blank_positions)
-        
-        # Build unseen tiles counter
-        unseen = {}
-        for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ?':
-            remaining = tracker.get_remaining(letter)
-            if remaining > 0:
-                unseen[letter] = remaining
-        
-        bag_size = tracker.get_bag_count()
+        _, unseen, bag_size = self._get_tile_context(rack=rack)
         bag_empty = bag_size < 7
         endgame_exact = (bag_size == 0)
         
@@ -260,7 +251,7 @@ class GameAnalysisMixin:
         # Sort by preliminary equity and take top candidates for full analysis
         # Need enough to feed both display (top_n) and MC (up to ~111 candidates)
         preliminary.sort(key=lambda m: -m['prelim_equity'])
-        candidates = preliminary[:max(130, top_n * 3)]  # Ensure enough for MC stage
+        candidates = preliminary[:max(ANALYSIS_MIN_CANDIDATES_MC, top_n * 3)]  # Ensure enough for MC stage
         
         # ENDGAME FAST PATH: When bag=0, skip risk analysis entirely.
         # The endgame 2-ply solver gives exact results (opponent rack is known).
@@ -306,8 +297,8 @@ class GameAnalysisMixin:
         analyzed_moves = []
         best_equity = float('-inf')
         skipped_count = 0
-        min_to_analyze = max(top_n + 5, 115)  # Analyze enough for both display and MC candidates (up to N=111)
-        risk_time_budget = 90.0 if bag_size <= 5 else 3.0  # generous budget for exhaustive endgame
+        min_to_analyze = max(top_n + 5, ANALYSIS_MIN_CANDIDATES_RISK)  # Analyze enough for both display and MC candidates (up to N=111)
+        risk_time_budget = RISK_TIME_BUDGET_EXHAUSTIVE if bag_size <= 5 else RISK_TIME_BUDGET_NORMAL
         t_risk_start = time.time()
         risk_budget_exhausted = False
         
@@ -512,7 +503,7 @@ class GameAnalysisMixin:
                 draw_count = 7 - leave_len  # How many tiles we'd draw
                 if draw_count > 0 and bag_size > 0:
                     power_prob = prob_draw_any_power_tile(unseen, bag_size, draw_count)
-                    if power_prob > 0.05:  # Only show if >5%
+                    if power_prob > POWER_TILE_PROB_THRESHOLD:  # Only show if >5%
                         print(f"   --> Power tile chance: {power_prob*100:.0f}% (drawing {draw_count})")
             
             # Show blocking bonus if any
@@ -548,7 +539,7 @@ class GameAnalysisMixin:
             
             # Only consider exchange when best play equity < 35
             # (strong plays will always dominate exchange)
-            if best_play_equity < 35:
+            if best_play_equity < EXCHANGE_EQUITY_THRESHOLD:
                 exchange_candidates = self._generate_exchange_candidates(rack, unseen)
                 if exchange_candidates:
                     n_exch = len(exchange_candidates)
@@ -587,7 +578,7 @@ class GameAnalysisMixin:
             return None
         
         # Quick MC to estimate E[new rack leave] for each exchange option
-        N_QUICK = 500  # fast estimate
+        N_QUICK = EXCHANGE_QUICK_MC_SIMS
         options = []
         
         # Full exchange (keep nothing)
@@ -636,7 +627,7 @@ class GameAnalysisMixin:
         
         # Sort by expected leave, take top 5
         options.sort(key=lambda x: -x['expected_leave'])
-        return options[:5]
+        return options[:EXCHANGE_TOP_CANDIDATES]
     
     def _analyze_threat(self, square: tuple, unseen: dict, is_3w: bool) -> str:
         """Analyze threat level for an opened bonus square."""
@@ -719,7 +710,7 @@ class GameAnalysisMixin:
         
         # MC time budget -- with early stopping, MC typically finishes in 2-8s
         # regardless of K. Budget is a safety cap, not a planning target.
-        mc_budget = 27.0
+        mc_budget = MC_TIME_BUDGET
         
         if lookahead_n is None:
             from .mc_calibrate import compute_adaptive_n
@@ -760,7 +751,7 @@ class GameAnalysisMixin:
                 print("No MC 2-ply results available.")
                 return
             
-            print(f"  >> MC 2-ply completed in {t_mc*1000:.0f}ms ({k_sims * len(results)} total sims)")
+            logger.debug("MC 2-ply completed in %dms (%d total sims)", t_mc*1000, k_sims * len(results))
             
             # Check for bingo threats BEFORE any move (baseline)
             baseline_bingo = self._find_opponent_bingo(unseen_str)
@@ -804,8 +795,8 @@ class GameAnalysisMixin:
                 blocks_bingo = False
                 opp_avg = m['mc_avg_opp']
 
-                if not is_exch and baseline_bingo and baseline_bingo['score'] >= 41:
-                    if opp_avg < baseline_bingo['score'] - 20:
+                if not is_exch and baseline_bingo and baseline_bingo['score'] >= BINGO_SCORE_THRESHOLD:
+                    if opp_avg < baseline_bingo['score'] - BINGO_BLOCKING_DELTA:
                         blocks_bingo = True
                         blocking_moves.append((m, baseline_bingo))
 
@@ -815,7 +806,7 @@ class GameAnalysisMixin:
                     bingo_marker = "[EXCH]"
                 else:
                     opp_word = m.get('opp_word', '')
-                    if len(opp_word) >= 7 and m['mc_max_opp'] >= 41:
+                    if len(opp_word) >= 7 and m['mc_max_opp'] >= BINGO_SCORE_THRESHOLD:
                         bingo_marker = "[!B]"
                     elif blocks_bingo:
                         bingo_marker = "[DB]"
@@ -921,7 +912,7 @@ class GameAnalysisMixin:
                 }
 
             # Bingo blocking analysis
-            if baseline_bingo and baseline_bingo['score'] >= 41:
+            if baseline_bingo and baseline_bingo['score'] >= BINGO_SCORE_THRESHOLD:
                 self._show_bingo_blocking_analysis(rack, unseen_str, baseline_bingo, results)
             
             # Catch-up advice for late game when far behind
@@ -931,7 +922,7 @@ class GameAnalysisMixin:
             # Budget: 20s total minus MC time already spent
             bag_size = total_unseen - 7  # unseen minus opponent rack
             if bag_size <= 12 and bag_size >= 0:
-                remaining_budget = max(2.0, 20.0 - t_mc)
+                remaining_budget = max(2.0, THREE_PLY_TIME_BUDGET - t_mc)
                 self._show_3ply_analysis(rack, unseen_str, total_unseen, time_budget=remaining_budget)
                     
         except Exception as e:
@@ -945,7 +936,7 @@ class GameAnalysisMixin:
         Only runs when unseen tiles <= 21 (late game), otherwise returns None.
         """
         # Skip if too many unseen - combinatorially expensive and less useful
-        if len(unseen_str) > 21:
+        if len(unseen_str) > LATE_GAME_UNSEEN_THRESHOLD:
             return None
             
         finder = GADDAGMoveFinder(self.board, self.gaddag, board_blanks=self.state.blank_positions)
@@ -956,7 +947,7 @@ class GameAnalysisMixin:
         for m in opp_moves:
             # Count tiles actually placed (word length minus tiles already on board)
             tiles_placed = len(m['word'])  # Simplified - actual calculation would check hooks
-            if m['score'] >= 41:  # Likely a bingo (min: 7 × 1pt + 40 bonus)
+            if m['score'] >= BINGO_SCORE_THRESHOLD:  # Likely a bingo (min: 7x1pt + 40 bonus)
                 bingos.append(m)
         
         if bingos:
@@ -1095,9 +1086,9 @@ class GameAnalysisMixin:
         bag_size = total_unseen - 7  # Unseen minus opponent's rack
         
         # Only show if: behind by 50+, unseen <= 21 (late game), power tiles available
-        if score_diff >= -50:
+        if score_diff >= -CATCHUP_DEFICIT_THRESHOLD:
             return
-        if total_unseen > 21:
+        if total_unseen > LATE_GAME_UNSEEN_THRESHOLD:
             return
         
         power_tiles = get_power_tiles_in_pool(unseen)
@@ -1133,11 +1124,11 @@ class GameAnalysisMixin:
         
         # Strategic advice based on situation
         print()
-        if score_diff <= -100:
+        if score_diff <= -HIGH_VARIANCE_DEFICIT_THRESHOLD:
             print("   WARNING:  DOWN 100+: High variance is your friend!")
             print("      Consider plays that draw more tiles for better power tile odds.")
             print("      Keeping a great leave matters less when you need big swings.")
-        elif score_diff <= -50:
+        elif score_diff <= -CATCHUP_DEFICIT_THRESHOLD:
             print("   [INFO] DOWN 50-100: Balance scoring with power tile chances.")
             print("      Plays that empty your rack give more lottery tickets.")
     
@@ -1549,12 +1540,7 @@ class GameAnalysisMixin:
         row, col = move['row'], move['col']
         horiz = move['direction'] == 'H'
         
-        BLOCKING_VALUES = {
-            '3W': 15,
-            '2W': 8,
-            '3L': 3,
-            '2L': 2
-        }
+        BLOCKING_VALUES = BLOCKING_BONUSES
         
         total_bonus = 0
         blocked = []

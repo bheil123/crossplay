@@ -68,6 +68,8 @@ version changes.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 20.0.0 | 2026-02 | Architectural cleanup: config centralization (~50 constants), TileTracker consolidation, structured logging (log.py), pytest suite (91 tests), Game DI for testing |
+| 19.0.0 | 2026-02 | Game class mixin refactor: split into game_analysis.py (1500 lines) + game_moves.py (670 lines), game_manager.py reduced to 1400 lines |
 | 18.0.0 | 2026-02 | Gen3 SuperLeaves deployed (TD-learning, 1M games), Cython word_set optimization (68% training speedup), gen3 validates at 513-484 vs formula (+2.1), 510-486 vs gen2 (+1.0) |
 | 17.2.0 | 2026-02 | HVT premium bonus (high-value tiles on premium squares), TW/DW exposure penalty (penalizes opening 3W/2W) |
 | 17.0.0 | 2026-02 | Near-endgame hybrid evaluator (bag 1-7), SuperLeaves gen1 deployed, gen2 training with equity-based signal |

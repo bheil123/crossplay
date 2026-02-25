@@ -1,4 +1,4 @@
-# CLAUDE.md -- Crossplay V18
+# CLAUDE.md -- Crossplay V20
 
 ## What is this project?
 
@@ -53,7 +53,9 @@ endgame equity calculation is:
 ## Architecture overview
 
 ```
-game_manager.py          <- Entry point, game loop, AI orchestration
+game_manager.py          <- Game core (init, display, persistence, bag) + GameManager
+  |-- game_analysis.py   <- GameAnalysisMixin: analyze, threats, MC display, endgame
+  |-- game_moves.py      <- GameMovesMixin: play_move, record_opponent_move, exchange
   |-- mc_eval.py         <- Monte Carlo 2-ply evaluation (core AI)
   |-- mc_calibrate.py    <- Auto-benchmarks hardware, computes NxK per turn
   |-- move_finder_c.py   <- C-accelerated move finder + post-validation
@@ -65,7 +67,7 @@ game_manager.py          <- Entry point, game loop, AI orchestration
   |-- gaddag_compact.py  <- Compact binary GADDAG format
   |-- board.py           <- Board representation + tiles_used() utility
   |-- scoring.py         <- Move scoring with bonuses and crosswords
-  |-- config.py          <- ALL constants: tile values, distribution, bonuses
+  |-- config.py          <- ALL constants: tile values, distribution, bonuses, tuning
   |-- dictionary.py      <- Word validation (196K words)
   |-- leave_eval.py      <- Rack leave evaluation + bingo probability DB
   |-- real_risk.py       <- Opponent threat analysis
@@ -73,6 +75,7 @@ game_manager.py          <- Entry point, game loop, AI orchestration
   |-- lookahead_3ply.py  <- 3-ply exhaustive endgame
   |-- parallel_eval.py   <- Multi-worker parallel evaluation
   |-- tile_tracker.py    <- Tile bag and tracking
+  |-- log.py             <- Structured logging (get_logger, configure)
   |-- play_game.py       <- Game state management
   |-- game_library.py    <- Game library persistence (CRUD, archive, search)
   |-- game_archive.py    <- Enriched move history + CSV export
@@ -91,6 +94,13 @@ game_manager.py          <- Entry point, game loop, AI orchestration
       |-- self_play.py   <- Single-game self-play loop
       |-- trainer.py     <- Parallel training orchestrator
       +-- validate.py    <- Multi-worker head-to-head validation
+tests/                   <- pytest test suite (91 tests)
+  |-- conftest.py        <- Shared fixtures (board, board_with_hike, etc.)
+  |-- test_config.py     <- Config constants, tile distribution, bonus squares
+  |-- test_board.py      <- Board placement, queries, tiles_used
+  |-- test_scoring.py    <- Tile values, word/move scoring, crosswords
+  |-- test_tile_tracker.py <- Bag tracking, sync_with_board, blanks
+  +-- test_game.py       <- Game class: mixins, DI, _get_tile_context, play_move
 ```
 
 ## How to run
@@ -427,15 +437,65 @@ since GameManager caches game state in memory at startup.
 `GameManager.reload_games(slot=None)` is the programmatic API. Reloads all
 slots if `slot` is None, or a single slot if specified.
 
-## V19 roadmap: bingo -> sweep terminology
+## V20 changes: architectural cleanup + test suite
 
-NYT Crossplay calls a 7-tile play a "sweep" (40 pts), not a "bingo" (50 pts).
-The codebase currently uses "bingo" throughout. Scope: 221 references across
-21 files, 14 variable/constant names to rename, Cython rebuild required.
-Estimated 2-3 hours. Deferred as a breaking terminology change.
+**Deep architectural review** implementing 13 items for maintainability and
+testability. No behavior changes -- same move recommendations, same output.
 
-Key renames: `BINGO_BONUS` -> `SWEEP_BONUS`, `bingo_prob` -> `sweep_prob`,
-`is_bingo` -> `is_sweep`, `[!B]` marker -> `[!S]`, `[DB]` -> `[DS]`, etc.
+**Item 1: TileTracker consolidation.**
+Added `Game._get_tile_context(rack=None)` returning `(tracker, unseen_dict,
+bag_size)`. Replaced 14 copy-pasted 5-line TileTracker instantiation blocks
+across `game_manager.py`, `game_analysis.py`, and `game_moves.py`. Removed
+unused `TileTracker` imports from mixin modules.
+
+**Item 2: Config centralization.**
+Moved ~50 magic numbers from `game_analysis.py` and `game_manager.py` into
+`config.py` as named constants. Categories: MC display, risk analysis,
+analysis thresholds, scoring adjustments, display formatting, endgame, and
+exchange evaluation. All constants are documented with inline comments.
+
+**Item 3: DI for Game class.**
+`Game.__init__` accepts optional `gaddag` and `dictionary` parameters for
+dependency injection. When both are provided, `get_resources()` is skipped.
+Enables fast unit testing without loading the 28MB GADDAG.
+
+**Item 4: Formal test suite (pytest).**
+91 tests across 6 files in `tests/`. Covers: config constants and tile
+distribution (17), board placement and queries (25), tile tracker and bag
+management (8), scoring with bonuses and crosswords (14), Game class with
+mixin composition, DI, and play_move (27). Run: `pytest tests/`.
+
+**Item 5: analysis_lock.py hardening.**
+Lock file operations wrapped in try/except for robustness against filesystem
+errors. Stale lock auto-cleared on timeout.
+
+**Item 11: Structured logging.**
+New `log.py` module with `get_logger()` and `configure()`. Internal diagnostics
+(timing, fallback warnings, MC stats) use `logger.debug()`/`.warning()`.
+User-facing output stays as `print()`. Configure via `CROSSPLAY_LOG_LEVEL`
+env var (default: WARNING).
+
+**Items 6,7,9,12,13:** Minor cleanups -- consistent method ordering, reduced
+code duplication, improved error messages, cleaner import structure.
+
+**Items 8,10:** Already implemented (cross-check cache in Cython BoardContext)
+or deferred (MC pool lifecycle -- already persistent between analyze() calls).
+
+**V19 changes: Game class mixin refactor.**
+Split 2,875-line `Game` class into mixin modules:
+- `game_analysis.py` (GameAnalysisMixin, ~1,500 lines): analyze, threats,
+  MC display, endgame solvers, risk calculators, strategic analysis
+- `game_moves.py` (GameMovesMixin, ~670 lines): play_move,
+  record_opponent_move, record_exchange, validation
+- `game_manager.py` (Game core + GameManager, ~1,400 lines): init, display,
+  persistence, bag management, shared utilities
+
+All `self.*` references work unchanged -- mixins share the same instance.
+No changes to any calling code. `class Game(GameAnalysisMixin, GameMovesMixin):`
+
+**Deferred: bingo -> sweep terminology rename.**
+NYT calls a 7-tile play a "sweep" (40 pts), not a "bingo" (50 pts). Scope:
+221 references across 21 files, Cython rebuild required. Deferred.
 
 ## V16.1 changes: end command for game completion
 

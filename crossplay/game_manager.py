@@ -27,6 +27,7 @@ import os
 import json
 import random
 import time
+import traceback
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
@@ -39,9 +40,12 @@ from .dictionary import Dictionary
 from .config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE, BOARD_SIZE, CENTER_ROW, CENTER_COL
 from .tile_tracker import TileTracker
 from .blocked_cache import BlockedSquareCache
+from .log import get_logger
 from . import __version__
 from .game_analysis import GameAnalysisMixin
 from .game_moves import GameMovesMixin
+
+logger = get_logger(__name__)
 
 # =============================================================================
 # GAME STATE
@@ -56,7 +60,7 @@ def get_resources():
     """Load GADDAG and dictionary (cached)."""
     global GADDAG, DICTIONARY
     if GADDAG is None:
-        print("Loading GADDAG...")
+        logger.info("Loading GADDAG...")
         GADDAG = get_gaddag()
         import os as _os
         _dict_path = _os.path.join(_os.path.dirname(__file__), 'crossplay_dict.pkl')
@@ -88,6 +92,13 @@ class GameState:
     updated_at: str
     notes: str = ""
     final_turns_remaining: Optional[int] = None
+
+    def __repr__(self) -> str:
+        spread = self.your_score - self.opp_score
+        turn = "yours" if self.is_your_turn else self.opponent_name
+        return (f"GameState({self.name}, {self.your_score}-{self.opp_score} "
+                f"({'+' if spread >= 0 else ''}{spread}), "
+                f"{len(self.board_moves)} moves, turn={turn})")
 
     def to_dict(self):
         return asdict(self)
@@ -125,8 +136,12 @@ class GameState:
 class Game(GameAnalysisMixin, GameMovesMixin):
     """A single game instance."""
     
-    def __init__(self, state: Optional[GameState] = None):
-        self.gaddag, self.dictionary = get_resources()
+    def __init__(self, state: Optional[GameState] = None,
+                 gaddag=None, dictionary=None):
+        if gaddag is not None and dictionary is not None:
+            self.gaddag, self.dictionary = gaddag, dictionary
+        else:
+            self.gaddag, self.dictionary = get_resources()
         self.blocked_cache = BlockedSquareCache()
         self._threats_cache = None  # Cached existing threats (invalidated after moves)
         self._cached_baseline_risk = 0.0   # Board-wide baseline risk (EV of top existing threat)
@@ -157,11 +172,8 @@ class Game(GameAnalysisMixin, GameMovesMixin):
             self.bag = self._reconstruct_bag()
             # Infer final_turns_remaining for old saves missing it
             if state.final_turns_remaining is None:
-                _tracker = TileTracker()
-                _tracker.sync_with_board(self.board, your_rack=state.your_rack or "",
-                                         blanks_in_rack=(state.your_rack or "").count('?'),
-                                         blank_positions=state.blank_positions)
-                if _tracker.get_bag_count() == 0:
+                _, _, _bag = self._get_tile_context()
+                if _bag == 0:
                     # Bag already empty but field not set -- assume 2 final turns left
                     # (both players get one final turn after bag empties)
                     state.final_turns_remaining = 2
@@ -185,6 +197,46 @@ class Game(GameAnalysisMixin, GameMovesMixin):
             # Empty board - all bonus squares playable
             self.blocked_cache.initialize(self.board, self.dictionary)
     
+    def _get_tile_context(self, rack: str = None):
+        """Build a synced TileTracker, unseen dict, and bag count.
+
+        This consolidates the repeated pattern of creating a TileTracker,
+        syncing it with the board, and extracting unseen tiles. Call once
+        at the start of any method that needs tile distribution info.
+
+        Args:
+            rack: Rack to use for tracking. If None, uses self.state.your_rack.
+
+        Returns:
+            (tracker, unseen_dict, bag_size) where:
+            - tracker: synced TileTracker instance
+            - unseen_dict: dict of {letter: count} for unseen tiles (A-Z + ?)
+            - bag_size: tiles in bag (unseen minus opponent rack)
+        """
+        rack = rack or self.state.your_rack or ""
+        tracker = TileTracker()
+        tracker.sync_with_board(
+            self.board, your_rack=rack,
+            blanks_in_rack=rack.count('?'),
+            blank_positions=self.state.blank_positions
+        )
+        unseen = {}
+        for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ?':
+            remaining = tracker.get_remaining(letter)
+            if remaining > 0:
+                unseen[letter] = remaining
+        bag_size = tracker.get_bag_count()
+        return tracker, unseen, bag_size
+
+    def __repr__(self) -> str:
+        gid = self.game_id or "no-id"
+        s = self.state
+        spread = s.your_score - s.opp_score
+        return (f"Game({gid}, vs {s.opponent_name}, "
+                f"{s.your_score}-{s.opp_score} "
+                f"({'+' if spread >= 0 else ''}{spread}), "
+                f"rack={s.your_rack or 'none'})")
+
     def _new_bag(self) -> List[str]:
         """Create a new shuffled bag."""
         bag = []
@@ -285,10 +337,7 @@ class Game(GameAnalysisMixin, GameMovesMixin):
             return s.final_turns_remaining <= 0
         # Mid-game checks (final_turns_remaining is None = bag not empty yet)
         # Compute remaining unseen tiles (bag + opp_rack) from board state
-        _trk = TileTracker()
-        _trk.sync_with_board(self.board, your_rack=s.your_rack or "",
-                             blanks_in_rack=(s.your_rack or "").count('?'),
-                             blank_positions=s.blank_positions)
+        _trk, _, _ = self._get_tile_context()
         remaining = _trk.get_unseen_count()  # bag + opp_rack
         # You went out (empty rack AND bag was already empty)
         # Note: empty rack with tiles remaining just means rack hasn't been set
@@ -328,12 +377,8 @@ class Game(GameAnalysisMixin, GameMovesMixin):
 
         print(f"\n[INFO] {self.state.name} vs {self.state.opponent_name}")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score} ({spread_str})")
-        # Compute bag count from board state via TileTracker
-        _tracker = TileTracker()
-        _tracker.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                 blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                 blank_positions=self.state.blank_positions)
-        bag_tiles = _tracker.get_bag_count()
+        # Compute bag count and unseen tiles from board state
+        tracker, unseen_dict, bag_tiles = self._get_tile_context()
         ftr = self.state.final_turns_remaining
         if bag_tiles == 0 and ftr is not None:
             if ftr == 2 and self.state.is_your_turn:
@@ -355,33 +400,21 @@ class Game(GameAnalysisMixin, GameMovesMixin):
             rack_val = sum(TILE_VALUES.get(t, 0) for t in self.state.your_rack)
             print(f"   Your rack: [{' '.join(self.state.your_rack)}] (value: {rack_val})")
         
-        # Show unseen tiles
-        tracker = TileTracker()
-        tracker.sync_with_board(self.board, your_rack=self.state.your_rack or "",
-                                blanks_in_rack=(self.state.your_rack or "").count('?'),
-                                blank_positions=self.state.blank_positions)
-        
-        # Build unseen dict and string
-        unseen_dict = {}
+        # Show unseen tiles (reuse tracker from above)
         unseen_parts = []
-        for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
-            remaining = tracker.get_remaining(letter)
-            if remaining > 0:
-                unseen_dict[letter] = remaining
-                unseen_parts.append(f"{letter}:{remaining}" if remaining > 1 else letter)
-        blanks_remaining = tracker.get_remaining('?')
-        if blanks_remaining > 0:
-            unseen_dict['?'] = blanks_remaining
-            unseen_parts.append(f"?:{blanks_remaining}" if blanks_remaining > 1 else "?")
-        
-        total_unseen = tracker.get_unseen_count()
+        for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ?':
+            count = unseen_dict.get(letter, 0)
+            if count > 0:
+                unseen_parts.append(f"{letter}:{count}" if count > 1 else letter)
+
+        total_unseen = sum(unseen_dict.values())
         print(f"   Unseen ({total_unseen}): {' '.join(unseen_parts)}")
-        
+
         # Show played out high-value tiles (5+ points)
         high_value_letters = {'J': 10, 'Q': 10, 'X': 8, 'Z': 10, 'K': 6, 'V': 6, 'W': 5}
         played_out = []
         for letter, value in sorted(high_value_letters.items(), key=lambda x: -x[1]):
-            if tracker.get_remaining(letter) == 0:
+            if unseen_dict.get(letter, 0) == 0:
                 played_out.append(f"{letter}({value})")
         
         if played_out:
@@ -743,6 +776,7 @@ class GameManager:
                       f"({s.your_score}-{s.opp_score}, {'+' if spread >= 0 else ''}{spread}) "
                       f"| {status} [{game_id}]")
             except Exception as e:
+                logger.error("Slot %d: failed to load %s: %s", slot, game_id, e)
                 print(f"  Slot {slot}: ! Failed to load {game_id}: {e}")
                 self.games[slot] = None
 
@@ -1079,8 +1113,11 @@ class GameManager:
             self.games[slot] = Game.load(filepath)
             self.current_slot = slot
             print(f"[OK] Loaded into Slot {slot}")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"[X] Failed to load: {e}")
         except Exception as e:
             print(f"[X] Failed to load: {e}")
+            traceback.print_exc()
     
     def list_saves(self):
         """List all saved games."""
@@ -1110,9 +1147,9 @@ class GameManager:
                         'score': f"{your_score}-{opp_score} ({spread_str})",
                         'updated': updated
                     })
-                except:
+                except (json.JSONDecodeError, KeyError, OSError):
                     pass
-        
+
         if saves:
             print(f"\n{'='*70}")
             print("SAVED GAMES")
@@ -1190,7 +1227,7 @@ class GameManager:
             elif action == 'slot' and len(parts) >= 2:
                 try:
                     self.select_slot(int(parts[1]))
-                except:
+                except (ValueError, IndexError):
                     print("Usage: slot N")
             
             elif action == 'new' and len(parts) >= 2:
@@ -1198,7 +1235,7 @@ class GameManager:
                     slot = int(parts[1])
                     name = ' '.join(parts[2:]) if len(parts) > 2 else "Opponent"
                     self.new_game(slot, name)
-                except:
+                except (ValueError, IndexError):
                     print("Usage: new SLOT OPPONENT_NAME")
             
             elif action == 'slots':
@@ -1247,8 +1284,11 @@ class GameManager:
                         game.play_move(word, row, col, horiz,
                                        rack=game.state.your_rack,
                                        new_rack=post_rack)
+                    except (ValueError, IndexError) as e:
+                        print(f"Error: {e}")
                     except Exception as e:
                         print(f"Error: {e}")
+                        traceback.print_exc()
                 else:
                     print("No game in current slot")
 
@@ -1261,8 +1301,11 @@ class GameManager:
                         tiles_dumped = parts[1].upper()
                         new_rack = parts[2].upper()
                         game.record_exchange(tiles_dumped, new_rack)
+                    except (ValueError, IndexError) as e:
+                        print(f"Error: {e}")
                     except Exception as e:
                         print(f"Error: {e}")
+                        traceback.print_exc()
                 else:
                     print("No game in current slot")
 
@@ -1280,8 +1323,11 @@ class GameManager:
                         score = int(parts[5])
                         game.record_opponent_move(word, row, col, horiz, score,
                                                   force=force)
+                    except (ValueError, IndexError) as e:
+                        print(f"Error: {e}")
                     except Exception as e:
                         print(f"Error: {e}")
+                        traceback.print_exc()
                 else:
                     print("No game in current slot")
             
@@ -1294,9 +1340,12 @@ class GameManager:
                     opp_sc = int(parts[2])
                     result = parts[3].lower() if len(parts) >= 4 else None
                     self.end_game(your_score=your_sc, opp_score=opp_sc, result=result)
-                except Exception as e:
+                except (ValueError, IndexError) as e:
                     print(f"Error: {e}")
                     print("Usage: end YOUR_SCORE OPP_SCORE [win/loss/tie]")
+                except Exception as e:
+                    print(f"Error: {e}")
+                    traceback.print_exc()
 
             elif action == 'resign':
                 # resign [SLOT] -- opponent resigned, end game with current scores
@@ -1305,9 +1354,12 @@ class GameManager:
                 try:
                     resign_slot = int(parts[1]) if len(parts) >= 2 else None
                     self.end_game(slot=resign_slot, result='win', resignation=True)
-                except Exception as e:
+                except (ValueError, IndexError) as e:
                     print(f"Error: {e}")
                     print("Usage: resign [SLOT]")
+                except Exception as e:
+                    print(f"Error: {e}")
+                    traceback.print_exc()
 
             elif action == 'reload':
                 # Reload game(s) from disk after git pull or external edits
@@ -1328,7 +1380,7 @@ class GameManager:
             elif action == 'reset' and len(parts) >= 2:
                 try:
                     self.reset_slot(int(parts[1]))
-                except:
+                except (ValueError, IndexError):
                     print("Usage: reset N")
             
             else:
