@@ -68,6 +68,7 @@ version changes.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 20.2.0 | 2026-02 | Blank strategy 3-ply: when rack has 2+ blanks, supplementary 3-ply MC compares spending both vs saving one for next turn |
 | 20.1.0 | 2026-02 | MC total timeout (90s) prevents dense-board hangs -- stuck candidates cancelled, partial results used |
 | 20.0.0 | 2026-02 | Architectural cleanup: config centralization (~50 constants), TileTracker consolidation, structured logging (log.py), pytest suite (91 tests), Game DI for testing |
 | 19.0.0 | 2026-02 | Game class mixin refactor: split into game_analysis.py (1500 lines) + game_moves.py (670 lines), game_manager.py reduced to 1400 lines |
