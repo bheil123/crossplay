@@ -221,6 +221,7 @@ MC_ES_SE_THRESHOLD: float = 1.0    # std error target (95% CI +/- 2 pts)
 MC_CEILING_K: int = 2000           # max simulations per candidate
 MC_PROBE_COUNT: int = 3            # initial probes before adaptive K
 MC_SLOW_BOARD_MS: int = 20         # threshold (ms) for slow board detection
+MC_TOTAL_TIMEOUT: int = 90         # max seconds for entire MC phase (cancels stuck candidates)
 
 # =============================================================================
 # EXCHANGE EVALUATION

@@ -31,7 +31,7 @@ import os
 import random
 import time
 from typing import List, Dict, Tuple, Optional
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed, TimeoutError
 
 from .board import Board
 from .move_finder_gaddag import GADDAGMoveFinder
@@ -40,11 +40,8 @@ from .leave_eval import evaluate_leave
 from .config import (
     TILE_VALUES, VALID_TWO_LETTER, BINGO_BONUS, RACK_SIZE,
     MC_ES_MIN_SIMS, MC_ES_CHECK_EVERY, MC_ES_SE_THRESHOLD,
-    MC_CEILING_K, MC_PROBE_COUNT, MC_SLOW_BOARD_MS,
+    MC_CEILING_K, MC_PROBE_COUNT, MC_SLOW_BOARD_MS, MC_TOTAL_TIMEOUT,
 )
-from .log import get_logger
-
-logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -1182,15 +1179,25 @@ def mc_evaluate_2ply(
         for j, exch_args in enumerate(exchange_args_list):
             futures[pool.submit(_mc_eval_exchange_candidate, exch_args)] = len(args_list) + j
         results = []
-        for i, future in enumerate(as_completed(futures)):
-            results.append(future.result())
+        timed_out = 0
+        try:
+            for i, future in enumerate(as_completed(futures, timeout=MC_TOTAL_TIMEOUT)):
+                results.append(future.result())
+                elapsed = time.time() - t0
+                pct = (i + 1) / total
+                filled = int(20 * pct)
+                bar = '#' * filled + '-' * (20 - filled)
+                # Print at 25% milestones and final
+                if i + 1 == total or int(pct * 4) > int(i / total * 4):
+                    print(f"  MC [{bar}] {i+1}/{total}  {elapsed:.0f}s")
+        except TimeoutError:
+            # Cancel remaining futures stuck on dense board positions
+            for f in futures:
+                f.cancel()
+            timed_out = total - len(results)
             elapsed = time.time() - t0
-            pct = (i + 1) / total
-            filled = int(20 * pct)
-            bar = '#' * filled + '-' * (20 - filled)
-            # Print at 25% milestones and final
-            if i + 1 == total or int(pct * 4) > int(i / total * 4):
-                print(f"  MC [{bar}] {i+1}/{total}  {elapsed:.0f}s")
+            print(f"  MC timeout after {elapsed:.0f}s -- {len(results)}/{total} candidates"
+                  f" ({timed_out} skipped)")
         elapsed = time.time() - t0
 
         # Apply blank correction to parallel results
@@ -1211,7 +1218,7 @@ def mc_evaluate_2ply(
         return results
 
     except Exception as e:
-        logger.warning("MC parallel eval failed: %s -- falling back to sequential", e)
+        print(f"[!] MC parallel eval failed: {e} -- falling back to sequential")
         return _mc_eval_sequential(
             board, candidates, unseen_pool, your_rack, board_blanks,
             gaddag, k_sims, blank_corr
