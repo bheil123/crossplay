@@ -422,6 +422,50 @@
       "engine_version": "20.0.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "SILL",
+      "row": 12,
+      "col": 4,
+      "dir": "V",
+      "player": "opp",
+      "score": 26,
+      "bag": 2,
+      "blanks": [],
+      "cumulative": [
+        412,
+        310
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-25T08:11:08.896594",
+      "engine": null,
+      "engine_version": "20.2.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "OD",
+      "row": 14,
+      "col": 8,
+      "dir": "V",
+      "player": "me",
+      "score": 19,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        431,
+        310
+      ],
+      "rack": "ODPDUO?",
+      "drawn": "HN",
+      "note": "",
+      "timestamp": "2026-02-25T08:13:30.365285",
+      "engine": null,
+      "engine_version": "20.2.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -431,17 +475,17 @@
       "N"
     ]
   ],
-  "your_score": 412,
-  "opp_score": 268,
-  "your_rack": "ODDUPO?",
+  "your_score": 431,
+  "opp_score": 310,
+  "your_rack": "EPDUO?",
   "is_your_turn": false,
   "opponent_name": "joybells27",
   "created_at": "2026-02-24T08:55:51.252021",
-  "updated_at": "2026-02-25T01:00:20.918659",
+  "updated_at": "2026-02-25T08:13:30.606282",
   "notes": "",
-  "final_turns_remaining": null,
+  "final_turns_remaining": 2,
   "game_id": "joybells27_004",
   "status": "active",
-  "spread": 144,
-  "move_count": 19
+  "spread": 121,
+  "move_count": 21
 }
