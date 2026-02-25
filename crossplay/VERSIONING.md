@@ -68,6 +68,7 @@ version changes.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 20.3.0 | 2026-02 | Fix post-MC hang: bingo blocking time budget (was 37min, now 15s max), C extension segfault fix (rack_indices[7]->[26]), 3-ply uses C movegen (13x faster), 3-ply threshold raised bag<=12 to bag<=21 |
 | 20.2.0 | 2026-02 | Blank strategy 3-ply: when rack has 2+ blanks, supplementary 3-ply MC compares spending both vs saving one for next turn |
 | 20.1.0 | 2026-02 | MC total timeout (90s) prevents dense-board hangs -- stuck candidates cancelled, partial results used |
 | 20.0.0 | 2026-02 | Architectural cleanup: config centralization (~50 constants), TileTracker consolidation, structured logging (log.py), pytest suite (91 tests), Game DI for testing |
