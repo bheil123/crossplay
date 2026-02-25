@@ -1,11 +1,12 @@
 """
 CROSSPLAY V15 - 3-Ply Lookahead Module
-Deep analysis for endgame situations (bag ≤ 12, unseen ≤ 19).
+Deep analysis for late-to-mid game positions (bag <= 21, unseen <= 28).
 
-3-ply: Your move → Opponent's best → Your best response
+3-ply: Your move -> Opponent's best -> Your best response
 
 Features:
-  - 30-second time budget with adaptive per-candidate timing
+  - 20-second time budget with adaptive per-candidate timing
+  - C extension for move generation (13x faster than Python)
   - Blank correction factor for capped opponent blanks
   - Progressive pruning (skip candidates that can't beat current best)
   - Auto-scaled candidate count based on unseen tile count
@@ -280,21 +281,42 @@ def evaluate_3ply(
     blank_corr = _blank_correction_factor(unseen_count, blanks_in_unseen)
 
     # --- Auto-scale top_n based on unseen count ---
+    # C extension opponent movegen: ~0.1s (14 tiles) to ~1.0s (28 tiles)
+    # Python fallback: 5-11s per call, so fewer candidates
     if top_n is None:
         if unseen_count <= 10:
             top_n = 12
         elif unseen_count <= 14:
             top_n = 10
-        elif unseen_count <= 17:
-            top_n = 8
         elif unseen_count <= 19:
-            top_n = 5   # ~30s budget, ~6s each
+            top_n = 8
+        elif unseen_count <= 24:
+            top_n = 6
+        elif unseen_count <= 28:
+            top_n = 5
         else:
-            top_n = 4   # tight budget
+            top_n = 4
+
+    # Try C extension for move generation (13x faster with large tile sets)
+    _use_c_ext = False
+    try:
+        from .move_finder_c import find_all_moves_c as _3ply_find_c
+        _use_c_ext = True
+    except Exception:
+        pass
+
+    def _find_moves(brd, rack_str):
+        """Generate moves using C extension with Python fallback."""
+        if _use_c_ext:
+            try:
+                return _3ply_find_c(brd, gaddag, rack_str, board_blanks=board_blanks)
+            except Exception:
+                pass
+        f = GADDAGMoveFinder(brd, gaddag, board_blanks=board_blanks)
+        return f.find_all_moves(rack_str)
 
     # --- PLY 0: Generate your candidate moves ---
-    finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks)
-    your_moves = finder.find_all_moves(your_rack)
+    your_moves = _find_moves(board, your_rack)
 
     if not your_moves:
         return []
@@ -355,8 +377,7 @@ def evaluate_3ply(
         )
 
         # === PLY 2: Opponent's best response ===
-        opp_finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks)
-        opp_moves = opp_finder.find_all_moves(unseen_limited)
+        opp_moves = _find_moves(board, unseen_limited)
 
         opp_best_responses = []
         if opp_moves:
@@ -380,8 +401,7 @@ def evaluate_3ply(
                 opp_best['word'], opp_best['row'], opp_best['col'], opp_horizontal
             )
 
-            your_resp_finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks)
-            your_resp_moves = your_resp_finder.find_all_moves(your_leave)
+            your_resp_moves = _find_moves(board, your_leave)
 
             if your_resp_moves:
                 your_resp_best = max(your_resp_moves, key=lambda m: m['score'])

@@ -78,7 +78,7 @@ cdef class _SearchState:
     cdef const unsigned char* data
     cdef list grid                  # Python list-of-lists (kept for cross-check)
     cdef int rack[27]               # C array: counts per letter (0-25=A-Z, 26=blank)
-    cdef int rack_indices[7]        # C array: which letter indices are in rack
+    cdef int rack_indices[26]       # C array: which letter indices are in rack (up to 26 distinct)
     cdef int rack_nletters          # how many distinct letters in rack
     cdef int num_blanks
     cdef bint empty_board

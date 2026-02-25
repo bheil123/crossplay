@@ -926,9 +926,9 @@ class GameAnalysisMixin:
             if blanks_in_rack >= BLANK_3PLY_MIN_BLANKS and bag_size > BLANK_3PLY_MIN_BAG:
                 self._show_blank_3ply_analysis(rack, unseen_str, total_unseen, results, bag_size)
 
-            # 3-ply analysis for late game (<=12 in bag)
+            # 3-ply analysis for late-to-mid game (C extension makes this fast)
             # Budget: 20s total minus MC time already spent
-            if bag_size <= 12 and bag_size >= 0:
+            if bag_size <= 21 and bag_size >= 0:
                 remaining_budget = max(2.0, THREE_PLY_TIME_BUDGET - t_mc)
                 self._show_3ply_analysis(rack, unseen_str, total_unseen, time_budget=remaining_budget)
                     
@@ -945,9 +945,16 @@ class GameAnalysisMixin:
         # Skip if too many unseen - combinatorially expensive and less useful
         if len(unseen_str) > LATE_GAME_UNSEEN_THRESHOLD:
             return None
-            
-        finder = GADDAGMoveFinder(self.board, self.gaddag, board_blanks=self.state.blank_positions)
-        opp_moves = finder.find_all_moves(unseen_str)
+
+        # Use C extension for speed (13x faster with large tile sets)
+        try:
+            from .move_finder_c import find_all_moves_c
+            opp_moves = find_all_moves_c(
+                self.board, self.gaddag, unseen_str,
+                board_blanks=self.state.blank_positions)
+        except Exception:
+            finder = GADDAGMoveFinder(self.board, self.gaddag, board_blanks=self.state.blank_positions)
+            opp_moves = finder.find_all_moves(unseen_str)
         
         # Find best bingo (7+ tiles used)
         bingos = []
@@ -1010,19 +1017,42 @@ class GameAnalysisMixin:
         if not blocking_candidates:
             print("\n   No blocking moves available for this bingo.")
             return
-        
-        # Evaluate each blocking move with 2-ply
-        print(f"\nEvaluating {len(blocking_candidates)} blocking moves...")
-        
+
+        # Sort by score and limit candidates (opponent movegen is expensive)
+        blocking_candidates.sort(key=lambda m: -m['score'])
+        max_eval = 8  # only display 8 anyway
+        blocking_candidates = blocking_candidates[:max_eval]
+
+        # Evaluate each blocking move with 2-ply (time-budgeted)
+        print(f"\nEvaluating top {len(blocking_candidates)} blocking moves...")
+        t_block_start = time.time()
+        block_budget = 15.0  # seconds
+
+        # Try C extension for opponent movegen (13x faster than Python)
+        try:
+            from .move_finder_c import find_all_moves_c as _block_find_c
+            _use_c_block = True
+        except Exception:
+            _use_c_block = False
+
         blocking_results = []
         for move in blocking_candidates:
+            if time.time() - t_block_start > block_budget:
+                print(f"  (time budget reached, {len(blocking_results)} evaluated)")
+                break
+
             horiz = move['direction'] == 'H'
             placed = self.board.place_move(move['word'], move['row'], move['col'], horiz)
-            
-            # Find opponent's new best
-            opp_finder = GADDAGMoveFinder(self.board, self.gaddag, board_blanks=self.state.blank_positions)
-            opp_moves = opp_finder.find_all_moves(unseen_str)
-            
+
+            # Find opponent's new best (C extension preferred for speed)
+            if _use_c_block:
+                opp_moves = _block_find_c(
+                    self.board, self.gaddag, unseen_str,
+                    board_blanks=self.state.blank_positions)
+            else:
+                opp_finder = GADDAGMoveFinder(self.board, self.gaddag, board_blanks=self.state.blank_positions)
+                opp_moves = opp_finder.find_all_moves(unseen_str)
+
             if opp_moves:
                 opp_best = max(opp_moves, key=lambda m: m['score'])
                 opp_score = opp_best['score']
@@ -1030,12 +1060,12 @@ class GameAnalysisMixin:
             else:
                 opp_score = 0
                 opp_word = "(none)"
-            
+
             self.board.undo_move(placed)
-            
+
             net = move['score'] - opp_score
             saved = baseline_bingo['score'] - opp_score
-            
+
             blocking_results.append({
                 'word': move['word'],
                 'row': move['row'],
@@ -1060,30 +1090,30 @@ class GameAnalysisMixin:
             print(f"{m['word']:<12} {pos:<10} {m['score']:>4} {m['opp_word'][:12]:>12} "
                   f"{m['opp_score']:>6} {m['saved']:>+6} {m['net']:>+6}")
         
-        # Compare best blocker to best overall 2-ply
-        best_blocker = blocking_results[0]
-        best_overall = results[0] if results else None
-        
-        if best_overall:
-            overall_net = best_overall['score'] - best_overall['opp_best']
-            blocker_net = best_blocker['net']
-            
-            print(f"\n[INFO] Comparison:")
-            print(f"   Best 2-ply (no block): {best_overall['word']} ({best_overall['score']} pts)")
-            print(f"      -> Opp plays {best_overall.get('opp_word', '?')} ({best_overall['opp_best']} pts)")
-            print(f"      -> Net: {overall_net:+.0f}")
-            print(f"   Best BLOCKER: {best_blocker['word']} ({best_blocker['score']} pts)")
-            print(f"      -> Opp plays {best_blocker['opp_word']} ({best_blocker['opp_score']} pts)")
-            print(f"      -> Net: {blocker_net:+d}")
-            
-            if blocker_net > overall_net:
-                advantage = blocker_net - overall_net
-                print(f"\n   --> BLOCKING IS BETTER! {best_blocker['word']} gains {advantage} pts net")
-                print(f"      Blocks {baseline_bingo['score']} pt bingo, opp limited to {best_blocker['opp_score']} pts")
-            else:
-                disadvantage = overall_net - blocker_net
-                print(f"\n   OK Non-blocking play is better by {disadvantage} pts net")
-                print(f"      But blocking keeps game closer if you're ahead")
+        # Compare best blocker to best overall MC result
+        if blocking_results:
+            best_blocker = blocking_results[0]
+            best_overall = results[0] if results else None
+
+            if best_overall and not best_overall.get('is_exchange'):
+                opp_avg = best_overall.get('mc_avg_opp', 0)
+                overall_net = best_overall['score'] - opp_avg
+                blocker_net = best_blocker['net']
+
+                print(f"\n[INFO] Comparison:")
+                print(f"   Best MC: {best_overall['word']} ({best_overall['score']} pts)")
+                print(f"      -> Avg opp: {opp_avg:.0f} pts  -> Net: {overall_net:+.0f}")
+                print(f"   Best BLOCKER: {best_blocker['word']} ({best_blocker['score']} pts)")
+                print(f"      -> Opp plays {best_blocker['opp_word']} ({best_blocker['opp_score']} pts)")
+                print(f"      -> Net: {blocker_net:+d}")
+
+                if blocker_net > overall_net:
+                    advantage = blocker_net - overall_net
+                    print(f"\n   --> BLOCKING IS BETTER! {best_blocker['word']} gains {advantage:.0f} pts net")
+                    print(f"      Blocks {baseline_bingo['score']} pt bingo, opp limited to {best_blocker['opp_score']} pts")
+                else:
+                    disadvantage = overall_net - blocker_net
+                    print(f"\n   OK Non-blocking play is better by {disadvantage:.0f} pts net")
     
     def _show_catchup_advice(self, unseen: dict, total_unseen: int, results: list):
         """Show strategic advice when far behind in late game."""
