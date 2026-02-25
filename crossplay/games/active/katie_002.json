@@ -268,6 +268,50 @@
       "engine_version": "18.0.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "UPTEAR",
+      "row": 9,
+      "col": 2,
+      "dir": "V",
+      "player": "opp",
+      "score": 33,
+      "bag": 27,
+      "blanks": [],
+      "cumulative": [
+        215,
+        191
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-24T22:57:48.427675",
+      "engine": null,
+      "engine_version": "19.0.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "OBEY",
+      "row": 12,
+      "col": 1,
+      "dir": "V",
+      "player": "me",
+      "score": 67,
+      "bag": 22,
+      "blanks": [],
+      "cumulative": [
+        282,
+        191
+      ],
+      "rack": "IBTEGOY",
+      "drawn": "ASS?",
+      "note": "",
+      "timestamp": "2026-02-24T23:00:59.875500",
+      "engine": null,
+      "engine_version": "19.0.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -282,17 +326,17 @@
       "I"
     ]
   ],
-  "your_score": 215,
-  "opp_score": 158,
-  "your_rack": "IBTEGOY",
+  "your_score": 282,
+  "opp_score": 191,
+  "your_rack": "ITAGSS?",
   "is_your_turn": false,
   "opponent_name": "katie",
   "created_at": "2026-02-22T13:00:00.000000",
-  "updated_at": "2026-02-24T22:14:04.069543",
+  "updated_at": "2026-02-24T23:01:00.251759",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "katie_002",
   "status": "active",
-  "spread": 57,
-  "move_count": 12
+  "spread": 91,
+  "move_count": 14
 }
