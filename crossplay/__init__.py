@@ -1,5 +1,5 @@
 """
-CROSSPLAY V18 - TD-learned SuperLeaves gen3, Cython word_set optimization, near-endgame evaluation.
+CROSSPLAY V19 - Game class mixin refactor (game_analysis.py, game_moves.py).
 
 See VERSIONING.md for version numbering rules.
 See CLAUDE.md for architecture overview and coding conventions.
@@ -7,7 +7,7 @@ See CLAUDE.md for architecture overview and coding conventions.
 Entry point: game_manager.GameManager
 """
 
-__version__ = "18.0.0"
+__version__ = "19.0.0"
 __author__ = "Claude"
 
 # Import main classes for convenience
