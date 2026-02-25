@@ -7,6 +7,8 @@ from collections import Counter
 import math
 from typing import Tuple, List, Optional, Set
 
+from . import config
+
 def calculate_real_risk(
     board, 
     move: dict,
@@ -238,11 +240,11 @@ def calculate_real_risk(
     risk_str = risk_parts[0]
     
     # Collect results: top by EV, max threat, and top high-score threats
-    result_threats = unique_threats[:6]  # Top 6 by EV
-    
-    # Add top 3 high-score realistic threats if not already included
+    result_threats = unique_threats[:config.THREAT_PER_MOVE_TOP_EV]
+
+    # Add high-score realistic threats if not already included
     high_score = sorted(realistic, key=lambda t: -t['score'])
-    for t in high_score[:3]:
+    for t in high_score[:config.THREAT_PER_MOVE_TOP_SCORE]:
         if t not in result_threats:
             result_threats.append(t)
     
@@ -331,21 +333,31 @@ def _find_vertical_threats(
             if not positions_needed:
                 continue
             
-            pattern_str = ''.join(pattern)
+            # Inject single-letter crossword constraints into pattern
+            # before find_words() to narrow search space dramatically
+            # (e.g., '??????' -> 'B?????' reduces 16706 -> 1187 matches)
+            optimized = list(pattern)
+            for r in positions_needed:
+                if r in cross_valid and len(cross_valid[r]) == 1:
+                    optimized[r - start_r] = next(iter(cross_valid[r]))
+            pattern_str = ''.join(optimized)
             matches = dictionary.find_words(pattern_str)
-            
+
             # Check more matches when hitting multiple bonuses
+            # Raise limits for heavily-wildcarded patterns
+            wc = pattern_str.count('?')
+            wild = wc >= config.THREAT_WILDCARD_THRESHOLD
             if len(bonuses_hittable) >= 2:
-                limit = 2000
+                limit = config.THREAT_LIMIT_MULTI_BONUS_WILD if wild else config.THREAT_LIMIT_MULTI_BONUS
             elif bonuses_hittable:
-                limit = 500
+                limit = config.THREAT_LIMIT_SINGLE_BONUS_WILD if wild else config.THREAT_LIMIT_SINGLE_BONUS
             else:
-                limit = 100
-            
+                limit = config.THREAT_LIMIT_NO_BONUS_WILD if wild else config.THREAT_LIMIT_NO_BONUS
+
             for word in list(matches)[:limit]:
                 if not _check_crosswords_fast(word, start_r, positions_needed, cross_valid):
                     continue
-                
+
                 threat = _evaluate_threat(
                     word, start_r, col, positions_needed, constraints, False,
                     unseen, total_unseen, bonus_squares, tile_values,
@@ -435,20 +447,28 @@ def _find_horizontal_threats(
             if not positions_needed:
                 continue
             
-            pattern_str = ''.join(pattern)
+            # Inject single-letter crossword constraints into pattern
+            optimized = list(pattern)
+            for c in positions_needed:
+                if c in cross_valid and len(cross_valid[c]) == 1:
+                    optimized[c - start_c] = next(iter(cross_valid[c]))
+            pattern_str = ''.join(optimized)
             matches = dictionary.find_words(pattern_str)
-            
+
+            # Raise limits for heavily-wildcarded patterns
+            wc = pattern_str.count('?')
+            wild = wc >= config.THREAT_WILDCARD_THRESHOLD
             if len(bonuses_hittable) >= 2:
-                limit = 2000
+                limit = config.THREAT_LIMIT_MULTI_BONUS_WILD if wild else config.THREAT_LIMIT_MULTI_BONUS
             elif bonuses_hittable:
-                limit = 500
+                limit = config.THREAT_LIMIT_SINGLE_BONUS_WILD if wild else config.THREAT_LIMIT_SINGLE_BONUS
             else:
-                limit = 100
-            
+                limit = config.THREAT_LIMIT_NO_BONUS_WILD if wild else config.THREAT_LIMIT_NO_BONUS
+
             for word in list(matches)[:limit]:
                 if not _check_crosswords_fast(word, start_c, positions_needed, cross_valid):
                     continue
-                
+
                 threat = _evaluate_threat(
                     word, row, start_c, positions_needed, constraints, True,
                     unseen, total_unseen, bonus_squares, tile_values,
@@ -662,7 +682,7 @@ def _evaluate_threat(
     
     prob = _calc_prob(needed_str, unseen, total_unseen, hand_size=hand_size)
 
-    if total_score < 6 or prob < 0.001:
+    if total_score < config.THREAT_MIN_SCORE or prob < config.THREAT_MIN_PROB:
         return None
     
     if horizontal:
@@ -990,4 +1010,18 @@ def analyze_existing_threats(
     else:
         risk_str = f"({max_damage})"
     
-    return risk_str, expected_damage, max_damage, unique_threats[:20]
+    # Collect results: top by EV, plus top high-score threats
+    result_threats = unique_threats[:config.THREAT_TOP_BY_EV]
+
+    # Add high-score threats not already included
+    # (pattern injection finds high-damage plays that have low EV)
+    high_score = sorted(unique_threats, key=lambda t: -t['score'])
+    added = 0
+    for t in high_score:
+        if added >= config.THREAT_TOP_BY_SCORE:
+            break
+        if t not in result_threats:
+            result_threats.append(t)
+            added += 1
+
+    return risk_str, expected_damage, max_damage, result_threats

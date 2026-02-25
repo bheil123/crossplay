@@ -437,6 +437,34 @@ since GameManager caches game state in memory at startup.
 `GameManager.reload_games(slot=None)` is the programmatic API. Reloads all
 slots if `slot` is None, or a single slot if specified.
 
+## V20.4 changes: threat analyzer pattern injection
+
+**Cross-valid pattern injection (`real_risk.py`):**
+`_find_vertical_threats()` and `_find_horizontal_threats()` now inject
+single-letter crossword constraints into wildcard patterns BEFORE calling
+`dictionary.find_words()`. When `cross_valid[pos]` has exactly 1 valid
+letter, the `?` at that position is replaced with the letter. This narrows
+the search space dramatically (e.g., `??????` -> `B?????` reduces matches
+from 16,706 to 1,187), preventing high-scoring threats from being truncated
+by the match limit.
+
+**Raised limits for wildcarded patterns:**
+Pattern match limits are now tiered by bonus square count AND wildcard
+density. When a pattern has 4+ remaining wildcards after injection, limits
+are raised (e.g., 2000->5000 for multi-bonus patterns). Constants live in
+`config.py` as `THREAT_LIMIT_*` and `THREAT_WILDCARD_THRESHOLD`.
+
+**High-score threat append:**
+`analyze_existing_threats()` now appends the top high-score threats (sorted
+by raw score) alongside the top EV-sorted threats. This surfaces high-damage
+plays that have low probability (low EV) but are still strategically relevant.
+
+**Config centralization:**
+12 threat analyzer magic numbers moved from `real_risk.py` to `config.py`:
+`THREAT_LIMIT_*` (6), `THREAT_WILDCARD_THRESHOLD`, `THREAT_MIN_SCORE`,
+`THREAT_MIN_PROB`, `THREAT_TOP_BY_EV`, `THREAT_TOP_BY_SCORE`,
+`THREAT_PER_MOVE_TOP_EV`, `THREAT_PER_MOVE_TOP_SCORE`.
+
 ## V20 changes: architectural cleanup + test suite
 
 **Deep architectural review** implementing 13 items for maintainability and

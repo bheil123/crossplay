@@ -107,6 +107,27 @@ RISK_THRESHOLD_CRITICAL: float = 60.0
 RISK_THRESHOLD_HIGH: float = 40.0
 RISK_THRESHOLD_MEDIUM: float = 20.0
 
+# Threat pattern matching limits (word matches to evaluate per pattern)
+# Higher limits catch more threats but cost more time. Raised when pattern
+# has many wildcards (>= THREAT_WILDCARD_THRESHOLD) since more words match.
+THREAT_LIMIT_MULTI_BONUS: int = 2000       # pattern hits 2+ bonus squares
+THREAT_LIMIT_MULTI_BONUS_WILD: int = 5000  # ... with many wildcards
+THREAT_LIMIT_SINGLE_BONUS: int = 500       # pattern hits 1 bonus square
+THREAT_LIMIT_SINGLE_BONUS_WILD: int = 2000 # ... with many wildcards
+THREAT_LIMIT_NO_BONUS: int = 100           # pattern hits no bonus squares
+THREAT_LIMIT_NO_BONUS_WILD: int = 500      # ... with many wildcards
+THREAT_WILDCARD_THRESHOLD: int = 4         # wildcards needed for raised limits
+
+# Threat evaluation filters
+THREAT_MIN_SCORE: int = 6                  # ignore threats scoring below this
+THREAT_MIN_PROB: float = 0.001             # ignore threats with prob below 0.1%
+
+# Threat result collection
+THREAT_TOP_BY_EV: int = 20                 # max threats sorted by expected value
+THREAT_TOP_BY_SCORE: int = 5               # extra high-score threats to append
+THREAT_PER_MOVE_TOP_EV: int = 6            # per-move top threats by EV
+THREAT_PER_MOVE_TOP_SCORE: int = 3         # per-move extra high-score threats
+
 # =============================================================================
 # LEAVE EVALUATION CONFIGURATION
 # =============================================================================
