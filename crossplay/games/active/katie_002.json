@@ -356,6 +356,109 @@
       "engine_version": "20.2.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "LAXES",
+      "row": 11,
+      "col": 14,
+      "dir": "V",
+      "player": "opp",
+      "score": 26,
+      "bag": 8,
+      "blanks": [],
+      "cumulative": [
+        361,
+        244
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "hooks S from STIGMAS at R15C14, 2W on E at (14,14)",
+      "timestamp": "2026-02-25T18:12:26.561663",
+      "engine": null,
+      "engine_version": "20.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "DOOB",
+      "row": 9,
+      "col": 15,
+      "dir": "V",
+      "player": "me",
+      "score": 42,
+      "bag": 4,
+      "blanks": [],
+      "cumulative": [
+        403,
+        244
+      ],
+      "rack": "OOBDNPE",
+      "drawn": "IIOT",
+      "note": "",
+      "timestamp": "2026-02-25T18:16:02.165534",
+      "engine": {
+        "word": "DOOB",
+        "row": 9,
+        "col": 15,
+        "dir": "V",
+        "score": 42,
+        "mc_equity": -5.1,
+        "risk_equity": -12.0
+      },
+      "engine_version": "20.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "QUART",
+      "row": 6,
+      "col": 11,
+      "dir": "H",
+      "player": "opp",
+      "score": 35,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        403,
+        279
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-25T18:33:17.950208",
+      "engine": null,
+      "engine_version": "20.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "TEPA",
+      "row": 12,
+      "col": 13,
+      "dir": "V",
+      "player": "me",
+      "score": 26,
+      "bag": 0,
+      "blanks": [],
+      "cumulative": [
+        429,
+        279
+      ],
+      "rack": "IIOTNPE",
+      "drawn": "",
+      "note": "",
+      "timestamp": "2026-02-25T18:38:33.292129",
+      "engine": {
+        "word": "TEPA",
+        "row": 12,
+        "col": 13,
+        "dir": "V",
+        "score": 25,
+        "endgame_net": -11
+      },
+      "engine_version": "20.4.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -368,19 +471,24 @@
       4,
       13,
       "I"
+    ],
+    [
+      15,
+      12,
+      "M"
     ]
   ],
-  "your_score": 361,
-  "opp_score": 218,
-  "your_rack": "OOBDNPE",
+  "your_score": 429,
+  "opp_score": 279,
+  "your_rack": "ION",
   "is_your_turn": false,
   "opponent_name": "katie",
   "created_at": "2026-02-22T13:00:00.000000",
-  "updated_at": "2026-02-25T09:40:42.747139",
+  "updated_at": "2026-02-25T18:38:33.292129",
   "notes": "",
-  "final_turns_remaining": null,
+  "final_turns_remaining": 1,
   "game_id": "katie_002",
   "status": "active",
-  "spread": 143,
-  "move_count": 16
+  "spread": 150,
+  "move_count": 20
 }
