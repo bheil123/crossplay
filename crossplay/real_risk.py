@@ -214,31 +214,45 @@ def calculate_real_risk(
 
     # Sort by EV
     unique_threats.sort(key=lambda x: -x['ev'])
-    expected_damage = unique_threats[0]['ev']
-    
+
+    # Aggregate expected damage across all threats that exploit each bonus
+    # square.  A single bonus square reachable from both H and V has roughly
+    # the sum of individual EVs (independent events at low probabilities).
+    # The worst-case bonus square determines expected_damage.
+    bonus_ev = {}  # (r, c) -> cumulative EV from all threats using it
+    for t in unique_threats:
+        for (r, c, _btype) in t.get('bonus_positions', []):
+            bonus_ev[(r, c)] = bonus_ev.get((r, c), 0.0) + t['ev']
+
+    if bonus_ev:
+        expected_damage = max(bonus_ev.values())
+    else:
+        # Threats that don't hit any bonus square -- fall back to top EV
+        expected_damage = unique_threats[0]['ev']
+
     # Max realistic threat (prob > 0.5%)
     realistic = [t for t in unique_threats if t['prob'] > 0.005]
     max_threat = max(realistic, key=lambda t: t['score']) if realistic else unique_threats[0]
     max_damage = max_threat['score']
-    
+
     # Build risk string showing max potential damage
     bonuses_opened = set()
     for r, c in opened_squares:
         b = bonus_squares.get((r, c))
         if b:
             bonuses_opened.add(b)
-    
+
     risk_parts = []
     for b in ['3W', '2W', '3L', '2L']:
         if b in bonuses_opened:
             risk_parts.append(f"{b}({max_damage})")
             break  # Just show first major bonus with max damage
-    
+
     if not risk_parts:
         risk_parts.append(f"({max_damage})")
-    
+
     risk_str = risk_parts[0]
-    
+
     # Collect results: top by EV, max threat, and top high-score threats
     result_threats = unique_threats[:config.THREAT_PER_MOVE_TOP_EV]
 
@@ -247,7 +261,7 @@ def calculate_real_risk(
     for t in high_score[:config.THREAT_PER_MOVE_TOP_SCORE]:
         if t not in result_threats:
             result_threats.append(t)
-    
+
     return risk_str, expected_damage, max_damage, result_threats
 
 
@@ -612,7 +626,8 @@ def _evaluate_threat(
     score = 0
     word_mult = 1
     bonuses_used = []
-    
+    bonus_positions = []  # (row, col, type) for each bonus square hit
+
     for i, letter in enumerate(word):
         if horizontal:
             r, c = row, start_col + i
@@ -620,27 +635,31 @@ def _evaluate_threat(
         else:
             r, c = start_row + i, col
             pos = r
-        
+
         # If this letter must be played with a blank, it scores 0
         if letter in tiles_needing_blank:
             ls = 0
         else:
             ls = tile_values.get(letter, 0)
-        
+
         if pos in positions_needed:
             bonus = bonus_squares.get((r, c))
             if bonus == '2L':
                 ls *= 2
                 bonuses_used.append('2L')
+                bonus_positions.append((r, c, '2L'))
             elif bonus == '3L':
                 ls *= 3
                 bonuses_used.append('3L')
+                bonus_positions.append((r, c, '3L'))
             elif bonus == '2W':
                 word_mult *= 2
                 bonuses_used.append('2W')
+                bonus_positions.append((r, c, '2W'))
             elif bonus == '3W':
                 word_mult *= 3
                 bonuses_used.append('3W')
+                bonus_positions.append((r, c, '3W'))
         
         score += ls
     
@@ -703,7 +722,8 @@ def _evaluate_threat(
         'needed': needed_str,
         'prob': prob,
         'ev': total_score * prob,
-        'bonuses': list(set(bonuses_used))
+        'bonuses': list(set(bonuses_used)),
+        'bonus_positions': bonus_positions,
     }
 
 
@@ -972,32 +992,31 @@ def analyze_existing_threats(
     
     if not unique_threats:
         return "-", 0.0, 0, []
-    
+
     # Sort by expected value
     unique_threats.sort(key=lambda t: -t['ev'])
-    
+
     # Calculate summary stats
     max_damage = max(t['score'] for t in unique_threats)
-    
-    # Use simple max (top threat EV) as expected damage
-    expected_damage = unique_threats[0]['ev'] if unique_threats else 0.0
-    
+
+    # Aggregate expected damage by bonus square position.
+    # A bonus square attackable from both H and V has combined EV from
+    # all threats using it (independent events at low probabilities).
+    bonus_ev = {}  # (r, c) -> cumulative EV
+    for t in unique_threats:
+        for (r, c, _btype) in t.get('bonus_positions', []):
+            bonus_ev[(r, c)] = bonus_ev.get((r, c), 0.0) + t['ev']
+
+    if bonus_ev:
+        expected_damage = max(bonus_ev.values())
+    else:
+        expected_damage = unique_threats[0]['ev'] if unique_threats else 0.0
+
     # Find which bonus squares are exposed
     bonuses_exposed = set()
     for t in unique_threats[:10]:  # Check top threats
-        # Determine which bonus the threat hits
-        if t['horizontal']:
-            for i in range(len(t['word'])):
-                pos = (t['row'], t['col'] + i)
-                b = bonus_squares.get(pos)
-                if b:
-                    bonuses_exposed.add(b)
-        else:
-            for i in range(len(t['word'])):
-                pos = (t['row'] + i, t['col'])
-                b = bonus_squares.get(pos)
-                if b:
-                    bonuses_exposed.add(b)
+        for (r, c, btype) in t.get('bonus_positions', []):
+            bonuses_exposed.add(btype)
     
     # Build risk string
     risk_parts = []
