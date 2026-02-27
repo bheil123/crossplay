@@ -26,7 +26,7 @@ class GameMovesMixin:
     shared Game instance state through self.
     """
     
-    def play_move(self, word: str, row: int, col: int, horizontal: bool,
+    def play_move(self, word: str, row: int, col: int, horizontal: bool, *,
                   is_opponent: bool = False, rack: str = None,
                   new_rack: str = None, engine_rec: dict = None) -> Tuple[bool, int]:
         """Play a move. Returns (success, score).
