@@ -1378,7 +1378,7 @@ class GameAnalysisMixin:
         Uses upper-bound pruning: evaluates ALL moves but only does full
         opponent search for moves that could actually be optimal.
         """
-        from .lookahead_3ply import evaluate_endgame_2ply
+        from .mc_eval import mc_evaluate_endgame
 
         print(f"\n{'='*70}")
         print(f"ENDGAME 2-PLY (exact) [bag: 0, opp rack: {len(opp_rack)} tiles]")
@@ -1388,7 +1388,7 @@ class GameAnalysisMixin:
         print()
 
         try:
-            results = evaluate_endgame_2ply(
+            results = mc_evaluate_endgame(
                 self.board,
                 your_rack=rack,
                 opp_rack=opp_rack,
@@ -1462,7 +1462,7 @@ class GameAnalysisMixin:
         structural advantage). This correctly captures the structural advantage
         of emptying the bag.
         """
-        from .lookahead_3ply import evaluate_near_endgame
+        from .mc_eval import mc_evaluate_near_endgame
 
         bag_size = total_unseen - 7
 
@@ -1475,7 +1475,7 @@ class GameAnalysisMixin:
 
         try:
             t_start = time.time()
-            results = evaluate_near_endgame(
+            results = mc_evaluate_near_endgame(
                 self.board,
                 your_rack=rack,
                 unseen_tiles=unseen_str,

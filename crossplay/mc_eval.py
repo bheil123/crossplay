@@ -1494,6 +1494,288 @@ def _mc_eval_3ply_blank_candidate(args: tuple) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Endgame: deterministic 2-ply when bag=0 (parallel worker)
+# ---------------------------------------------------------------------------
+
+def _mc_eval_endgame_candidate(args: tuple) -> dict:
+    """
+    Deterministic 2-ply endgame evaluation for one candidate move (bag=0).
+
+    Opponent rack is known exactly (all unseen tiles). Evaluates:
+      net = our_score - opponent_best_response_score
+
+    Uses grid-copy board reconstruction (O(225) constant time, faster than
+    board_moves replay for late-game positions with 20+ moves played).
+
+    Args (packed tuple):
+        grid:           15x15 list of lists (board._grid snapshot)
+        bb_set_list:    list of (r0, c0) tuples for blanks on board (0-indexed)
+        move:           dict with word, row, col, direction, score, blanks_used
+        opp_rack:       opponent rack string (known exactly when bag=0)
+
+    Returns:
+        dict matching evaluate_endgame_2ply() result format
+    """
+    grid, bb_set_list, move, opp_rack = args
+
+    global _mc_worker_gaddag, _mc_worker_gdata_bytes
+    global _mc_worker_cython_fast, _mc_worker_word_set
+    if _mc_worker_gaddag is None:
+        from .gaddag import get_gaddag
+        _mc_worker_gaddag = get_gaddag()
+        _mc_worker_gdata_bytes = bytes(_mc_worker_gaddag._data)
+
+    from .board import Board
+
+    # Reconstruct board from grid snapshot
+    board = Board()
+    for r in range(15):
+        for c in range(15):
+            if grid[r][c] is not None:
+                board._grid[r][c] = grid[r][c]
+
+    # Place our move
+    horizontal = move['direction'] == 'H'
+    placed = board.place_move(move['word'], move['row'], move['col'], horizontal)
+
+    # Build blank set including blanks from this move
+    bb_set = set(bb_set_list)
+    for idx in move.get('blanks_used', []):
+        if horizontal:
+            bb_set.add((move['row'] - 1, move['col'] - 1 + idx))
+        else:
+            bb_set.add((move['row'] - 1 + idx, move['col'] - 1))
+
+    # Find opponent's best response
+    _use_cython = _mc_worker_cython_fast and _mc_worker_gdata_bytes is not None
+
+    opp_score = 0
+    opp_word = '(pass)'
+
+    if _use_cython:
+        import gaddag_accel as _accel
+        ctx = _accel.prepare_board_context(
+            board._grid, _mc_worker_gdata_bytes, bb_set,
+            _mc_worker_word_set, VALID_TWO_LETTER,
+            _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
+        score, word, _, _, _ = _accel.find_best_score_c(ctx, opp_rack)
+        if score > 0:
+            opp_score = score
+            opp_word = word if word else '(pass)'
+    else:
+        from .move_finder_opt import find_best_score_opt
+        score, word, _, _, _ = find_best_score_opt(
+            board._grid, _mc_worker_gaddag._data, opp_rack, bb_set)
+        if score > 0:
+            opp_score = score
+            opp_word = word if word else '(pass)'
+
+    board.undo_move(placed)
+
+    return {
+        'word': move['word'],
+        'row': move['row'],
+        'col': move['col'],
+        'direction': move['direction'],
+        'score': move['score'],
+        'opp_word': opp_word,
+        'opp_score': opp_score,
+        'opp_responses': [],
+        'net_2ply': move['score'] - opp_score,
+        'exact': True,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Near-endgame: exhaustive 3-ply for one bag-emptying move (parallel worker)
+# ---------------------------------------------------------------------------
+
+def _mc_eval_near_endgame_candidate(args: tuple) -> dict:
+    """
+    Exhaustive 3-ply evaluation for one bag-emptying move (bag 1-8).
+
+    Iterates over ALL C(unseen, opp_rack_size) opponent rack combinations.
+    For each: our_score - opp_best_response + our_follow_up.
+
+    Args (packed tuple):
+        grid:           15x15 list of lists (board._grid snapshot)
+        bb_set_list:    list of (r0, c0) tuples for blanks on board (0-indexed)
+        move:           dict with word, row, col, direction, score,
+                        blanks_used, tiles_used
+        unseen_pool:    string of all unseen tiles
+        your_rack:      your rack string
+        blank_corr:     blank correction factor for opponent scores
+
+    Returns:
+        dict matching evaluate_near_endgame() 'exhaust' result format
+    """
+    from itertools import combinations
+
+    grid, bb_set_list, move, unseen_pool, your_rack, blank_corr = args
+
+    global _mc_worker_gaddag, _mc_worker_gdata_bytes
+    global _mc_worker_cython_fast, _mc_worker_word_set
+    if _mc_worker_gaddag is None:
+        from .gaddag import get_gaddag
+        _mc_worker_gaddag = get_gaddag()
+        _mc_worker_gdata_bytes = bytes(_mc_worker_gaddag._data)
+
+    from .board import Board
+
+    # Reconstruct board from grid snapshot
+    board = Board()
+    for r in range(15):
+        for c in range(15):
+            if grid[r][c] is not None:
+                board._grid[r][c] = grid[r][c]
+
+    # Place our move (ply 1)
+    horizontal = move['direction'] == 'H'
+    placed_1 = board.place_move(move['word'], move['row'], move['col'], horizontal)
+
+    # Build blank set including blanks from this move
+    bb_set = set(bb_set_list)
+    for idx in move.get('blanks_used', []):
+        if horizontal:
+            bb_set.add((move['row'] - 1, move['col'] - 1 + idx))
+        else:
+            bb_set.add((move['row'] - 1 + idx, move['col'] - 1))
+
+    # Compute our leave (tiles remaining after playing)
+    tiles_used = move.get('tiles_used', move.get('used', list(move['word'])))
+    rack_list = list(your_rack.upper())
+    for t in tiles_used:
+        t_upper = t.upper() if isinstance(t, str) else t
+        if t_upper in rack_list:
+            rack_list.remove(t_upper)
+        elif '?' in rack_list:
+            rack_list.remove('?')
+    your_leave = ''.join(rack_list)
+
+    # Build ply-2 board context (after our move)
+    _use_cython = _mc_worker_cython_fast and _mc_worker_gdata_bytes is not None
+
+    if _use_cython:
+        import gaddag_accel as _accel
+        ctx_ply2 = _accel.prepare_board_context(
+            board._grid, _mc_worker_gdata_bytes, bb_set,
+            _mc_worker_word_set, VALID_TWO_LETTER,
+            _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
+    else:
+        from .move_finder_opt import find_best_score_opt
+
+    unseen_list = list(unseen_pool)
+    n_unseen = len(unseen_list)
+    opp_rack_size = min(RACK_SIZE, n_unseen)
+
+    net_scores = []
+    opp_scores_all = []
+    your_resp_scores_all = []
+    opp_response_counts = {}  # word -> [count, max_score]
+
+    for combo_indices in combinations(range(n_unseen), opp_rack_size):
+        opp_rack = ''.join(unseen_list[i] for i in combo_indices)
+
+        # Limit blanks in opp rack to avoid exponential blowup
+        opp_rack_limited = _limit_blanks(opp_rack, max_blanks=2)
+
+        # Remaining unseen tiles go to bag -> your draw
+        drawn_indices = set(range(n_unseen)) - set(combo_indices)
+        drawn_tiles = ''.join(unseen_list[i] for i in drawn_indices)
+        your_full_rack = your_leave + drawn_tiles
+
+        # Ply 2: opponent's best response
+        if _use_cython:
+            opp_score, opp_word, opp_r, opp_c, opp_d = _accel.find_best_score_c(
+                ctx_ply2, opp_rack_limited)
+        else:
+            opp_score, opp_word, opp_r, opp_c, opp_d = find_best_score_opt(
+                board._grid, _mc_worker_gaddag._data, opp_rack_limited, bb_set)
+
+        opp_score_corrected = opp_score * blank_corr if opp_score > 0 else 0
+
+        # Track opponent responses
+        if opp_score > 0 and opp_word:
+            if opp_word not in opp_response_counts:
+                opp_response_counts[opp_word] = [0, 0]
+            opp_response_counts[opp_word][0] += 1
+            opp_response_counts[opp_word][1] = max(
+                opp_response_counts[opp_word][1], opp_score)
+
+        # Ply 3: our follow-up after opponent's move
+        your_resp_score = 0
+        if opp_score > 0 and opp_word:
+            opp_horiz = opp_d == 'H' if isinstance(opp_d, str) else opp_d
+            placed_2 = board.place_move(opp_word, opp_r, opp_c, opp_horiz)
+
+            if _use_cython:
+                ctx_ply3 = _accel.prepare_board_context(
+                    board._grid, _mc_worker_gdata_bytes, bb_set,
+                    _mc_worker_word_set, VALID_TWO_LETTER,
+                    _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
+                your_resp_score, _, _, _, _ = _accel.find_best_score_c(
+                    ctx_ply3, your_full_rack)
+            else:
+                your_resp_score, _, _, _, _ = find_best_score_opt(
+                    board._grid, _mc_worker_gaddag._data, your_full_rack, bb_set)
+
+            board.undo_move(placed_2)
+        else:
+            # Opponent passed -- find our best on ply-2 board (reuse ctx)
+            if _use_cython:
+                your_resp_score, _, _, _, _ = _accel.find_best_score_c(
+                    ctx_ply2, your_full_rack)
+            else:
+                your_resp_score, _, _, _, _ = find_best_score_opt(
+                    board._grid, _mc_worker_gaddag._data, your_full_rack, bb_set)
+
+        net = move['score'] - opp_score_corrected + your_resp_score
+        net_scores.append(net)
+        opp_scores_all.append(opp_score_corrected)
+        your_resp_scores_all.append(your_resp_score)
+
+    board.undo_move(placed_1)
+
+    # Aggregate stats
+    n_racks = len(net_scores)
+    if n_racks > 0:
+        avg_net = sum(net_scores) / n_racks
+        avg_opp = sum(opp_scores_all) / n_racks
+        max_opp = max(opp_scores_all) if opp_scores_all else 0
+        avg_resp = sum(your_resp_scores_all) / n_racks
+    else:
+        avg_net = float(move['score'])
+        avg_opp = 0.0
+        max_opp = 0
+        avg_resp = 0.0
+
+    # Top opponent responses by frequency
+    top_opp = sorted(opp_response_counts.items(),
+                     key=lambda x: (-x[1][0], -x[1][1]))[:5]
+    top_opp_list = [
+        {'word': w, 'count': c, 'max_score': s}
+        for w, (c, s) in top_opp
+    ]
+
+    return {
+        'word': move['word'],
+        'row': move['row'],
+        'col': move['col'],
+        'direction': move['direction'],
+        'score': move['score'],
+        'eval_type': 'exhaust',
+        'leave': your_leave,
+        'leave_value': 0.0,
+        'opp_avg': round(avg_opp, 1),
+        'opp_max': max_opp,
+        'your_resp_avg': round(avg_resp, 1),
+        'net_equity': round(avg_net, 1),
+        'n_racks': n_racks,
+        'top_opp_responses': top_opp_list,
+    }
+
+
 def mc_evaluate_3ply_blanks(
     board: Board,
     your_rack: str,
@@ -1586,3 +1868,339 @@ def mc_evaluate_3ply_blanks(
         import traceback
         traceback.print_exc()
         return []
+
+
+# ---------------------------------------------------------------------------
+# Parallel endgame evaluation (bag=0, opponent rack known exactly)
+# ---------------------------------------------------------------------------
+
+def mc_evaluate_endgame(
+    board: Board,
+    your_rack: str,
+    opp_rack: str,
+    gaddag=None,
+    board_blanks: List[Tuple[int, int, str]] = None,
+    top_n: int = 20,
+    max_workers: int = None,
+) -> List[Dict]:
+    """
+    Parallel 2-ply endgame solver (bag=0, opp rack known exactly).
+
+    Fans out ALL candidate moves to worker pool. Each worker places the move,
+    finds opponent's best response via Cython, returns net = score - opp_score.
+
+    With 10 workers, brute-force evaluation of N moves completes in ceil(N/10)
+    evaluations, competitive with sequential upper-bound pruning.
+
+    Falls back to sequential evaluate_endgame_2ply() for small move counts
+    or on failure.
+
+    Returns:
+        Same format as evaluate_endgame_2ply(): list of dicts sorted by net_2ply.
+    """
+    t_start = time.perf_counter()
+
+    if board_blanks is None:
+        board_blanks = []
+
+    # Generate all candidate moves
+    try:
+        from .move_finder_c import find_all_moves_c, is_available
+        if is_available():
+            if gaddag is None:
+                gaddag = get_gaddag()
+            your_moves = find_all_moves_c(
+                board, gaddag, your_rack, board_blanks=board_blanks)
+        else:
+            raise ImportError("C extension not available")
+    except (ImportError, Exception):
+        if gaddag is None:
+            gaddag = get_gaddag()
+        finder = GADDAGMoveFinder(board, gaddag, board_blanks=board_blanks)
+        your_moves = finder.find_all_moves(your_rack)
+
+    if not your_moves:
+        return []
+
+    # For small move counts, use sequential (pool overhead not worth it)
+    if len(your_moves) < 4:
+        from .lookahead_3ply import evaluate_endgame_2ply
+        return evaluate_endgame_2ply(
+            board, your_rack=your_rack, opp_rack=opp_rack,
+            gaddag=gaddag, board_blanks=board_blanks)
+
+    # Serialize board grid (O(225) constant, faster than move replay)
+    grid = [row[:] for row in board._grid]
+    bb_set_list = [(r - 1, c - 1) for r, c, _ in board_blanks]
+
+    # Build clean move dicts (only picklable fields)
+    args_list = []
+    for move in your_moves:
+        clean_move = {
+            'word': move['word'],
+            'row': move['row'],
+            'col': move['col'],
+            'direction': move['direction'],
+            'score': move['score'],
+            'blanks_used': move.get('blanks_used', []),
+        }
+        args_list.append((grid, bb_set_list, clean_move, opp_rack))
+
+    # Run in parallel
+    try:
+        if max_workers is None:
+            cpu = os.cpu_count() or 4
+            max_workers = max(2, min(cpu - 2, 10))
+        pool = _get_mc_pool(max_workers)
+        total = len(args_list)
+
+        futures = {pool.submit(_mc_eval_endgame_candidate, args): i
+                   for i, args in enumerate(args_list)}
+
+        results = []
+        try:
+            for future in as_completed(futures, timeout=30):
+                results.append(future.result())
+        except TimeoutError:
+            for f in futures:
+                f.cancel()
+            print(f"  Endgame parallel: {len(results)}/{total} completed before timeout")
+
+        elapsed = time.perf_counter() - t_start
+        results.sort(key=lambda r: -r['net_2ply'])
+
+        # Attach metadata (matching evaluate_endgame_2ply format)
+        meta = {
+            'elapsed_s': round(elapsed, 2),
+            'total_moves': len(your_moves),
+            'interfering': len(your_moves),  # all evaluated in parallel
+            'non_interfering': 0,
+            'fully_evaluated': len(results),
+            'pruned_by_bound': 0,
+            'opp_baseline': '(parallel)',
+            'baseline_time_s': 0,
+            'opp_rack_size': len(opp_rack),
+            'solver': 'endgame_2ply_parallel',
+        }
+        for r in results:
+            r['_meta'] = meta
+
+        return results
+
+    except Exception as e:
+        print(f"  Endgame parallel failed: {e} -- falling back to sequential")
+        from .lookahead_3ply import evaluate_endgame_2ply
+        return evaluate_endgame_2ply(
+            board, your_rack=your_rack, opp_rack=opp_rack,
+            gaddag=gaddag, board_blanks=board_blanks)
+
+
+# ---------------------------------------------------------------------------
+# Parallel near-endgame evaluation (bag 1-8, hybrid exhaustive + parity)
+# ---------------------------------------------------------------------------
+
+# Parity penalty lookup table (same as lookahead_3ply.py)
+_PARITY_P_OPP_EMPTIES = {
+    1: 0.97, 2: 0.94, 3: 0.88, 4: 0.78,
+    5: 0.62, 6: 0.40, 7: 0.18,
+}
+_PARITY_STRUCTURAL_ADV = 10.0
+
+
+def mc_evaluate_near_endgame(
+    board: Board,
+    your_rack: str,
+    unseen_tiles: str,
+    candidates: List[Dict],
+    gaddag=None,
+    board_blanks: List[Tuple[int, int, str]] = None,
+    top_n: int = 25,
+    time_budget: float = 45.0,
+    max_workers: int = None,
+) -> List[Dict]:
+    """
+    Parallel hybrid near-endgame evaluator (bag 1-8).
+
+    Pass 1 (main process, instant): Non-emptying moves get parity-adjusted
+    1-ply equity -- penalized by P(opp empties bag) x structural advantage.
+
+    Pass 2 (parallel workers): Bag-emptying moves fan out to worker pool.
+    Each worker computes exhaustive 3-ply over all C(unseen, 7) opponent
+    rack combinations.
+
+    Falls back to sequential evaluate_near_endgame() on failure.
+
+    Returns:
+        Same format as evaluate_near_endgame(): list of dicts sorted by net_equity.
+    """
+    t_start = time.perf_counter()
+
+    if not candidates:
+        return []
+
+    if gaddag is None:
+        gaddag = get_gaddag()
+    if board_blanks is None:
+        board_blanks = []
+
+    unseen_count = len(unseen_tiles)
+    bag_size = max(0, unseen_count - 7)
+
+    if bag_size < 1 or bag_size > 8:
+        return []
+
+    # Blank correction factor
+    blanks_in_unseen = unseen_tiles.count('?')
+    blank_corr = _blank_correction_factor(unseen_count, blanks_in_unseen)
+
+    cands = candidates[:top_n]
+    results = []
+    exhaust_count = 0
+    oneply_count = 0
+
+    # --- PASS 1: Non-emptying moves (instant, parity-adjusted 1-ply) ---
+    exhaust_cands = []
+    for move in cands:
+        tiles_used = move.get('tiles_used', move.get('used', move['word']))
+        n_tiles_used = len(tiles_used)
+
+        if n_tiles_used >= bag_size:
+            exhaust_cands.append(move)
+        else:
+            # Parity-adjusted 1-ply equity
+            oneply_count += 1
+            leave_val = move.get('leave_value', 0.0)
+            if isinstance(leave_val, str):
+                leave_val = 0.0
+            equity = move['score'] + leave_val
+
+            n_draw = min(n_tiles_used, bag_size)
+            bag_after = bag_size - n_draw
+            parity_penalty = 0.0
+            p_opp_empties = 0.0
+            if 1 <= bag_after <= 7:
+                p_opp_empties = _PARITY_P_OPP_EMPTIES[bag_after]
+                parity_penalty = -p_opp_empties * _PARITY_STRUCTURAL_ADV
+                equity += parity_penalty
+
+            eval_type = 'parity' if parity_penalty != 0 else '1ply'
+            results.append({
+                'word': move['word'],
+                'row': move['row'],
+                'col': move['col'],
+                'direction': move['direction'],
+                'score': move['score'],
+                'eval_type': eval_type,
+                'leave': move.get('leave_str', ''),
+                'leave_value': round(leave_val, 1),
+                'opp_avg': 0.0,
+                'opp_max': 0,
+                'your_resp_avg': 0.0,
+                'net_equity': round(equity, 1),
+                'n_racks': 0,
+                'top_opp_responses': [],
+                'parity_penalty': round(parity_penalty, 1),
+                'p_opp_empties': round(p_opp_empties, 2),
+                'bag_after': bag_after,
+            })
+
+    # --- PASS 2: Bag-emptying moves (parallel exhaustive 3-ply) ---
+    if exhaust_cands:
+        grid = [row[:] for row in board._grid]
+        bb_set_list = [(r - 1, c - 1) for r, c, _ in board_blanks]
+
+        work_list = []
+        for move in exhaust_cands:
+            clean_move = {
+                'word': move['word'],
+                'row': move['row'],
+                'col': move['col'],
+                'direction': move['direction'],
+                'score': move['score'],
+                'blanks_used': move.get('blanks_used', []),
+                'tiles_used': move.get('tiles_used',
+                                       move.get('used', list(move['word']))),
+            }
+            work_list.append((
+                grid, bb_set_list, clean_move,
+                unseen_tiles, your_rack, blank_corr
+            ))
+
+        try:
+            if max_workers is None:
+                cpu = os.cpu_count() or 4
+                max_workers = max(2, min(cpu - 2, 10))
+            pool = _get_mc_pool(max_workers)
+            total = len(work_list)
+
+            futures = {pool.submit(_mc_eval_near_endgame_candidate, args): i
+                       for i, args in enumerate(work_list)}
+
+            try:
+                remaining_budget = time_budget - (time.perf_counter() - t_start)
+                for future in as_completed(futures, timeout=max(5, remaining_budget)):
+                    result = future.result()
+                    results.append(result)
+                    exhaust_count += 1
+            except TimeoutError:
+                # Fall back to 1-ply for timed-out candidates
+                completed_words = {r['word'] for r in results
+                                   if r.get('eval_type') == 'exhaust'}
+                for move in exhaust_cands:
+                    if move['word'] not in completed_words:
+                        leave_val = move.get('leave_value', 0.0)
+                        if isinstance(leave_val, str):
+                            leave_val = 0.0
+                        oneply_count += 1
+                        results.append({
+                            'word': move['word'],
+                            'row': move['row'],
+                            'col': move['col'],
+                            'direction': move['direction'],
+                            'score': move['score'],
+                            'eval_type': '1ply',
+                            'leave': move.get('leave_str', ''),
+                            'leave_value': round(leave_val, 1),
+                            'opp_avg': 0.0,
+                            'opp_max': 0,
+                            'your_resp_avg': 0.0,
+                            'net_equity': round(move['score'] + leave_val, 1),
+                            'n_racks': 0,
+                            'top_opp_responses': [],
+                            'parity_penalty': 0.0,
+                            'p_opp_empties': 0.0,
+                            'bag_after': 0,
+                        })
+
+                for f in futures:
+                    f.cancel()
+                elapsed = time.perf_counter() - t_start
+                print(f"  Near-endgame: {exhaust_count}/{total} exhaust completed "
+                      f"in {elapsed:.1f}s (timeout)")
+
+        except Exception as e:
+            print(f"  Near-endgame parallel failed: {e} -- falling back to sequential")
+            from .lookahead_3ply import evaluate_near_endgame
+            return evaluate_near_endgame(
+                board, your_rack=your_rack, unseen_tiles=unseen_tiles,
+                candidates=candidates, gaddag=gaddag,
+                board_blanks=board_blanks, top_n=top_n,
+                time_budget=time_budget)
+
+    elapsed = time.perf_counter() - t_start
+    results.sort(key=lambda r: -r['net_equity'])
+
+    # Attach metadata (matching evaluate_near_endgame format)
+    if results:
+        results[0]['_meta'] = {
+            'elapsed_s': round(elapsed, 2),
+            'bag_size': bag_size,
+            'unseen_count': unseen_count,
+            'exhaust_evaluated': exhaust_count,
+            'oneply_evaluated': oneply_count,
+            'total_candidates': len(cands),
+            'blank_correction': round(blank_corr, 3),
+            'solver': 'near_endgame_parallel',
+        }
+
+    return results
