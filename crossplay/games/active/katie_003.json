@@ -104,8 +104,7 @@
       "engine_version": "20.4.0",
       "win_pct": null,
       "nyt": null
-    }
-    ,
+    },
     {
       "word": "EAU",
       "row": 8,
@@ -179,20 +178,64 @@
       "engine_version": "20.4.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "SWEAT",
+      "row": 11,
+      "col": 5,
+      "dir": "H",
+      "player": "opp",
+      "score": 34,
+      "bag": 54,
+      "blanks": [],
+      "cumulative": [
+        118,
+        112
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-02-26T23:10:36.630810",
+      "engine": null,
+      "engine_version": "20.5.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "OGLER",
+      "row": 4,
+      "col": 11,
+      "dir": "H",
+      "player": "me",
+      "score": 39,
+      "bag": 50,
+      "blanks": [],
+      "cumulative": [
+        157,
+        112
+      ],
+      "rack": "BRELGXE",
+      "drawn": "AGLC",
+      "note": "",
+      "timestamp": "2026-02-26T23:13:22.112725",
+      "engine": null,
+      "engine_version": "20.5.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [],
-  "your_score": 118,
-  "opp_score": 78,
-  "your_rack": "BRELGXE",
+  "your_score": 157,
+  "opp_score": 112,
+  "your_rack": "BAGELCX",
   "is_your_turn": false,
   "opponent_name": "katie",
   "created_at": "2026-02-25T19:06:09.668330",
-  "updated_at": "2026-02-26T12:10:00.000000",
+  "updated_at": "2026-02-26T23:13:24.023924",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "katie_003",
   "status": "active",
-  "spread": 40,
-  "move_count": 7
+  "spread": 45,
+  "move_count": 9
 }
