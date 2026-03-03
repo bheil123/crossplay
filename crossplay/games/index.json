@@ -1,10 +1,10 @@
 {
   "slots": {
-    "1": null,
+    "1": "dani_001",
     "2": "melain_002",
-    "3": "joybells27_006",
+    "3": "joybells27_007",
     "4": "katie_003",
-    "5": "katie_002"
+    "5": null
   },
   "counters": {
     "canjam": 3,
@@ -14,10 +14,11 @@
     "garnetgirl": 1,
     "melain": 3,
     "pkp8": 2,
-    "joybells27": 6,
+    "joybells27": 7,
     "katie": 3,
     "piph": 1,
-    "dforb": 1
+    "dforb": 1,
+    "dani": 1
   },
   "opponent_notes": {}
 }
