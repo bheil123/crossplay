@@ -64,7 +64,6 @@ class TestGameConstruction:
 class TestMixinComposition:
     def test_has_analysis_methods(self, game):
         assert hasattr(game, 'analyze')
-        assert hasattr(game, 'show_existing_threats')
         assert hasattr(game, '_analyze_impl')
 
     def test_has_move_methods(self, game):

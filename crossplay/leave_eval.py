@@ -1,11 +1,14 @@
 """
-CROSSPLAY V15 - Leave Evaluation Module (Bingo-Aware)
+CROSSPLAY V21 - Leave Evaluation Module
 Evaluate the quality of tiles remaining after a play.
+
+V21: Formula-only mode (USE_FORMULA_ONLY = True). DadBot v5 tournament
+testing proved the simple per-tile formula dominates SuperLeaves (921K
+trained table) and bingo probability bonus at all compute levels.
+SuperLeaves and bingo code retained for future A/B testing after retrain.
 
 V9 upgrade: Integrates precomputed bingo probability database.
 Each leave value = base formula + bingo equity bonus.
-The bingo bonus captures the expected value of reaching a 7-letter
-word on the next draw, which the hand-tuned formula cannot model.
 """
 
 import os
@@ -18,6 +21,10 @@ from .config import (
     DUPLICATE_PENALTY, BINGO_STEMS
 )
 
+
+# V21: Formula-only mode. Set False to re-enable SuperLeaves + bingo bonus
+# (e.g., after retraining SuperLeaves on the clean V21 engine).
+USE_FORMULA_ONLY = True
 
 VOWELS = set('AEIOU')
 CONSONANTS = set('BCDFGHJKLMNPQRSTVWXYZ')
@@ -150,8 +157,12 @@ def evaluate_leave(leave: str, bag_empty: bool = False) -> float:
     """
     Evaluate the quality of a leave (tiles remaining after a play).
 
-    Composite: base formula value + bingo equity bonus.
-    The bingo bonus = BINGO_WEIGHT × P(bingo) × EXPECTED_BINGO_SCORE
+    When USE_FORMULA_ONLY is True (V21 default), returns the hand-tuned
+    formula value directly. This was validated via DadBot v5 tournament
+    testing to outperform SuperLeaves + bingo at all compute levels.
+
+    When USE_FORMULA_ONLY is False, uses composite evaluation:
+    base formula + SuperLeaves override + bingo equity bonus.
 
     Args:
         leave: Tiles remaining in rack (e.g., 'AERT')
@@ -163,6 +174,11 @@ def evaluate_leave(leave: str, bag_empty: bool = False) -> float:
     if not leave:
         return 0.0
 
+    # V21: Formula-only mode (proven superior in DadBot v5 tournament)
+    if USE_FORMULA_ONLY:
+        return _formula_evaluate(leave, bag_empty)
+
+    # --- Legacy composite path (SuperLeaves + bingo) ---
     # SuperLeaves lookup (if trained table deployed)
     if not bag_empty:
         _load_superleaves()

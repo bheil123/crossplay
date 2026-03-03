@@ -1,4 +1,4 @@
-# CLAUDE.md -- Crossplay V20
+# CLAUDE.md -- Crossplay V21
 
 ## What is this project?
 
@@ -70,7 +70,7 @@ game_manager.py          <- Game core (init, display, persistence, bag) + GameMa
   |-- config.py          <- ALL constants: tile values, distribution, bonuses, tuning
   |-- dictionary.py      <- Word validation (196K words)
   |-- leave_eval.py      <- Rack leave evaluation + bingo probability DB
-  |-- real_risk.py       <- Opponent threat analysis
+  |                         (real_risk.py removed in V21.1)
   |-- lookahead.py       <- 1-ply lookahead
   |-- lookahead_3ply.py  <- 3-ply exhaustive endgame
   |-- parallel_eval.py   <- Multi-worker parallel evaluation
@@ -437,33 +437,128 @@ since GameManager caches game state in memory at startup.
 `GameManager.reload_games(slot=None)` is the programmatic API. Reloads all
 slots if `slot` is None, or a single slot if specified.
 
-## V20.4 changes: threat analyzer pattern injection
+## V21.2 changes: DadBot v6 A/B tests (SuperLeaves + 3-ply)
 
-**Cross-valid pattern injection (`real_risk.py`):**
-`_find_vertical_threats()` and `_find_horizontal_threats()` now inject
-single-letter crossword constraints into wildcard patterns BEFORE calling
-`dictionary.find_words()`. When `cross_valid[pos]` has exactly 1 valid
-letter, the `?` at that position is replaced with the letter. This narrows
-the search space dramatically (e.g., `??????` -> `B?????` reduces matches
-from 16,706 to 1,187), preventing high-scoring threats from being truncated
-by the match limit.
+**Two independent A/B tests for DadBot v6, run via tournament:**
 
-**Raised limits for wildcarded patterns:**
-Pattern match limits are now tiered by bonus square count AND wildcard
-density. When a pattern has 4+ remaining wildcards after injection, limits
-are raised (e.g., 2000->5000 for multi-bonus patterns). Constants live in
-`config.py` as `THREAT_LIMIT_*` and `THREAT_WILDCARD_THRESHOLD`.
+1. **SuperLeaves gen4 vs formula** -- does TD-trained leave evaluation beat
+   the hand-tuned formula?
+2. **3-ply override for bag 9-21** -- does considering your counter-response
+   (ply 3) improve play vs MC 2-ply only?
 
-**High-score threat append:**
-`analyze_existing_threats()` now appends the top high-score threats (sorted
-by raw score) alongside the top EV-sorted threats. This surfaces high-damage
-plays that have low probability (low EV) but are still strategically relevant.
+**Environment variable feature flags (independent of BOT_TIER):**
+```
+DADBOT_LEAVES=formula|superleaves   (default: formula -- V21 baseline)
+DADBOT_3PLY=off|on                  (default: off -- V21 baseline)
+```
 
-**Config centralization:**
-12 threat analyzer magic numbers moved from `real_risk.py` to `config.py`:
-`THREAT_LIMIT_*` (6), `THREAT_WILDCARD_THRESHOLD`, `THREAT_MIN_SCORE`,
-`THREAT_MIN_PROB`, `THREAT_TOP_BY_EV`, `THREAT_TOP_BY_SCORE`,
-`THREAT_PER_MOVE_TOP_EV`, `THREAT_PER_MOVE_TOP_SCORE`.
+**4 test configurations:**
+- `baseline`: formula + no-3ply (should match v5 behavior)
+- `superleaves`: superleaves + no-3ply (trained leaves only)
+- `3ply`: formula + 3ply (3-ply override only)
+- `both`: superleaves + 3ply (both features combined)
+
+**3-ply integration design:**
+- Bag 9-21 only: below 9, `evaluate_near_endgame()` handles with exact
+  enumeration. Above 21, opponent gets too many unseen tiles for meaningful
+  3-ply analysis.
+- 15s time budget per move (acceptable for standard/deep tiers).
+- Full override, not blend: when 3-ply produces a result, it replaces the
+  MC pick. 3-ply's ply-3 counter-response gives it a structural advantage.
+- Fallback to MC if 3-ply fails or times out.
+
+**SuperLeaves integration:**
+- `_leave_value()` checks `DADBOT_LEAVES` flag:
+  - `formula`: always uses `_formula_leave()` (V21 behavior)
+  - `superleaves`: trained table -> formula fallback -> bingo bonus
+
+**3-ply bug fix (`lookahead_3ply.py`):**
+`evaluate_3ply()` passed ALL unseen tiles as opponent's "rack" to the move
+finder, allowing generation of physically impossible moves (e.g., 14-letter
+words needing 13 tiles from rack when max rack is 7). Fixed by adding
+`_tiles_from_rack()` helper that counts empty board positions in a move's
+path, then filtering opponent moves to <= 7 tiles from rack.
+
+**Files changed:**
+- `crossplay-tournament/bots/dadbot_v6.py` -- new file (copied from v5),
+  A/B flags, 3-ply import/integration, SuperLeaves toggle in `_leave_value()`
+- `crossplay-tournament/run_tourney.py` -- rewritten for A/B test matrix
+  with 4 configs, shared seed generation, env var injection per config
+- `crossplay/lookahead_3ply.py` -- `_tiles_from_rack()` filter + bug fix
+
+**Running the tournament:**
+```bash
+# Full A/B matrix (20 games x 4 configs = 80 games)
+python run_tourney.py
+
+# Quick smoke test (5 games per config)
+python run_tourney.py --games 5
+
+# Single config only
+python run_tourney.py --config baseline
+
+# With timing diagnostics
+python run_tourney.py --timing
+```
+
+## V21 changes: heuristic-validated equity formula
+
+**Context: DadBot v5 tournament validation.**
+Multi-tier A/B testing (blitz/fast/standard/deep, 20 games each) proved
+that a simple equity formula dominates all hand-tuned heuristics. Stripped
+DadBot achieved monotonic scaling: 9-11 (blitz) -> 11-9 (fast) -> 16-4
+(standard) -> 16-4 (deep). The pre-V21 engine with all heuristics showed
+INVERSE scaling at higher compute (more candidates = worse play).
+
+**Equity formula simplified:**
+- 1-ply: `equity = score + leave_value` (was: + blocking - risk + DLS + DD + turnover + HVT + TW/DW)
+- MC 2-ply: `total = mc_equity + leave_value` (was: + positional_adj * 0.5)
+- Leave evaluation: formula only (was: SuperLeaves table -> formula fallback -> bingo bonus)
+
+**Heuristics removed from ranking and code:**
+
+V21.0 disabled heuristics from ranking but kept computation for display.
+V21.1 removed ALL heuristic computation code for speed (~2050 lines deleted).
+
+**Removed code:**
+1. Risk analysis (`_calculate_probabilistic_risk`, `_calculate_exhaustive_opp_risk`)
+2. Blocking bonus (`_calculate_blocking_bonus`)
+3. Opening heuristics (`opening_heuristics.py` deleted entirely)
+4. Threat analysis (`real_risk.py` deleted entirely, `show_existing_threats` removed)
+5. Bingo blocking analysis (`_show_bingo_blocking_analysis`, `_find_opponent_bingo`)
+6. Exchange evaluation (`_generate_exchange_candidates`, `_mc_eval_exchange_candidate`)
+7. Blank correction (`_blank_correction_factor`)
+8. Positional adjustment (`MC_POSITIONAL_DAMPEN`, `positional_adj` field)
+9. ~40 dead config constants (risk thresholds, threat limits, blocking bonuses, etc.)
+
+**Kept for A/B testing:**
+- `leave_eval.py`: `USE_FORMULA_ONLY = True` flag + full SuperLeaves/bingo legacy path
+
+**1-ply table simplified:** `# Word Position Pts Leave Equity`
+**MC table simplified:** `# Word Pos Pts AvgOpp MaxOpp Std %Beats Leave MC Eq`
+
+**Speed gain:** ~3s per turn saved (risk analysis was the bottleneck).
+Target flow: move gen (0.5s) -> leave eval -> MC 2-ply (2-7s) = 3-8s total.
+
+**Files changed (V21.0 + V21.1 combined):**
+
+| File | Changes |
+|------|---------|
+| `leave_eval.py` | USE_FORMULA_ONLY flag, bypasses SuperLeaves + bingo |
+| `mc_eval.py` | Removed exchange eval, blank correction, positional adj (~305 lines) |
+| `game_analysis.py` | Removed risk/blocking/heuristics/exchange (~890 lines) |
+| `game_moves.py` | Removed show_existing_threats calls |
+| `game_manager.py` | Removed threat cache initialization |
+| `opening_heuristics.py` | DELETED (~538 lines) |
+| `real_risk.py` | DELETED (~400+ lines) |
+| `config.py` | Removed ~40 dead constants |
+| `__init__.py` | Version bump to 21.1.0 |
+
+## V20.4 changes: threat analyzer (REMOVED in V21.1)
+
+*V20.4 added cross-valid pattern injection and tiered wildcard limits to
+`real_risk.py`. All removed in V21.1 along with the entire threat analysis
+module -- DadBot v5 tournament proved threat heuristics degrade play quality.*
 
 ## V20 changes: architectural cleanup + test suite
 

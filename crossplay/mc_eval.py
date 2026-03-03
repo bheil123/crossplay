@@ -55,11 +55,6 @@ for _ch, _val in TILE_VALUES.items():
 _MC_OA = ord('A')
 
 # Bonus grid: _MC_BONUS[r][c] = (letter_mult, word_mult)
-# Dampening factor for Phase 2 positional adjustments carried into MC.
-# MC avg_opp already captures ~30-50% of blocking/risk, so dampen to
-# avoid double-counting. 0.5 = conservative; tune via self-play.
-MC_POSITIONAL_DAMPEN = 0.5
-
 from .config import BONUS_SQUARES
 _MC_BONUS = [[(1, 1)] * 15 for _ in range(15)]
 for (_r1, _c1), _btype in BONUS_SQUARES.items():
@@ -404,8 +399,7 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
     leave_value = evaluate_leave(leave)
 
     mc_equity = move['score'] - avg_opp
-    total_eq = mc_equity + leave_value + move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN
-    exp_risk = move.get('expected_risk', 0)
+    total_eq = mc_equity + leave_value
 
     return {
         'word': move['word'],
@@ -419,236 +413,16 @@ def _mc_eval_single_candidate(args: tuple) -> dict:
         'mc_min_opp': min_opp,
         'mc_std_opp': round(std_opp, 1),
         'pct_opp_beats': round(pct_beats, 1),
-        # Equity (with dampened Phase 2 positional adjustment)
+        # Equity
         'mc_equity': round(mc_equity, 1),
         'leave': leave,
         'leave_value': round(leave_value, 1),
-        'positional_adj': move.get('positional_adj', 0),
-        'pos_adj_dampened': round(move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
         'total_equity': round(total_eq, 1),
-        'expected_risk': round(exp_risk, 1),
-        'risk_adj_equity': round(total_eq - exp_risk, 1),
-        'baseline_risk': round(move.get('baseline_risk', 0), 1),
         # Detail
         'top_opp_responses': top_opp,
         'k_sims': n,
         # Keep legacy field names for compatibility with display code
         'opp_best': round(avg_opp, 0),        # avg instead of deterministic best
-        'opp_word': top_opp[0]['word'] if top_opp else '',
-        'lookahead_equity': round(mc_equity, 1),
-    }
-
-
-def _mc_eval_exchange_candidate(args: tuple) -> dict:
-    """
-    Monte Carlo evaluation of one exchange candidate.
-
-    For this exchange candidate, run K simulations:
-        1. Board stays UNCHANGED (exchange doesn't place tiles)
-        2. Sample a random 7-tile opponent rack from unseen pool
-        3. Find opponent's best response on the unchanged board
-        4. Simulate our post-exchange draw (remove opp rack from pool,
-           remove kept tiles, draw from remainder)
-        5. Record opponent score and our expected new rack leave
-
-    Args (packed as tuple for pool.map):
-        board_moves:    list of (word, row, col, horizontal) to reconstruct board
-        exchange_info:  dict with 'keep' (tiles kept), 'dump' (tiles exchanged),
-                        'rack' (full original rack)
-        unseen_pool:    list of individual unseen tile characters (pre-expanded)
-        board_blanks:   list of (row, col, letter) for blanks on board
-        k_sims:         number of MC iterations
-        seed:           random seed for reproducibility (None = random)
-
-    Returns:
-        dict with MC statistics formatted like regular move results,
-        plus exchange-specific fields.
-    """
-    board_moves, exchange_info, unseen_pool, board_blanks, k_sims, seed = args
-
-    if seed is not None:
-        random.seed(seed)
-
-    global _mc_worker_gaddag, _mc_worker_gdata_bytes, _mc_worker_set_dict
-    if _mc_worker_gaddag is None:
-        from .gaddag import get_gaddag
-        _mc_worker_gaddag = get_gaddag()
-        _mc_worker_gdata_bytes = bytes(_mc_worker_gaddag._data)
-        from .move_finder_c import _get_dict
-        _d = _get_dict()
-        class _SetDict:
-            __slots__ = ('is_valid',)
-            def __init__(self, s): self.is_valid = s.__contains__
-        _mc_worker_set_dict = _SetDict(_d._words)
-    gaddag = _mc_worker_gaddag
-
-    # Reconstruct board (unchanged — no move placed)
-    from .board import Board
-    board = Board()
-    for word, row, col, horiz in board_moves:
-        board.place_word(word, row, col, horiz)
-
-    keep_tiles = list(exchange_info['keep'])
-    dump_tiles = list(exchange_info['dump'])
-    draw_n = len(dump_tiles)  # how many we draw after dumping
-
-    pool_size = len(unseen_pool)
-    rack_size = min(7, pool_size)
-
-    _bb_set = {(r-1, c-1) for r, c, _ in (board_blanks or [])}
-    _grid = board._grid
-
-    # Determine which path to use (priority: Cython fast > Python best-score)
-    global _mc_worker_cython_fast, _mc_worker_word_set
-    _use_cython_fast = _mc_worker_cython_fast and _mc_worker_gdata_bytes is not None
-
-    _ctx = None
-    if _use_cython_fast:
-        import gaddag_accel as _accel
-        _ctx = _accel.prepare_board_context(
-            _grid, _mc_worker_gdata_bytes, _bb_set,
-            _mc_worker_word_set, VALID_TWO_LETTER,
-            _MC_TV, _MC_BONUS, BINGO_BONUS, RACK_SIZE)
-    else:
-        from .move_finder_opt import find_best_score_opt
-        from .dictionary import get_dictionary as _get_dict_py
-        _dict_py = _get_dict_py()
-        _cross_cache = {}
-
-    from .leave_eval import evaluate_leave
-
-    opp_scores = []
-    opp_responses = {}
-    new_rack_leaves = []
-
-    # Adaptive K (same logic as _mc_eval_single_candidate)
-    _PER_CANDIDATE_BUDGET = 8.0
-    effective_k = k_sims
-    _t_sim_start = time.perf_counter()
-
-    # Early stopping (same as _mc_eval_single_candidate)
-    _running_sum = 0.0
-    _running_sum_sq = 0.0
-
-    sim_i = 0
-    while sim_i < effective_k:
-        if sim_i == MC_PROBE_COUNT and not _use_cython_fast:
-            elapsed = time.perf_counter() - _t_sim_start
-            ms_per_sim = elapsed / MC_PROBE_COUNT * 1000
-            if ms_per_sim > MC_SLOW_BOARD_MS:
-                max_k = max(20, int(_PER_CANDIDATE_BUDGET / (ms_per_sim / 1000)))
-                if max_k < effective_k:
-                    effective_k = max_k
-
-        # Early stopping convergence check
-        if (sim_i >= MC_ES_MIN_SIMS and sim_i % MC_ES_CHECK_EVERY == 0):
-            _variance = (_running_sum_sq / sim_i) - (_running_sum / sim_i) ** 2
-            if _variance > 0:
-                _se = (_variance / sim_i) ** 0.5
-                if _se < MC_ES_SE_THRESHOLD:
-                    break
-
-        # 1. Sample opponent rack from unseen pool
-        opp_rack_list = random.sample(unseen_pool, rack_size)
-        opp_rack = ''.join(opp_rack_list)
-
-        # 2. Find opponent's best move on UNCHANGED board
-        if _use_cython_fast:
-            opp_score, opp_word, opp_row, opp_col, opp_dir = _accel.find_best_score_c(
-                _ctx, opp_rack)
-        else:
-            opp_score, opp_word, opp_row, opp_col, opp_dir = find_best_score_opt(
-                _grid, gaddag._data, opp_rack, _bb_set,
-                cross_cache=_cross_cache, dictionary=_dict_py)
-
-        if opp_score > 0:
-            opp_scores.append(opp_score)
-            _running_sum += opp_score
-            _running_sum_sq += opp_score * opp_score
-            key = (opp_word, opp_row, opp_col, opp_dir)
-            if key not in opp_responses or opp_score > opp_responses[key]:
-                opp_responses[key] = opp_score
-        else:
-            opp_scores.append(0)
-
-        # 3. Simulate our exchange draw:
-        # Remaining pool = unseen - opp_rack + dump_tiles (dumped go back to bag)
-        # We draw draw_n tiles from this pool
-        remaining = list(unseen_pool)
-        for t in opp_rack_list:
-            try:
-                remaining.remove(t)
-            except ValueError:
-                pass
-        # Dumped tiles go back into bag
-        remaining.extend(dump_tiles)
-
-        if len(remaining) >= draw_n and draw_n > 0:
-            drawn = random.sample(remaining, draw_n)
-            new_rack = keep_tiles + drawn
-        else:
-            new_rack = keep_tiles + remaining[:draw_n]
-
-        new_rack_leaves.append(evaluate_leave(''.join(new_rack)))
-        sim_i += 1
-
-    # Compute stats
-    n = len(opp_scores)
-    if n == 0:
-        avg_opp = 0.0
-        max_opp = 0
-        min_opp = 0
-        std_opp = 0.0
-        pct_beats = 0.0
-    else:
-        avg_opp = sum(opp_scores) / n
-        max_opp = max(opp_scores)
-        min_opp = min(opp_scores)
-        variance = sum((s - avg_opp) ** 2 for s in opp_scores) / n
-        std_opp = variance ** 0.5
-        # For exchange, our score is 0 — opp always "beats" us on points
-        pct_beats = 100.0
-
-    avg_new_leave = sum(new_rack_leaves) / len(new_rack_leaves) if new_rack_leaves else 0.0
-
-    top_responses = sorted(opp_responses.items(), key=lambda x: -x[1])[:5]
-    top_opp = [
-        {'word': k[0], 'row': k[1], 'col': k[2], 'direction': k[3], 'score': v}
-        for k, v in top_responses
-    ]
-
-    mc_equity = 0 - avg_opp  # score=0 for exchange
-
-    keep_str = ''.join(keep_tiles) or '(none)'
-    dump_str = ''.join(dump_tiles)
-
-    return {
-        'word': f'xchg -{dump_str}',
-        'row': -1,
-        'col': -1,
-        'direction': 'X',  # exchange marker
-        'score': 0,
-        'is_exchange': True,
-        'exchange_keep': ''.join(keep_tiles),
-        'exchange_dump': dump_str,
-        # MC opponent stats
-        'mc_avg_opp': round(avg_opp, 1),
-        'mc_max_opp': max_opp,
-        'mc_min_opp': min_opp,
-        'mc_std_opp': round(std_opp, 1),
-        'pct_opp_beats': round(pct_beats, 1),
-        # Equity — leave is E[new rack leave from draw simulation]
-        'mc_equity': round(mc_equity, 1),
-        'leave': f'>{keep_str}+{len(dump_tiles)}',
-        'leave_value': round(avg_new_leave, 1),
-        'total_equity': round(mc_equity + avg_new_leave, 1),
-        'expected_risk': 0,
-        'risk_adj_equity': round(mc_equity + avg_new_leave, 1),
-        'baseline_risk': round(exchange_info.get('baseline_risk', 0), 1),
-        # Detail
-        'top_opp_responses': top_opp,
-        'k_sims': n,
-        'opp_best': round(avg_opp, 0),
         'opp_word': top_opp[0]['word'] if top_opp else '',
         'lookahead_equity': round(mc_equity, 1),
     }
@@ -668,90 +442,6 @@ def _get_leave(rack: str, tiles_used: str) -> str:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def _blank_correction_factor(total_unseen: int, blanks_unseen: int) -> float:
-    """
-    Calculate correction multiplier for MC opponent scores when blanks are capped.
-
-    The MC simulation caps blanks at 2 in opponent racks for performance.
-    This is only needed when 3 blanks are unseen (Crossplay has 3 blanks).
-    With cap=2, the correction is small (~1.01-1.04x) since 3-blank racks
-    are extremely rare (~0.3% of draws at unseen=44).
-
-    Based on empirical measurement (Crossplay board, N=20 per category):
-      0-blank avg best = 39
-      1-blank avg best = 57
-      2-blank avg best = 83  (baseline for cap=2)
-      3-blank avg best = 86  (1.04x vs 2-blank)
-
-    Uses hypergeometric distribution to calculate P(opp draws k blanks).
-    Returns multiplier to apply to avg_opp score (1.0 = no correction needed).
-
-    Typical corrections (Crossplay, 3 blanks total, cap=2):
-      unseen=24, 3 blanks: ~1.04x
-      unseen=44, 3 blanks: ~1.02x
-      unseen=65, 3 blanks: ~1.01x
-      unseen=93, 3 blanks: ~1.01x
-    """
-    if blanks_unseen <= 2 or total_unseen < 7:
-        return 1.0
-
-    from math import comb
-
-    # Empirical scoring ratios: score[k_blanks] / score[2_blank]
-    # Calibrated on Crossplay board (Turn 13 position, N=20 per category)
-    RATIO_0v2 = 0.470   # 0-blank scores ~47% of 2-blank
-    RATIO_1v2 = 0.687   # 1-blank scores ~69% of 2-blank
-    RATIO_3v2 = 1.036   # 3-blank scores ~104% of 2-blank
-
-    draw = min(7, total_unseen)
-
-    def p_draw_k(k):
-        """P(exactly k blanks in draw from unseen)"""
-        non = total_unseen - blanks_unseen
-        if k > blanks_unseen or k > draw or (draw - k) > non:
-            return 0.0
-        return comb(blanks_unseen, k) * comb(non, draw - k) / comb(total_unseen, draw)
-
-    # True expected score (relative to 2-blank baseline):
-    # E_true = P(0)*ratio_0v2 + P(1)*ratio_1v2 + P(2)*1.0 + P(3)*ratio_3v2
-    p0 = p_draw_k(0)
-    p1 = p_draw_k(1)
-    p2 = p_draw_k(2)
-    p3 = p_draw_k(3) if blanks_unseen >= 3 else 0.0
-
-    e_true = p0 * RATIO_0v2 + p1 * RATIO_1v2 + p2 * 1.0 + p3 * RATIO_3v2
-
-    # MC-capped expected score:
-    # MC pool has (total - blanks_removed) tiles with 2 blanks max.
-    # Recalculate draw probabilities for the capped pool.
-    blanks_removed = blanks_unseen - 2
-    cap_total = total_unseen - blanks_removed
-    cap_blanks = 2  # 2 blanks remain in capped pool
-    cap_draw = min(7, cap_total)
-
-    if cap_total < 1 or cap_draw < 1:
-        return 1.0
-
-    cap_non = cap_total - cap_blanks
-
-    def p_draw_k_capped(k):
-        """P(exactly k blanks in draw from capped pool)"""
-        if k > cap_blanks or k > cap_draw or (cap_draw - k) > cap_non:
-            return 0.0
-        return comb(cap_blanks, k) * comb(cap_non, cap_draw - k) / comb(cap_total, cap_draw)
-
-    cp0 = p_draw_k_capped(0)
-    cp1 = p_draw_k_capped(1)
-    cp2 = p_draw_k_capped(2)
-
-    e_capped = cp0 * RATIO_0v2 + cp1 * RATIO_1v2 + cp2 * 1.0
-
-    if e_capped <= 0:
-        return 1.0
-
-    return e_true / e_capped
-
 
 def _limit_blanks(tiles: str, max_blanks: int = 2) -> str:
     """Limit blanks in tile string to avoid exponential move generation."""
@@ -858,7 +548,6 @@ def _mc_eval_sequential(
     board_blanks: list,
     gaddag,
     k_sims: int,
-    blank_corr: float = 1.0,
 ) -> List[Dict]:
     """Sequential MC evaluation — runs in the main process."""
     results = []
@@ -964,12 +653,10 @@ def _mc_eval_sequential(
 
         # Stats
         n = len(opp_scores)
-        avg_opp_raw = sum(opp_scores) / n if n else 0
-        avg_opp = avg_opp_raw * blank_corr  # Apply blank correction
+        avg_opp = sum(opp_scores) / n if n else 0
         max_opp = max(opp_scores) if n else 0
         min_opp = min(opp_scores) if n else 0
-        mean = avg_opp_raw  # Use raw for variance calc
-        variance = sum((s - mean) ** 2 for s in opp_scores) / n if n else 0
+        variance = sum((s - avg_opp) ** 2 for s in opp_scores) / n if n else 0
         std_opp = variance ** 0.5
         pct_beats = (sum(1 for s in opp_scores if s > move['score']) / n * 100) if n else 0
 
@@ -983,8 +670,7 @@ def _mc_eval_sequential(
         leave = _get_leave(your_rack, tiles_used)
         leave_value = evaluate_leave(leave)
         mc_equity = move['score'] - avg_opp
-        total_eq = mc_equity + leave_value + move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN
-        exp_risk = move.get('expected_risk', 0)
+        total_eq = mc_equity + leave_value
 
         results.append({
             'word': move['word'],
@@ -1000,12 +686,7 @@ def _mc_eval_sequential(
             'mc_equity': round(mc_equity, 1),
             'leave': leave,
             'leave_value': round(leave_value, 1),
-            'positional_adj': move.get('positional_adj', 0),
-            'pos_adj_dampened': round(move.get('positional_adj', 0) * MC_POSITIONAL_DAMPEN, 1),
             'total_equity': round(total_eq, 1),
-            'expected_risk': round(exp_risk, 1),
-            'risk_adj_equity': round(total_eq - exp_risk, 1),
-            'baseline_risk': round(move.get('baseline_risk', 0), 1),
             'top_opp_responses': top_opp,
             'k_sims': n,
             'opp_best': round(avg_opp, 0),
@@ -1030,7 +711,6 @@ def mc_evaluate_2ply(
     max_workers: int = None,
     seed: int = None,
     pre_ranked_candidates: List[Dict] = None,
-    exchange_candidates: List[Dict] = None,
 ) -> List[Dict]:
     """
     Monte Carlo 2-ply evaluation.
@@ -1056,11 +736,6 @@ def mc_evaluate_2ply(
                             move generation and uses these directly as MC candidates.
                             Each dict must have: word, row, col, direction, score,
                             tiles_used. Top top_n entries are used.
-        exchange_candidates: Optional list of exchange dicts to evaluate alongside
-                            regular moves. Each dict must have: 'keep' (str of kept
-                            tiles), 'dump' (str of dumped tiles), 'rack' (full rack).
-                            These are evaluated via _mc_eval_exchange_candidate and
-                            results are merged with regular move results.
 
     Returns:
         Sorted list of result dicts with MC statistics, best first by total_equity
@@ -1069,10 +744,6 @@ def mc_evaluate_2ply(
         gaddag = get_gaddag()
     if board_blanks is None:
         board_blanks = []
-
-    # Calculate blank correction factor BEFORE limiting blanks
-    blanks_in_unseen = unseen_tiles_str.count('?')
-    blank_corr = _blank_correction_factor(len(unseen_tiles_str), blanks_in_unseen)
 
     # Limit blanks in unseen to avoid exponential blowup in move generation
     unseen_limited = _limit_blanks(unseen_tiles_str, max_blanks=2)
@@ -1114,7 +785,7 @@ def mc_evaluate_2ply(
     if board_moves is None or len(candidates) <= 2 or max_workers <= 1:
         return _mc_eval_sequential(
             board, candidates, unseen_pool, your_rack, board_blanks,
-            gaddag, k_sims, blank_corr
+            gaddag, k_sims
         )
 
     # Convert board_moves dicts to (word, row, col, horizontal) tuples for workers.
@@ -1132,7 +803,6 @@ def mc_evaluate_2ply(
 
     # Build picklable argument tuples for parallel execution
     args_list = []
-    exchange_args_list = []
     for i, move in enumerate(candidates):
         clean_move = {
             'word': move['word'],
@@ -1141,9 +811,6 @@ def mc_evaluate_2ply(
             'direction': move['direction'],
             'score': move['score'],
             'tiles_used': move.get('tiles_used', move.get('used', move['word'])),
-            'positional_adj': move.get('positional_adj', 0),
-            'expected_risk': move.get('expected_risk', 0),
-            'baseline_risk': move.get('baseline_risk', 0),
         }
         # Each worker gets a unique seed derived from the base seed
         worker_seed = (seed + i * 1000) if seed is not None else None
@@ -1157,28 +824,12 @@ def mc_evaluate_2ply(
             worker_seed,
         ))
 
-    # Build exchange candidate args (if any)
-    if exchange_candidates:
-        for j, exch in enumerate(exchange_candidates):
-            exch_seed = (seed + (len(candidates) + j) * 1000) if seed is not None else None
-            exchange_args_list.append((
-                board_move_tuples,
-                exch,
-                unseen_pool,
-                board_blanks,
-                k_sims,
-                exch_seed,
-            ))
-
     # Run in parallel
     try:
         pool = _get_mc_pool(max_workers)
         t0 = time.time()
-        total = len(args_list) + len(exchange_args_list)
+        total = len(args_list)
         futures = {pool.submit(_mc_eval_single_candidate, args): i for i, args in enumerate(args_list)}
-        # Submit exchange candidates to the same pool
-        for j, exch_args in enumerate(exchange_args_list):
-            futures[pool.submit(_mc_eval_exchange_candidate, exch_args)] = len(args_list) + j
         results = []
         timed_out = 0
         try:
@@ -1201,20 +852,6 @@ def mc_evaluate_2ply(
                   f" ({timed_out} skipped)")
         elapsed = time.time() - t0
 
-        # Apply blank correction to parallel results
-        if blank_corr != 1.0:
-            for r in results:
-                raw_avg = r['mc_avg_opp']
-                corrected_avg = raw_avg * blank_corr
-                delta = corrected_avg - raw_avg
-                r['mc_avg_opp'] = round(corrected_avg, 1)
-                r['mc_equity'] = round(r['score'] - corrected_avg, 1)
-                pos_adj = r.get('pos_adj_dampened', 0)
-                r['total_equity'] = round(r['mc_equity'] + r['leave_value'] + pos_adj, 1)
-                r['risk_adj_equity'] = round(r['total_equity'] - r.get('expected_risk', 0), 1)
-                r['opp_best'] = round(corrected_avg, 0)
-                r['lookahead_equity'] = r['mc_equity']
-
         results.sort(key=lambda x: -x['total_equity'])
         return results
 
@@ -1222,7 +859,7 @@ def mc_evaluate_2ply(
         print(f"[!] MC parallel eval failed: {e} -- falling back to sequential")
         return _mc_eval_sequential(
             board, candidates, unseen_pool, your_rack, board_blanks,
-            gaddag, k_sims, blank_corr
+            gaddag, k_sims
         )
 
 
@@ -1605,14 +1242,13 @@ def _mc_eval_near_endgame_candidate(args: tuple) -> dict:
                         blanks_used, tiles_used
         unseen_pool:    string of all unseen tiles
         your_rack:      your rack string
-        blank_corr:     blank correction factor for opponent scores
 
     Returns:
         dict matching evaluate_near_endgame() 'exhaust' result format
     """
     from itertools import combinations
 
-    grid, bb_set_list, move, unseen_pool, your_rack, blank_corr = args
+    grid, bb_set_list, move, unseen_pool, your_rack = args
 
     global _mc_worker_gaddag, _mc_worker_gdata_bytes
     global _mc_worker_cython_fast, _mc_worker_word_set
@@ -1693,7 +1329,7 @@ def _mc_eval_near_endgame_candidate(args: tuple) -> dict:
             opp_score, opp_word, opp_r, opp_c, opp_d = find_best_score_opt(
                 board._grid, _mc_worker_gaddag._data, opp_rack_limited, bb_set)
 
-        opp_score_corrected = opp_score * blank_corr if opp_score > 0 else 0
+        opp_score_val = opp_score if opp_score > 0 else 0
 
         # Track opponent responses
         if opp_score > 0 and opp_word:
@@ -1730,9 +1366,9 @@ def _mc_eval_near_endgame_candidate(args: tuple) -> dict:
                 your_resp_score, _, _, _, _ = find_best_score_opt(
                     board._grid, _mc_worker_gaddag._data, your_full_rack, bb_set)
 
-        net = move['score'] - opp_score_corrected + your_resp_score
+        net = move['score'] - opp_score_val + your_resp_score
         net_scores.append(net)
-        opp_scores_all.append(opp_score_corrected)
+        opp_scores_all.append(opp_score_val)
         your_resp_scores_all.append(your_resp_score)
 
     board.undo_move(placed_1)
@@ -2049,10 +1685,6 @@ def mc_evaluate_near_endgame(
     if bag_size < 1 or bag_size > 8:
         return []
 
-    # Blank correction factor
-    blanks_in_unseen = unseen_tiles.count('?')
-    blank_corr = _blank_correction_factor(unseen_count, blanks_in_unseen)
-
     cands = candidates[:top_n]
     results = []
     exhaust_count = 0
@@ -2123,7 +1755,7 @@ def mc_evaluate_near_endgame(
             }
             work_list.append((
                 grid, bb_set_list, clean_move,
-                unseen_tiles, your_rack, blank_corr
+                unseen_tiles, your_rack
             ))
 
         try:
@@ -2199,7 +1831,6 @@ def mc_evaluate_near_endgame(
             'exhaust_evaluated': exhaust_count,
             'oneply_evaluated': oneply_count,
             'total_candidates': len(cands),
-            'blank_correction': round(blank_corr, 3),
             'solver': 'near_endgame_parallel',
         }
 

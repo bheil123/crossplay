@@ -39,7 +39,6 @@ from .gaddag import get_gaddag
 from .dictionary import Dictionary
 from .config import TILE_DISTRIBUTION, TILE_VALUES, BONUS_SQUARES, RACK_SIZE, BOARD_SIZE, CENTER_ROW, CENTER_COL
 from .tile_tracker import TileTracker
-from .blocked_cache import BlockedSquareCache
 from .log import get_logger
 from . import __version__
 from .game_analysis import GameAnalysisMixin
@@ -142,10 +141,6 @@ class Game(GameAnalysisMixin, GameMovesMixin):
             self.gaddag, self.dictionary = gaddag, dictionary
         else:
             self.gaddag, self.dictionary = get_resources()
-        self.blocked_cache = BlockedSquareCache()
-        self._threats_cache = None  # Cached existing threats (invalidated after moves)
-        self._cached_baseline_risk = 0.0   # Board-wide baseline risk (EV of top existing threat)
-        self._cached_baseline_threats = [] # Board-wide threat list for Phase 2 context
         self.auto_save = False      # Enable auto-save after each move
         self.save_filename = None   # Consistent filename for auto-save
         self.game_id = None         # Library game ID (e.g., 'canjam_002')
@@ -177,8 +172,6 @@ class Game(GameAnalysisMixin, GameMovesMixin):
                     # Bag already empty but field not set -- assume 2 final turns left
                     # (both players get one final turn after bag empties)
                     state.final_turns_remaining = 2
-            # Initialize blocked cache with current board state
-            self.blocked_cache.initialize(self.board, self.dictionary)
         else:
             self.state = GameState(
                 name="New Game",
@@ -194,8 +187,6 @@ class Game(GameAnalysisMixin, GameMovesMixin):
             )
             self.board = Board()
             self.bag = self._new_bag()
-            # Empty board - all bonus squares playable
-            self.blocked_cache.initialize(self.board, self.dictionary)
     
     def _get_tile_context(self, rack: str = None):
         """Build a synced TileTracker, unseen dict, and bag count.

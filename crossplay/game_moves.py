@@ -189,38 +189,24 @@ class GameMovesMixin:
 
         self.state.updated_at = datetime.now().isoformat()
 
-        # Update blocked square cache and invalidate threats cache
-        self.blocked_cache.update_after_move(self.board, word, row, col, horizontal)
-        self._threats_cache = None
-
         d = 'H' if horizontal else 'V'
         who = self.state.opponent_name if is_opponent else "You"
         print(f"[OK] {who} played {word} at R{row}C{col} {d} for {score} points!")
 
-        # Show existing threats (skip when opponent has no turns left)
-        # Note: is_your_turn hasn't been toggled yet, so use is_opponent param
+        # Show endgame status messages
         ftr = self.state.final_turns_remaining
         if ftr is not None and ftr <= 0:
             print("\n[ENDGAME] Game over -- no turns remaining.")
         elif ftr == 2 and not is_opponent:
-            # User just played and bag emptied -- both players get final turns
             print("\n[ENDGAME] Bag just emptied -- opponent plays next, then you get final move.")
-            self.show_existing_threats(top_n=5)
         elif ftr == 2 and is_opponent:
-            # Opponent just played and bag emptied -- both players get final turns
             print("\n[ENDGAME] Bag just emptied -- you play next, then opponent gets final move.")
-            self.show_existing_threats(top_n=5)
         elif ftr == 1 and not is_opponent:
-            # User just played their final turn -- opponent gets last move
             print("\n[ENDGAME] Your final turn done -- opponent gets last move.")
-            self.show_existing_threats(top_n=5)
         elif ftr == 1 and is_opponent:
-            # Opponent just played -- user's final move, no opp response
             print("\n[ENDGAME] Bag empty -- your final move (no opponent response). Use 'analyze' for 1-ply ranking.")
         elif bag_count == 0:
             print("\n[ENDGAME] Bag empty -- use 'analyze' for endgame solver.")
-        else:
-            self.show_existing_threats(top_n=5)
 
         # Auto-save if enabled
         self._auto_save()
@@ -634,10 +620,6 @@ class GameMovesMixin:
         self.state.is_your_turn = True
         self.state.updated_at = datetime.now().isoformat()
 
-        # Update blocked square cache and invalidate threats cache
-        self.blocked_cache.update_after_move(self.board, word, row, col, horizontal)
-        self._threats_cache = None
-
         print(f"\n[NOTE] Recorded: {self.state.opponent_name} played {word} for {score} pts")
         print(f"   Score: You {self.state.your_score} - {self.state.opponent_name} {self.state.opp_score}")
 
@@ -648,28 +630,22 @@ class GameMovesMixin:
         if ftr is not None and ftr <= 0:
             print("\n[ENDGAME] Game over -- no turns remaining.")
         elif self.state.your_rack:
-            # We have a rack — run full analysis automatically
+            # We have a rack -- run full analysis automatically
             print("\n[AUTO-ANALYZE] Running engine analysis...")
             try:
                 self.analyze()
             except Exception as e:
                 print(f"[AUTO-ANALYZE] Analysis failed: {e}")
-                # Fall back to showing threats only
-                self.show_existing_threats(top_n=5)
         else:
-            # No rack set yet — just show threats
+            # No rack set yet -- show endgame status
             if ftr == 2 and self.state.is_your_turn:
                 print("\n[ENDGAME] Bag just emptied -- you play next, then opponent gets final move.")
-                self.show_existing_threats(top_n=5)
             elif ftr == 1 and self.state.is_your_turn:
                 print("\n[ENDGAME] Bag empty -- your final move (no opponent response).")
             elif ftr == 1 and not self.state.is_your_turn:
                 print("\n[ENDGAME] Your final turn done -- opponent gets last move.")
-                self.show_existing_threats(top_n=5)
             elif bag_count == 0:
                 print("\n[ENDGAME] Bag empty.")
-            else:
-                self.show_existing_threats(top_n=5)
             print("\n[TIP] Set your rack with 'rack LETTERS' then 'analyze' for full engine analysis.")
 
         # Auto-save if enabled

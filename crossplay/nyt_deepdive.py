@@ -133,10 +133,6 @@ def analyze_position(record, turn_num, game_obj, quiet=False):
             word, row, col, horiz = m[0], m[1], m[2], m[3]
         game_obj.board.place_word(word, row, col, horiz)
     game_obj.bag = game_obj._reconstruct_bag()
-    game_obj.blocked_cache.initialize(game_obj.board, game_obj.dictionary)
-    game_obj._threats_cache = None
-    game_obj._cached_baseline_risk = 0.0
-    game_obj._cached_baseline_threats = []
     game_obj.last_analysis = None
 
     bag_size = len(game_obj.bag)

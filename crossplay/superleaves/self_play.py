@@ -1,8 +1,11 @@
 """
-CROSSPLAY V18 - Self-Play Game Loop for SuperLeaves Training
+CROSSPLAY V21.1 - Self-Play Game Loop for SuperLeaves Training
 
 Two greedy bots play a full game. Records (leave_key, td_target, weight)
 observations for every move where bag > 0.
+
+V21.1: skip_postvalidation=True for ~20% training speedup.
+       Finder reused per game (Board mutated in place).
 
 Gen3 improvements (TD-learning):
   - Per-player trajectory tracking through each game
@@ -33,6 +36,14 @@ def play_one_game(gaddag, move_finder_cls, leave_table, td_gamma=0.97):
     """
     board = Board()
 
+    # Create finder once per game -- Board is mutated in place by place_word,
+    # and CMoveFinder reads board._grid each call, so reuse is safe.
+    try:
+        finder = move_finder_cls(board, gaddag, skip_postvalidation=True)
+    except TypeError:
+        # Fallback for move finders that don't support skip_postvalidation
+        finder = move_finder_cls(board, gaddag)
+
     # Build and shuffle bag
     bag = []
     for letter, count in TILE_DISTRIBUTION.items():
@@ -62,7 +73,6 @@ def play_one_game(gaddag, move_finder_cls, leave_table, td_gamma=0.97):
         bag_size = len(bag)
 
         rack_str = ''.join(current_rack)
-        finder = move_finder_cls(board, gaddag)
         moves = finder.find_all_moves(rack_str)
 
         if not moves:

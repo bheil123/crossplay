@@ -1,5 +1,11 @@
 """
-CROSSPLAY V20 - Architectural cleanup, test suite, structured logging.
+CROSSPLAY V21 - Heuristic-validated equity formula.
+
+V21: Strip harmful heuristics from ranking pipeline based on DadBot v5
+tournament results. Equity simplified to score + leave_value (1-ply) and
+mc_equity + leave_value (2-ply MC). SuperLeaves, bingo bonus, positional
+adjustment, blank correction, and exchange evaluation all disabled.
+Heuristics retained for informational display only.
 
 See VERSIONING.md for version numbering rules.
 See CLAUDE.md for architecture overview and coding conventions.
@@ -7,7 +13,7 @@ See CLAUDE.md for architecture overview and coding conventions.
 Entry point: game_manager.GameManager
 """
 
-__version__ = "20.5.0"
+__version__ = "21.1.0"
 __author__ = "Claude"
 
 # Import main classes for convenience

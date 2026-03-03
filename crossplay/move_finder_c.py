@@ -79,10 +79,18 @@ def is_mc_fast_available():
 
 
 def find_all_moves_c(board, gaddag, rack_str: str,
-                     board_blanks: List[Tuple[int, int, str]] = None) -> List[Dict]:
+                     board_blanks: List[Tuple[int, int, str]] = None,
+                     skip_postvalidation: bool = False) -> List[Dict]:
     """
     Find all valid moves using C-accelerated GADDAG traversal.
     Falls back to Python if C extension not available.
+
+    Args:
+        skip_postvalidation: If True, skip the Python post-validation pass.
+            The C extension already validates words during traversal; post-
+            validation catches rare edge cases. Safe to skip for training
+            (statistical averaging absorbs rare misses) but keep for
+            interactive analysis where accuracy matters.
     """
     if _accel is None:
         from .move_finder_opt import find_all_moves_opt
@@ -111,9 +119,14 @@ def find_all_moves_c(board, gaddag, rack_str: str,
         _TV, _BONUS, BINGO_BONUS, RACK_SIZE,
     )
 
+    # Training fast path: skip post-validation for ~20% speedup.
+    # The C extension already does word/cross-word validation during traversal.
+    if skip_postvalidation:
+        return moves
+
     # ── Post-validation: reject any move whose main word or cross-words
     #    are invalid.  Catches edge cases missed by the C cross-check cache.
-    dictionary = _get_dict()
+    word_set = dictionary._words
     validated = []
     rejected = []
     for m in moves:
@@ -175,14 +188,14 @@ def find_all_moves_c(board, gaddag, rack_str: str,
                 if len(full_word) == 2:
                     if full_word not in VALID_TWO_LETTER:
                         ok = False
-                elif not dictionary.is_valid(full_word):
+                elif full_word not in word_set:
                     ok = False
             if full_word != word_str and ok:
                 # The placed word extends existing tiles — re-check the full word
                 if len(full_word) == 2:
                     ok = full_word in VALID_TWO_LETTER
                 else:
-                    ok = dictionary.is_valid(full_word)
+                    ok = full_word in word_set
 
         # 2) Validate every cross-word
         if ok:
@@ -192,7 +205,7 @@ def find_all_moves_c(board, gaddag, rack_str: str,
                     if cw_word not in VALID_TWO_LETTER:
                         ok = False
                         break
-                elif not dictionary.is_valid(cw_word):
+                elif cw_word not in word_set:
                     ok = False
                     break
 
@@ -202,7 +215,7 @@ def find_all_moves_c(board, gaddag, rack_str: str,
             if len(full_word) == 2:
                 ok = full_word in VALID_TWO_LETTER
             else:
-                ok = dictionary.is_valid(full_word)
+                ok = full_word in word_set
             if not ok:
                 rejected.append((m['word'], f"R{r1}C{c1}", f"extends to '{full_word}' (invalid)"))
 
@@ -228,12 +241,14 @@ class CMoveFinder:
     Used by SuperLeaves trainer for ~5-8x faster self-play.
     """
 
-    def __init__(self, board, gaddag=None):
+    def __init__(self, board, gaddag=None, skip_postvalidation=False):
         self.board = board
         if gaddag is None:
             from .gaddag import get_gaddag
             gaddag = gaddag or get_gaddag()
         self.gaddag = gaddag
+        self._skip_pv = skip_postvalidation
 
     def find_all_moves(self, rack_str: str) -> List[Dict]:
-        return find_all_moves_c(self.board, self.gaddag, rack_str)
+        return find_all_moves_c(self.board, self.gaddag, rack_str,
+                                skip_postvalidation=self._skip_pv)

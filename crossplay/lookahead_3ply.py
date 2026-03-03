@@ -276,9 +276,7 @@ def evaluate_3ply(
     # Limit blanks in unseen for opponent move generation speed
     unseen_limited = _limit_blanks(unseen_tiles, max_blanks=2)
 
-    # Blank correction: compensate for capping blanks at 2
-    from .mc_eval import _blank_correction_factor
-    blank_corr = _blank_correction_factor(unseen_count, blanks_in_unseen)
+    # Blank correction removed (V21.1: proven negligible)
 
     # --- Auto-scale top_n based on unseen count ---
     # C extension opponent movegen: ~0.1s (14 tiles) to ~1.0s (28 tiles)
@@ -379,6 +377,16 @@ def evaluate_3ply(
         # === PLY 2: Opponent's best response ===
         opp_moves = _find_moves(board, unseen_limited)
 
+        # Filter: opponent can only play moves using <= 7 tiles from rack.
+        # When unseen_limited has more than 7 tiles (bag > 0), the move
+        # finder may generate words requiring 8+ tiles from rack, which is
+        # physically impossible regardless of which 7 tiles the opponent has.
+        if opp_moves:
+            opp_moves = [
+                m for m in opp_moves
+                if _tiles_from_rack(board, m) <= 7
+            ]
+
         opp_best_responses = []
         if opp_moves:
             opp_moves.sort(key=lambda m: -m['score'])
@@ -421,7 +429,7 @@ def evaluate_3ply(
 
         board.undo_move(placed_1)
 
-        net_3ply = move['score'] - int(opp_score * blank_corr) + your_resp_score
+        net_3ply = move['score'] - opp_score + your_resp_score
         leave_val = evaluate_leave(your_leave) if your_leave else 0.0
 
         result = {
@@ -513,6 +521,21 @@ def _calculate_leave(rack: str, move: dict) -> str:
     return ''.join(sorted(leave))
 
 
+def _tiles_from_rack(board, move):
+    """Count how many tiles a move requires from the rack (not from the board)."""
+    word = move['word']
+    horiz = move['direction'] == 'H'
+    count = 0
+    for i in range(len(word)):
+        if horiz:
+            r0, c0 = move['row'] - 1, move['col'] - 1 + i
+        else:
+            r0, c0 = move['row'] - 1 + i, move['col'] - 1
+        if 0 <= r0 < 15 and 0 <= c0 < 15 and board._grid[r0][c0] is None:
+            count += 1
+    return count
+
+
 def _limit_blanks(tiles: str, max_blanks: int = 2) -> str:
     """Limit blanks in tile string to avoid exponential blowup."""
     result = []
@@ -590,10 +613,7 @@ def evaluate_near_endgame(
     # Pre-compute board blank set (0-indexed)
     bb_set = {(r - 1, c - 1) for r, c, _ in board_blanks}
 
-    # Blank correction factor for opponent moves (blanks capped to 2 for speed)
-    blanks_in_unseen = unseen_tiles.count('?')
-    from .mc_eval import _blank_correction_factor
-    blank_corr = _blank_correction_factor(unseen_count, blanks_in_unseen)
+    # Blank correction removed (V21.1: proven negligible)
 
     # Try Cython acceleration (same path as MC eval)
     _use_cython = False
@@ -769,8 +789,7 @@ def evaluate_near_endgame(
             opp_score = opp_result[0] if opp_result[0] > 0 else 0
             opp_word = opp_result[1] if opp_result[0] > 0 else "(pass)"
 
-            # Apply blank correction
-            opp_score_corrected = int(opp_score * blank_corr)
+            opp_score_corrected = opp_score
 
             # Track opponent responses
             if opp_word != "(pass)":
@@ -865,7 +884,6 @@ def evaluate_near_endgame(
             'exhaust_evaluated': exhaust_count,
             'oneply_evaluated': oneply_count,
             'total_candidates': len(cands),
-            'blank_correction': round(blank_corr, 3),
             'solver': 'near_endgame_hybrid',
         }
 

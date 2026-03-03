@@ -91,42 +91,9 @@ DOUBLE_LETTER_SQUARES: List[Tuple[int, int]] = [
 BINGO_BONUS: int = 40  # Bonus for using all 7 tiles (Crossplay uses 40, not 50)
 RACK_SIZE: int = 7
 
-# High-value tiles eligible for premium square offensive bonus
-HIGH_VALUE_TILES: set = {'J', 'Q', 'X', 'Z', 'K'}
-HVT_PREMIUM_SCALE: float = 0.15  # Bonus = extra_pts * SCALE → ~1-4 pts range
 
-# =============================================================================
-# RISK ASSESSMENT CONFIGURATION
-# =============================================================================
-
-RISK_PENALTY_3W: float = 8.0   # Penalty per 3W square opened
-RISK_PENALTY_2W: float = 3.0   # Penalty per 2W square opened
-
-# Risk level thresholds
-RISK_THRESHOLD_CRITICAL: float = 60.0
-RISK_THRESHOLD_HIGH: float = 40.0
-RISK_THRESHOLD_MEDIUM: float = 20.0
-
-# Threat pattern matching limits (word matches to evaluate per pattern)
-# Higher limits catch more threats but cost more time. Raised when pattern
-# has many wildcards (>= THREAT_WILDCARD_THRESHOLD) since more words match.
-THREAT_LIMIT_MULTI_BONUS: int = 2000       # pattern hits 2+ bonus squares
-THREAT_LIMIT_MULTI_BONUS_WILD: int = 5000  # ... with many wildcards
-THREAT_LIMIT_SINGLE_BONUS: int = 500       # pattern hits 1 bonus square
-THREAT_LIMIT_SINGLE_BONUS_WILD: int = 2000 # ... with many wildcards
-THREAT_LIMIT_NO_BONUS: int = 100           # pattern hits no bonus squares
-THREAT_LIMIT_NO_BONUS_WILD: int = 500      # ... with many wildcards
-THREAT_WILDCARD_THRESHOLD: int = 4         # wildcards needed for raised limits
-
-# Threat evaluation filters
-THREAT_MIN_SCORE: int = 6                  # ignore threats scoring below this
-THREAT_MIN_PROB: float = 0.001             # ignore threats with prob below 0.1%
-
-# Threat result collection
-THREAT_TOP_BY_EV: int = 20                 # max threats sorted by expected value
-THREAT_TOP_BY_SCORE: int = 5               # extra high-score threats to append
-THREAT_PER_MOVE_TOP_EV: int = 6            # per-move top threats by EV
-THREAT_PER_MOVE_TOP_SCORE: int = 3         # per-move extra high-score threats
+# V21.1: Risk assessment, threat analysis, opening heuristics, and blocking
+# bonus constants removed (proven unhelpful in DadBot v5 tournament testing).
 
 # =============================================================================
 # LEAVE EVALUATION CONFIGURATION
@@ -198,27 +165,13 @@ for word in VALID_TWO_LETTER:
         VALID_BACK_HOOKS[first] = []
     VALID_BACK_HOOKS[first].append(second)
 
-# =============================================================================
-# EXCHANGE CONFIGURATION
-# =============================================================================
-
-MIN_BAG_SIZE_FOR_EXCHANGE: int = 7  # Can't exchange if bag has fewer tiles
-MAX_EXCHANGE_TILES: int = 7
-
-# Rack quality thresholds for exchange recommendation
-RACK_QUALITY_TERRIBLE: int = 1
-RACK_QUALITY_WEAK: int = 2
-RACK_QUALITY_MEH: int = 3
-RACK_QUALITY_GOOD: int = 4
-RACK_QUALITY_AMAZING: int = 5
+# V21.1: Exchange configuration removed (exchange evaluation disabled).
 
 
 # =============================================================================
 # ANALYSIS TIME BUDGETS (seconds)
 # =============================================================================
 
-RISK_TIME_BUDGET_EXHAUSTIVE: float = 90.0   # bag <= 5: exhaustive opponent enumeration
-RISK_TIME_BUDGET_NORMAL: float = 3.0        # bag > 5: probabilistic risk sampling
 MC_TIME_BUDGET: float = 27.0                # main MC 2-ply evaluation budget
 THREE_PLY_TIME_BUDGET: float = 20.0         # 3-ply endgame analysis budget
 
@@ -227,10 +180,7 @@ THREE_PLY_TIME_BUDGET: float = 20.0         # 3-ply endgame analysis budget
 # =============================================================================
 
 ANALYSIS_MIN_CANDIDATES_MC: int = 130       # min candidates to pass to MC pipeline
-ANALYSIS_MIN_CANDIDATES_RISK: int = 115     # min moves to analyze for risk
 ANALYSIS_DEFAULT_TOP_N: int = 15            # default number of moves to display
-ANALYSIS_DEFAULT_THREATS: int = 10          # default threat count to display
-ANALYSIS_ENDGAME_THREATS: int = 5           # threat count at endgame
 
 # =============================================================================
 # MC EARLY STOPPING
@@ -256,19 +206,9 @@ BLANK_3PLY_FORCE_SAVERS: int = 4     # additional blank-saving candidates to for
 BLANK_3PLY_TIME_BUDGET: float = 25.0 # max seconds for entire blank 3-ply pass
 
 # =============================================================================
-# EXCHANGE EVALUATION
+# ENDGAME
 # =============================================================================
 
-EXCHANGE_EQUITY_THRESHOLD: float = 35.0     # consider exchange only if best play < 35
-EXCHANGE_TOP_CANDIDATES: int = 5            # exchange options to generate
-EXCHANGE_QUICK_MC_SIMS: int = 500           # quick MC sims per exchange option
-
-# =============================================================================
-# BINGO DETECTION / ENDGAME
-# =============================================================================
-
-BINGO_SCORE_THRESHOLD: int = 41     # 7-tile play >= 41 pts (7*1 + 40 bonus)
-BINGO_BLOCKING_DELTA: int = 20      # block detected if opp avg < baseline - 20
 ENDGAME_FINAL_TURNS: int = 2        # turns remaining when bag empties (both get 1)
 
 # =============================================================================
@@ -279,17 +219,6 @@ CATCHUP_DEFICIT_THRESHOLD: int = 50         # show catch-up advice if down by 50
 HIGH_VARIANCE_DEFICIT_THRESHOLD: int = 100  # "down 100+" advice trigger
 POWER_TILE_PROB_THRESHOLD: float = 0.05     # show power tile chance only if > 5%
 LATE_GAME_UNSEEN_THRESHOLD: int = 21        # unseen <= 21 = late game
-
-# =============================================================================
-# DEFENSIVE BLOCKING BONUSES
-# =============================================================================
-
-BLOCKING_BONUSES: Dict[str, int] = {
-    '3W': 15,   # defensive bonus for blocking triple word
-    '2W': 8,    # defensive bonus for blocking double word
-    '3L': 3,    # defensive bonus for blocking triple letter
-    '2L': 2,    # defensive bonus for blocking double letter
-}
 
 
 if __name__ == "__main__":
