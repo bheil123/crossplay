@@ -1,11 +1,17 @@
 """
-CROSSPLAY V21 - Leave Evaluation Module
+CROSSPLAY V21.2 - Leave Evaluation Module
 Evaluate the quality of tiles remaining after a play.
 
-V21: Formula-only mode (USE_FORMULA_ONLY = True). DadBot v5 tournament
-testing proved the simple per-tile formula dominates SuperLeaves (921K
-trained table) and bingo probability bonus at all compute levels.
-SuperLeaves and bingo code retained for future A/B testing after retrain.
+V21.2: Env-var-controlled leave mode (CROSSPLAY_LEAVES):
+  formula     -- hand-tuned per-tile formula (V21 default, proven best)
+  superleaves -- trained table -> formula fallback -> bingo bonus
+  blend       -- alpha * formula + (1-alpha) * superleaves
+
+  CROSSPLAY_BLEND_ALPHA -- blend weight (0.0=pure SL, 1.0=pure formula,
+  default 0.5). Only used when CROSSPLAY_LEAVES=blend.
+
+V21: Formula-only mode validated via DadBot v5/v6 tournament testing.
+Formula dominates SuperLeaves and bingo at all compute levels.
 
 V9 upgrade: Integrates precomputed bingo probability database.
 Each leave value = base formula + bingo equity bonus.
@@ -22,9 +28,12 @@ from .config import (
 )
 
 
-# V21: Formula-only mode. Set False to re-enable SuperLeaves + bingo bonus
-# (e.g., after retraining SuperLeaves on the clean V21 engine).
-USE_FORMULA_ONLY = True
+# Leave mode: 'formula' (default), 'superleaves', or 'blend'
+LEAVE_MODE = os.environ.get('CROSSPLAY_LEAVES', 'formula')
+BLEND_ALPHA = float(os.environ.get('CROSSPLAY_BLEND_ALPHA', '0.5'))
+
+# Legacy compatibility
+USE_FORMULA_ONLY = (LEAVE_MODE == 'formula')
 
 VOWELS = set('AEIOU')
 CONSONANTS = set('BCDFGHJKLMNPQRSTVWXYZ')
@@ -174,31 +183,33 @@ def evaluate_leave(leave: str, bag_empty: bool = False) -> float:
     if not leave:
         return 0.0
 
-    # V21: Formula-only mode (proven superior in DadBot v5 tournament)
-    if USE_FORMULA_ONLY:
+    # Formula mode (V21 default, proven best in tournament testing)
+    if LEAVE_MODE == 'formula':
         return _formula_evaluate(leave, bag_empty)
 
-    # --- Legacy composite path (SuperLeaves + bingo) ---
-    # SuperLeaves lookup (if trained table deployed)
+    # --- SuperLeaves value (used by both 'superleaves' and 'blend' modes) ---
+    sl_val = None
     if not bag_empty:
         _load_superleaves()
         if _SUPERLEAVES is not None:
             leave_key = tuple(sorted(leave.upper()))
             if leave_key in _SUPERLEAVES:
-                return _SUPERLEAVES.get(leave_key)
+                sl_val = _SUPERLEAVES.get(leave_key)
 
-    base = _formula_evaluate(leave, bag_empty)
+    # Fallback: formula + bingo bonus
+    if sl_val is None:
+        sl_val = _formula_evaluate(leave, bag_empty)
+        if not bag_empty and len(leave) < 7:
+            leave_key = tuple(sorted(leave.upper()))
+            bingo_prob = get_bingo_prob(leave_key)
+            sl_val += BINGO_WEIGHT * bingo_prob * EXPECTED_BINGO_SCORE
 
-    # No bingo bonus when bag is empty (can't draw to 7)
-    # or leave is already 7+ tiles (played nothing)
-    if bag_empty or len(leave) >= 7:
-        return base
+    if LEAVE_MODE == 'superleaves':
+        return sl_val
 
-    # Bingo DB lookup: keys are sorted uppercase tuples
-    leave_key = tuple(sorted(leave.upper()))
-    bingo_prob = get_bingo_prob(leave_key)
-
-    return base + BINGO_WEIGHT * bingo_prob * EXPECTED_BINGO_SCORE
+    # Blend mode: alpha * formula + (1-alpha) * superleaves
+    formula_val = _formula_evaluate(leave, bag_empty)
+    return BLEND_ALPHA * formula_val + (1.0 - BLEND_ALPHA) * sl_val
 
 
 def evaluate_leave_detailed(leave: str, bag_empty: bool = False) -> Tuple[float, List[str]]:
