@@ -377,14 +377,17 @@ def evaluate_3ply(
         # === PLY 2: Opponent's best response ===
         opp_moves = _find_moves(board, unseen_limited)
 
-        # Filter: opponent can only play moves using <= 7 tiles from rack.
-        # When unseen_limited has more than 7 tiles (bag > 0), the move
-        # finder may generate words requiring 8+ tiles from rack, which is
-        # physically impossible regardless of which 7 tiles the opponent has.
+        # Filter: opponent can only play moves using <= 7 tiles from rack,
+        # AND the tiles needed must actually exist in the unseen pool.
+        # The move finder generates from ALL unseen tiles as one big rack,
+        # so it can produce impossible moves (e.g., AUNTHOOD needing a U
+        # when all U's have been played -- blank could sub, but only if
+        # blanks are actually in the pool).
         if opp_moves:
             opp_moves = [
                 m for m in opp_moves
                 if _tiles_from_rack(board, m) <= 7
+                and _move_playable_from_pool(board, m, unseen_limited)
             ]
 
         opp_best_responses = []
@@ -534,6 +537,48 @@ def _tiles_from_rack(board, move):
         if 0 <= r0 < 15 and 0 <= c0 < 15 and board._grid[r0][c0] is None:
             count += 1
     return count
+
+
+def _tiles_needed_from_rack(board, move):
+    """Return list of tiles a move needs from the rack (not already on board)."""
+    word = move['word']
+    horiz = move['direction'] == 'H'
+    needed = []
+    for i in range(len(word)):
+        if horiz:
+            r0, c0 = move['row'] - 1, move['col'] - 1 + i
+        else:
+            r0, c0 = move['row'] - 1 + i, move['col'] - 1
+        if 0 <= r0 < 15 and 0 <= c0 < 15 and board._grid[r0][c0] is None:
+            needed.append(word[i])
+    return needed
+
+
+def _move_playable_from_pool(board, move, tile_pool_str):
+    """Check if a move's rack tiles can all be supplied by the tile pool.
+
+    Accounts for blanks: if the pool has '?' tiles, they can substitute
+    for any letter the pool lacks. Returns True if playable, False if
+    the move requires tiles not available in the pool.
+    """
+    needed = _tiles_needed_from_rack(board, move)
+    if not needed:
+        return True
+
+    # Count available tiles in the pool
+    from collections import Counter
+    available = Counter(tile_pool_str)
+    blanks_available = available.get('?', 0)
+
+    blanks_used = 0
+    for tile in needed:
+        if available.get(tile, 0) > 0:
+            available[tile] -= 1
+        elif blanks_available > blanks_used:
+            blanks_used += 1
+        else:
+            return False
+    return True
 
 
 def _limit_blanks(tiles: str, max_blanks: int = 2) -> str:
