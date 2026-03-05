@@ -1,11 +1,19 @@
 """
-CROSSPLAY V21.2 - Leave Evaluation Module
+CROSSPLAY V21.4 - Leave Evaluation Module
 Evaluate the quality of tiles remaining after a play.
 
+V21.4: Denoised SuperLeaves deployed as default. Rebased gen4 interactions
+onto Quackle per-tile scale with James-Stein shrinkage (medium). Validated
+at 10K games: +5.9 vs Quackle, +7.8 vs formula (greedy bots).
+
+V21.3: Added 'quackle' leave mode -- Quackle-derived per-tile values
+adapted for Crossplay tile values, with bag decay factor.
+
 V21.2: Env-var-controlled leave mode (CROSSPLAY_LEAVES):
-  formula     -- hand-tuned per-tile formula (V21 default, proven best)
-  superleaves -- trained table -> formula fallback -> bingo bonus
+  superleaves -- trained table -> formula fallback -> bingo bonus (V21.4 default)
+  formula     -- hand-tuned per-tile formula (V21 default)
   blend       -- alpha * formula + (1-alpha) * superleaves
+  quackle     -- Quackle-derived per-tile values with bag decay
 
   CROSSPLAY_BLEND_ALPHA -- blend weight (0.0=pure SL, 1.0=pure formula,
   default 0.5). Only used when CROSSPLAY_LEAVES=blend.
@@ -28,8 +36,8 @@ from .config import (
 )
 
 
-# Leave mode: 'formula' (default), 'superleaves', or 'blend'
-LEAVE_MODE = os.environ.get('CROSSPLAY_LEAVES', 'formula')
+# Leave mode: 'superleaves' (default), 'formula', 'blend', or 'quackle'
+LEAVE_MODE = os.environ.get('CROSSPLAY_LEAVES', 'superleaves')
 BLEND_ALPHA = float(os.environ.get('CROSSPLAY_BLEND_ALPHA', '0.5'))
 
 # Legacy compatibility
@@ -37,6 +45,54 @@ USE_FORMULA_ONLY = (LEAVE_MODE == 'formula')
 
 VOWELS = set('AEIOU')
 CONSONANTS = set('BCDFGHJKLMNPQRSTVWXYZ')
+
+# Quackle-derived per-tile leave values, adapted for Crossplay tile values.
+# Source: Quackle/Maven research, adjusted for Crossplay differences:
+#   - Sweep=40 (not 50): blank 25.57->20.0, S 8.04->7.0
+#   - Different tile values: L=2, K=6, G=4, J=10, B=4 -> less negative
+#   - V=6, W=5 -> more negative (high face value, hard to play)
+QUACKLE_TILE_VALUES = {
+    '?': 20.0, 'S': 7.0, 'Z': 5.12, 'X': 3.31, 'R': 1.10,
+    'C': 0.85, 'H': 0.60, 'M': 0.58, 'D': 0.45, 'E': 0.35,
+    'N': 0.22, 'L': 0.20, 'T': -0.10, 'P': -0.46, 'K': -0.20,
+    'Y': -0.63, 'A': -0.63, 'J': -0.80, 'B': -1.50, 'I': -2.07,
+    'F': -2.21, 'O': -2.50, 'G': -1.80, 'W': -4.50, 'U': -4.00,
+    'V': -6.50, 'Q': -6.79,
+}
+
+
+def _leave_decay(bag_size):
+    """Scale leave value down as bag empties (Crossplay has no tile penalty)."""
+    if bag_size is None or bag_size >= 30:
+        return 1.0
+    elif bag_size >= 15:
+        return 0.70
+    elif bag_size >= 7:
+        return 0.40
+    else:
+        return 0.10
+
+
+def _quackle_evaluate(leave, bag_size=None):
+    """Quackle-derived per-tile evaluation with bag decay."""
+    if not leave:
+        return 0.0
+    leave = leave.upper()
+    value = sum(QUACKLE_TILE_VALUES.get(t, -1.0) for t in leave)
+    # Vowel/consonant balance bonus
+    vowels = sum(1 for t in leave if t in VOWELS)
+    consonants = sum(1 for t in leave if t.isalpha() and t not in VOWELS and t != '?')
+    if len(leave) >= 2:
+        if vowels == 1 and consonants >= 1:
+            value += 2.0
+        elif vowels >= 2 and consonants == 0:
+            value -= 5.0
+    # Q without U penalty (can't check unseen here, just penalize Q in leave)
+    if 'Q' in leave:
+        value -= 4.0  # Partial Q-without-U penalty
+    # Bag decay
+    value *= _leave_decay(bag_size)
+    return value
 
 # --- SuperLeaves table (lazy-loaded) ---
 _SUPERLEAVES = None
@@ -162,26 +218,28 @@ def _formula_evaluate(leave: str, bag_empty: bool = False) -> float:
     return value
 
 
-def evaluate_leave(leave: str, bag_empty: bool = False) -> float:
+def evaluate_leave(leave: str, bag_empty: bool = False,
+                   bag_size: int = None) -> float:
     """
     Evaluate the quality of a leave (tiles remaining after a play).
 
-    When USE_FORMULA_ONLY is True (V21 default), returns the hand-tuned
-    formula value directly. This was validated via DadBot v5 tournament
-    testing to outperform SuperLeaves + bingo at all compute levels.
-
-    When USE_FORMULA_ONLY is False, uses composite evaluation:
-    base formula + SuperLeaves override + bingo equity bonus.
-
     Args:
         leave: Tiles remaining in rack (e.g., 'AERT')
-        bag_empty: True if bag is empty (endgame — bingo bonus disabled)
+        bag_empty: True if bag is empty (endgame -- bingo bonus disabled)
+        bag_size: Tiles remaining in bag (optional, used by quackle mode
+                  for decay calculation)
 
     Returns:
         Float value representing leave quality (higher = better)
     """
     if not leave:
         return 0.0
+
+    # Quackle mode: per-tile values with bag decay
+    if LEAVE_MODE == 'quackle':
+        if bag_size is None and bag_empty:
+            bag_size = 0
+        return _quackle_evaluate(leave, bag_size)
 
     # Formula mode (V21 default, proven best in tournament testing)
     if LEAVE_MODE == 'formula':

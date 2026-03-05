@@ -53,6 +53,10 @@ crossplay/superleaves/_worker_table.pkl
 crossplay/superleaves/gen1_*.pkl
 crossplay/superleaves/gen2_*.pkl
 crossplay/superleaves/gen3_*.pkl
+crossplay/superleaves/gen4_*.pkl
+crossplay/superleaves/tile_cma_*.pkl
+crossplay/superleaves/denoised_*.pkl
+crossplay/superleaves/rebased_*.pkl
 
 # LFS-tracked training data (allow through gitignore)
 !crossplay/superleaves/deployed_leaves.pkl

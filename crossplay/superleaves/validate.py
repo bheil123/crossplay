@@ -48,6 +48,29 @@ class FormulaLeaveAdapter:
         return self._eval(leave_str)
 
 
+# Quackle per-tile values (from Scrabble, used as baseline)
+QUACKLE_VALUES = {
+    '?': 20.0, 'S': 7.0, 'Z': 5.12, 'X': 3.31, 'R': 1.10,
+    'C': 0.85, 'H': 0.60, 'M': 0.58, 'D': 0.45, 'E': 0.35,
+    'N': 0.22, 'L': 0.20, 'T': -0.10, 'P': -0.46, 'K': -0.20,
+    'Y': -0.63, 'A': -0.63, 'J': -0.80, 'B': -1.50, 'I': -2.07,
+    'F': -2.21, 'O': -2.50, 'G': -1.80, 'W': -4.50, 'U': -4.00,
+    'V': -6.50, 'Q': -6.79,
+}
+
+
+class QuackleLeaveAdapter:
+    """Wraps Quackle per-tile values behind LeaveTable interface."""
+
+    def __init__(self):
+        self._values = QUACKLE_VALUES
+
+    def get(self, leave_key, default=0.0):
+        if not leave_key:
+            return 0.0
+        return sum(self._values.get(t, -1.0) for t in leave_key)
+
+
 def play_validation_game(gaddag, move_finder_cls, table_a, table_b):
     """Play one game: table_a is P1, table_b is P2.
 
@@ -140,8 +163,28 @@ _worker_super_table = None
 _worker_formula_table = None
 
 
+def _load_table(path_or_sentinel, label, pid):
+    """Load a leave table from path or create an adapter from sentinel."""
+    if path_or_sentinel == '__formula__':
+        print(f"  [Worker {pid}] {label}: Formula adapter", flush=True)
+        return FormulaLeaveAdapter()
+    elif path_or_sentinel == '__quackle__':
+        print(f"  [Worker {pid}] {label}: Quackle per-tile adapter", flush=True)
+        return QuackleLeaveAdapter()
+    else:
+        t = time.time()
+        table = LeaveTable.load(path_or_sentinel)
+        print(f"  [Worker {pid}] {label}: {len(table):,} entries ({time.time()-t:.1f}s)", flush=True)
+        return table
+
+
 def _init_worker(table_path, opponent_path=None):
-    """Load GADDAG and tables once per worker process."""
+    """Load GADDAG and tables once per worker process.
+
+    table_path/opponent_path can be file paths or sentinels:
+      '__formula__' -> FormulaLeaveAdapter
+      '__quackle__' -> QuackleLeaveAdapter
+    """
     global _worker_gaddag, _worker_move_finder_cls
     global _worker_super_table, _worker_formula_table
     pid = os.getpid()
@@ -153,14 +196,10 @@ def _init_worker(table_path, opponent_path=None):
         _worker_gaddag = get_gaddag()
         print(f"  [Worker {pid}] GADDAG loaded ({time.time()-t0:.1f}s)", flush=True)
 
-        t1 = time.time()
-        _worker_super_table = LeaveTable.load(table_path)
-        print(f"  [Worker {pid}] Table A: {len(_worker_super_table):,} entries ({time.time()-t1:.1f}s)", flush=True)
+        _worker_super_table = _load_table(table_path, "Table A", pid)
 
         if opponent_path:
-            t2 = time.time()
-            _worker_formula_table = LeaveTable.load(opponent_path)
-            print(f"  [Worker {pid}] Table B: {len(_worker_formula_table):,} entries ({time.time()-t2:.1f}s)", flush=True)
+            _worker_formula_table = _load_table(opponent_path, "Table B", pid)
         else:
             _worker_formula_table = FormulaLeaveAdapter()
 
@@ -214,32 +253,35 @@ def _play_batch(batch):
 # Main validation
 # ---------------------------------------------------------------------------
 
+def _label_for(path_or_sentinel):
+    """Human-readable label for a table path or sentinel."""
+    if path_or_sentinel == '__formula__':
+        return 'Formula'
+    elif path_or_sentinel == '__quackle__':
+        return 'Quackle'
+    else:
+        return os.path.basename(path_or_sentinel).replace('.pkl', '')
+
+
 def validate(table_path, num_games, workers=None, opponent_path=None):
     """Run head-to-head validation with parallel workers.
 
     Args:
-        table_path: path to trained SuperLeaves table
+        table_path: path to SuperLeaves .pkl, or sentinel
+                    ('__formula__', '__quackle__')
         num_games: number of games to play
         workers: number of parallel workers (default: cpu_count - 3)
-        opponent_path: optional path to opponent SuperLeaves table.
-                       If None, uses formula as opponent.
+        opponent_path: path to opponent .pkl, or sentinel, or None for formula
     """
     if workers is None:
         workers = _default_workers()
 
-    print(f"Loading table A: {table_path}")
-    super_table = LeaveTable.load(table_path)
-    print(f"  Table size: {len(super_table):,}")
+    if opponent_path is None:
+        opponent_path = '__formula__'
 
-    if opponent_path:
-        opp_label = os.path.basename(opponent_path).replace('.pkl', '')
-        print(f"Loading table B: {opponent_path}")
-        opp_table = LeaveTable.load(opponent_path)
-        print(f"  Table size: {len(opp_table):,}")
-    else:
-        opp_label = "Formula"
+    table_label = _label_for(table_path)
+    opp_label = _label_for(opponent_path)
 
-    table_label = os.path.basename(table_path).replace('.pkl', '')
     print(f"\nValidation: {table_label} vs {opp_label} ({num_games:,} games, {workers} workers)")
     print(f"  Alternating first player each game")
     print("=" * 60)
@@ -333,44 +375,61 @@ def validate(table_path, num_games, workers=None, opponent_path=None):
     else:
         print(f"\n  --> TIE")
 
+    return {
+        'a_label': table_label, 'b_label': opp_label,
+        'a_wins': super_wins, 'b_wins': formula_wins, 'ties': ties,
+        'avg_spread': avg_spread, 'games': num_games,
+        'elapsed': elapsed, 'gps': gps,
+    }
+
+
+def _resolve_path(path_str):
+    """Resolve a table path: sentinels pass through, files resolved."""
+    if path_str in ('__formula__', '__quackle__', 'formula', 'quackle'):
+        # Normalize short names to sentinel format
+        if path_str == 'formula':
+            return '__formula__'
+        if path_str == 'quackle':
+            return '__quackle__'
+        return path_str
+
+    # Try as-is, then relative to superleaves dir
+    if os.path.isabs(path_str) and os.path.exists(path_str):
+        return path_str
+    candidate = os.path.join(_superleaves_dir(), path_str)
+    if os.path.exists(candidate):
+        return candidate
+    if os.path.exists(path_str):
+        return path_str
+    return None
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Validate SuperLeaves table vs formula'
+        description='Validate SuperLeaves table vs formula/quackle/other table'
     )
     parser.add_argument('--table', type=str, required=True,
-                        help='Path to trained SuperLeaves .pkl file')
+                        help='Table A: .pkl path, "formula", or "quackle"')
     parser.add_argument('--games', type=int, default=1000,
                         help='Number of validation games (default: 1000)')
     parser.add_argument('--workers', type=int, default=None,
                         help='Number of workers (default: cpu_count - 3)')
     parser.add_argument('--opponent', type=str, default=None,
-                        help='Path to opponent SuperLeaves .pkl file '
-                             '(default: formula-based evaluation)')
+                        help='Table B: .pkl path, "formula", or "quackle" '
+                             '(default: formula)')
     args = parser.parse_args()
 
-    # Resolve table path relative to superleaves dir
-    table_path = args.table
-    if not os.path.isabs(table_path):
-        table_path = os.path.join(_superleaves_dir(), table_path)
-        if not os.path.exists(table_path):
-            # Also try relative to cwd
-            table_path = args.table
-
-    if not os.path.exists(table_path):
-        print(f"Error: table not found: {table_path}")
+    table_path = _resolve_path(args.table)
+    if table_path is None:
+        print(f"Error: table not found: {args.table}")
         sys.exit(1)
 
-    # Resolve opponent path
-    opponent_path = args.opponent
-    if opponent_path and not os.path.isabs(opponent_path):
-        candidate = os.path.join(_superleaves_dir(), opponent_path)
-        if os.path.exists(candidate):
-            opponent_path = candidate
-
-    if opponent_path and not os.path.exists(opponent_path):
-        print(f"Error: opponent table not found: {opponent_path}")
-        sys.exit(1)
+    opponent_path = None
+    if args.opponent:
+        opponent_path = _resolve_path(args.opponent)
+        if opponent_path is None:
+            print(f"Error: opponent not found: {args.opponent}")
+            sys.exit(1)
 
     validate(table_path, args.games, workers=args.workers,
              opponent_path=opponent_path)
