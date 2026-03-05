@@ -324,7 +324,7 @@ def _cleanup_old_checkpoints(generation, current_games, checkpoint_every, keep=3
 def train(num_games, workers, generation=1, resume_from=None,
           resume_games=0, batch_size=100, checkpoint_every=10000,
           report_every=1000, is_smoke_test=False, init_from=None,
-          td_gamma=0.97):
+          td_gamma=0.97, alpha_start=0.1, alpha_end=0.001):
     """Run training for one generation.
 
     Args:
@@ -367,9 +367,8 @@ def train(num_games, workers, generation=1, resume_from=None,
     worker_table_path = os.path.join(_superleaves_dir(), '_worker_table.pkl')
     table.save(worker_table_path)
 
-    # Alpha schedule: exponential decay from 0.1 to 0.001
-    alpha_start = 0.1
-    alpha_end = 0.001
+    # Alpha schedule: exponential decay
+    # (alpha_start and alpha_end come from function parameters)
 
     games_done = resume_games
     games_remaining = num_games - games_done
@@ -382,6 +381,7 @@ def train(num_games, workers, generation=1, resume_from=None,
     print(f"  Workers: {workers}")
     print(f"  Batch size: {batch_size}")
     print(f"  TD gamma: {td_gamma}")
+    print(f"  Alpha: {alpha_start} -> {alpha_end}")
     print(f"  Checkpoint every: {checkpoint_every:,}")
     print(f"  Report every: {report_every:,}")
     print()
@@ -700,6 +700,10 @@ def main():
     parser.add_argument('--td-gamma', type=float, default=0.97,
                         help='TD discount factor (default: 0.97). '
                              '0.0 = no bootstrapping, 1.0 = full discount.')
+    parser.add_argument('--alpha-start', type=float, default=0.1,
+                        help='Initial learning rate (default: 0.1)')
+    parser.add_argument('--alpha-end', type=float, default=0.001,
+                        help='Final learning rate (default: 0.001)')
     args = parser.parse_args()
 
     # System info
@@ -758,7 +762,9 @@ def main():
         report_every=args.report_every,
         is_smoke_test=is_smoke,
         init_from=init_from,
-        td_gamma=args.td_gamma
+        td_gamma=args.td_gamma,
+        alpha_start=args.alpha_start,
+        alpha_end=args.alpha_end
     )
 
 
