@@ -1,0 +1,83 @@
+{
+  "timestamp": "2026-03-05 12:25:59",
+  "cpu_info": {
+    "platform": "Windows",
+    "machine": "AMD64",
+    "python_version": "3.12.7",
+    "cpu_count": 32,
+    "processor": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "cpu_name": "AMD Ryzen 9 7950X3D 16-Core Processor",
+    "l3_cache_kb": 131072,
+    "l3_cache_mb": 128.0
+  },
+  "c_accelerated": true,
+  "games_per_test": 1000,
+  "total_benchmark_sec": 154.5,
+  "gaddag_build_sec": 25.4,
+  "results": [
+    {
+      "workers": 1,
+      "games": 1000,
+      "elapsed_sec": 88.71,
+      "init_sec": 5.29,
+      "game_sec": 83.43,
+      "gps_total": 11.3,
+      "gps_game_only": 12.0
+    },
+    {
+      "workers": 8,
+      "games": 1000,
+      "elapsed_sec": 19.96,
+      "init_sec": 4.53,
+      "game_sec": 15.43,
+      "gps_total": 50.1,
+      "gps_game_only": 64.8
+    },
+    {
+      "workers": 16,
+      "games": 1000,
+      "elapsed_sec": 12.57,
+      "init_sec": 2.93,
+      "game_sec": 9.64,
+      "gps_total": 79.6,
+      "gps_game_only": 103.7
+    },
+    {
+      "workers": 24,
+      "games": 1000,
+      "elapsed_sec": 11.76,
+      "init_sec": 4.21,
+      "game_sec": 7.55,
+      "gps_total": 85.1,
+      "gps_game_only": 132.5
+    },
+    {
+      "workers": 28,
+      "games": 1000,
+      "elapsed_sec": 10.88,
+      "init_sec": 4.21,
+      "game_sec": 6.66,
+      "gps_total": 91.9,
+      "gps_game_only": 150.1
+    },
+    {
+      "workers": 29,
+      "games": 1000,
+      "elapsed_sec": 10.66,
+      "init_sec": 4.18,
+      "game_sec": 6.48,
+      "gps_total": 93.8,
+      "gps_game_only": 154.4
+    }
+  ],
+  "optimal": {
+    "workers": 29,
+    "gps_game_only": 154.4,
+    "gps_total": 93.8
+  },
+  "projections": {
+    "100h_games": 55584000,
+    "100h_games_M": 55.6,
+    "obs_per_6tile_entry": 1026
+  }
+}
