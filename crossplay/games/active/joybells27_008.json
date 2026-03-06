@@ -178,6 +178,273 @@
       "engine_version": "21.4.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "WEAL",
+      "row": 2,
+      "col": 7,
+      "dir": "V",
+      "player": "opp",
+      "score": 24,
+      "bag": 49,
+      "blanks": [],
+      "cumulative": [
+        207,
+        175
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-03-04T22:44:48.902630",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "SILURIAN",
+      "row": 3,
+      "col": 4,
+      "dir": "V",
+      "player": "me",
+      "score": 60,
+      "bag": 42,
+      "blanks": [],
+      "cumulative": [
+        267,
+        175
+      ],
+      "rack": "SLAUNR?",
+      "drawn": "TPCDVGE",
+      "note": "bingo",
+      "timestamp": "2026-03-04T22:51:45.794923",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "MINX",
+      "row": 6,
+      "col": 8,
+      "dir": "H",
+      "player": "opp",
+      "score": 29,
+      "bag": 39,
+      "blanks": [],
+      "cumulative": [
+        267,
+        204
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-03-04T22:54:54.347974",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "DEVI",
+      "row": 4,
+      "col": 1,
+      "dir": "H",
+      "player": "me",
+      "score": 30,
+      "bag": 36,
+      "blanks": [],
+      "cumulative": [
+        297,
+        204
+      ],
+      "rack": "TPCDVGE",
+      "drawn": "KVO",
+      "note": "",
+      "timestamp": "2026-03-04T22:58:12.039498",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "SOB",
+      "row": 12,
+      "col": 9,
+      "dir": "V",
+      "player": "opp",
+      "score": 23,
+      "bag": 33,
+      "blanks": [
+        0,
+        1
+      ],
+      "cumulative": [
+        297,
+        227
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-03-04T23:06:42.997731",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "KNOP",
+      "row": 5,
+      "col": 10,
+      "dir": "V",
+      "player": "me",
+      "score": 26,
+      "bag": 30,
+      "blanks": [],
+      "cumulative": [
+        323,
+        227
+      ],
+      "rack": "TPCKVGO",
+      "drawn": "UOH",
+      "note": "",
+      "timestamp": "2026-03-04T23:14:05.684828",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "KORI",
+      "row": 5,
+      "col": 10,
+      "dir": "H",
+      "player": "opp",
+      "score": 19,
+      "bag": 27,
+      "blanks": [],
+      "cumulative": [
+        323,
+        246
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-03-04T23:26:34.901972",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "GOTCH",
+      "row": 4,
+      "col": 11,
+      "dir": "H",
+      "player": "me",
+      "score": 57,
+      "bag": 22,
+      "blanks": [],
+      "cumulative": [
+        380,
+        246
+      ],
+      "rack": "TUVOCHG",
+      "drawn": "EAMAE",
+      "note": "",
+      "timestamp": "2026-03-04T23:29:02.612954",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "JIB",
+      "row": 14,
+      "col": 7,
+      "dir": "H",
+      "player": "opp",
+      "score": 35,
+      "bag": 20,
+      "blanks": [],
+      "cumulative": [
+        380,
+        281
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-03-05T07:13:51.367049",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "UVEA",
+      "row": 1,
+      "col": 9,
+      "dir": "V",
+      "player": "me",
+      "score": 28,
+      "bag": 16,
+      "blanks": [],
+      "cumulative": [
+        408,
+        281
+      ],
+      "rack": "EAMUEAV",
+      "drawn": "IPOI",
+      "note": "",
+      "timestamp": "2026-03-05T07:20:20.678866",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "DREDGE",
+      "row": 2,
+      "col": 2,
+      "dir": "V",
+      "player": "opp",
+      "score": 26,
+      "bag": 11,
+      "blanks": [],
+      "cumulative": [
+        367,
+        307
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-03-05T13:27:38.540466",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "PEA",
+      "row": 13,
+      "col": 10,
+      "dir": "V",
+      "player": "me",
+      "score": 24,
+      "bag": 8,
+      "blanks": [],
+      "cumulative": [
+        391,
+        307
+      ],
+      "rack": "EAMIPOI",
+      "drawn": "EAS",
+      "note": "",
+      "timestamp": "2026-03-05T15:24:35.369980",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [
@@ -185,19 +452,29 @@
       7,
       8,
       "P"
+    ],
+    [
+      12,
+      9,
+      "S"
+    ],
+    [
+      13,
+      9,
+      "O"
     ]
   ],
-  "your_score": 207,
-  "opp_score": 151,
-  "your_rack": "SLAUNR*",
+  "your_score": 391,
+  "opp_score": 307,
+  "your_rack": "IEMASOI",
   "is_your_turn": false,
   "opponent_name": "joybells27",
   "created_at": "2026-03-04T19:01:58.842624",
-  "updated_at": "2026-03-04T21:31:12.333100",
+  "updated_at": "2026-03-05T15:24:35.370985",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "joybells27_008",
   "status": "active",
-  "spread": 56,
-  "move_count": 8
+  "spread": 84,
+  "move_count": 20
 }
