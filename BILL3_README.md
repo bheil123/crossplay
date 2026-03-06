@@ -36,20 +36,20 @@ Run from the repo root in a **native Windows terminal** (CMD or PowerShell, NOT 
 
 **CMD:**
 ```
-python -m crossplay.superleaves.trainer --resume --generation 5 ^
-  --games 36000000 ^
+python -m crossplay.superleaves.remote_train ^
+  --generation 5 --games 36000000 ^
   --init-from crossplay\superleaves\gen5_1490000.pkl ^
   --alpha-start 0.03 --alpha-end 0.0003 ^
-  --workers 28
+  --workers 28 --push-every 500000 --resume
 ```
 
 **PowerShell:**
 ```powershell
-python -m crossplay.superleaves.trainer --resume --generation 5 `
-  --games 36000000 `
+python -m crossplay.superleaves.remote_train `
+  --generation 5 --games 36000000 `
   --init-from crossplay\superleaves\gen5_1490000.pkl `
   --alpha-start 0.03 --alpha-end 0.0003 `
-  --workers 28
+  --workers 28 --push-every 500000 --resume
 ```
 
 ## What This Does
@@ -57,7 +57,8 @@ python -m crossplay.superleaves.trainer --resume --generation 5 `
 - Resumes gen5 training from the 1.49M game checkpoint
 - Trains to 36M total games using TD(0) temporal difference learning
 - Alpha (learning rate) decays exponentially from 0.03 to 0.0003
-- Checkpoints saved every 10,000 games
+- Checkpoints saved locally every 10,000 games
+- **Auto-pushes to GitHub every 500K games** so dad can monitor progress
 - Uses 28 workers (reserves 4 threads for OS)
 
 ## Estimated Time
@@ -73,20 +74,18 @@ python -m crossplay.superleaves.trainer --resume --generation 5 `
 3. Training runs fine in background -- you can use the computer normally
 4. If you need to stop: Ctrl+C (saves checkpoint before exiting)
 5. To resume after stopping: just run the same command again
+6. Git pushes happen automatically in the background -- you don't need to do anything
+7. If a git push fails (e.g. conflict), it retries next milestone -- no training interruption
 
-## Pushing Results
+## What Gets Auto-Pushed
 
-Push checkpoints periodically so dad can monitor progress:
+Every 500K games, the script automatically:
+- `git add -f` the latest gen5 checkpoint (.pkl file, ~21MB via LFS)
+- `git add` status.json (training progress)
+- Commits with a message like "Gen5 checkpoint at 2000000 games (Bill3 7950X3D)"
+- Pushes to GitHub
 
-```
-cd crossplay
-git add -f crossplay\superleaves\gen5_*.pkl
-git add crossplay\superleaves\status.json
-git commit -m "Gen5 training progress from Bill3 7950X3D"
-git push
-```
-
-Or just push the final result when training completes.
+Dad can monitor by running `git fetch && git log origin/main --oneline` on his end.
 
 ## Questions?
 
