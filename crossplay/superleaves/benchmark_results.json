@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-05 12:25:59",
+  "timestamp": "2026-03-05 20:10:20",
   "cpu_info": {
     "platform": "Windows",
     "machine": "AMD64",
@@ -12,72 +12,72 @@
   },
   "c_accelerated": true,
   "games_per_test": 1000,
-  "total_benchmark_sec": 154.5,
-  "gaddag_build_sec": 25.4,
+  "total_benchmark_sec": 164.0,
+  "gaddag_build_sec": 0.0,
   "results": [
     {
       "workers": 1,
       "games": 1000,
-      "elapsed_sec": 88.71,
-      "init_sec": 5.29,
-      "game_sec": 83.43,
-      "gps_total": 11.3,
-      "gps_game_only": 12.0
+      "elapsed_sec": 99.25,
+      "init_sec": 5.44,
+      "game_sec": 93.8,
+      "gps_total": 10.1,
+      "gps_game_only": 10.7
     },
     {
       "workers": 8,
       "games": 1000,
-      "elapsed_sec": 19.96,
-      "init_sec": 4.53,
-      "game_sec": 15.43,
-      "gps_total": 50.1,
-      "gps_game_only": 64.8
+      "elapsed_sec": 19.36,
+      "init_sec": 4.96,
+      "game_sec": 14.4,
+      "gps_total": 51.6,
+      "gps_game_only": 69.4
     },
     {
       "workers": 16,
       "games": 1000,
-      "elapsed_sec": 12.57,
-      "init_sec": 2.93,
-      "game_sec": 9.64,
-      "gps_total": 79.6,
-      "gps_game_only": 103.7
+      "elapsed_sec": 12.4,
+      "init_sec": 3.83,
+      "game_sec": 8.57,
+      "gps_total": 80.6,
+      "gps_game_only": 116.7
     },
     {
       "workers": 24,
       "games": 1000,
-      "elapsed_sec": 11.76,
-      "init_sec": 4.21,
-      "game_sec": 7.55,
-      "gps_total": 85.1,
-      "gps_game_only": 132.5
+      "elapsed_sec": 11.27,
+      "init_sec": 4.09,
+      "game_sec": 7.17,
+      "gps_total": 88.8,
+      "gps_game_only": 139.4
     },
     {
       "workers": 28,
       "games": 1000,
-      "elapsed_sec": 10.88,
-      "init_sec": 4.21,
-      "game_sec": 6.66,
-      "gps_total": 91.9,
-      "gps_game_only": 150.1
+      "elapsed_sec": 10.83,
+      "init_sec": 4.23,
+      "game_sec": 6.6,
+      "gps_total": 92.3,
+      "gps_game_only": 151.5
     },
     {
       "workers": 29,
       "games": 1000,
-      "elapsed_sec": 10.66,
-      "init_sec": 4.18,
-      "game_sec": 6.48,
-      "gps_total": 93.8,
-      "gps_game_only": 154.4
+      "elapsed_sec": 10.88,
+      "init_sec": 4.49,
+      "game_sec": 6.4,
+      "gps_total": 91.9,
+      "gps_game_only": 156.3
     }
   ],
   "optimal": {
     "workers": 29,
-    "gps_game_only": 154.4,
-    "gps_total": 93.8
+    "gps_game_only": 156.3,
+    "gps_total": 91.9
   },
   "projections": {
-    "100h_games": 55584000,
-    "100h_games_M": 55.6,
-    "obs_per_6tile_entry": 1026
+    "100h_games": 56268000,
+    "100h_games_M": 56.3,
+    "obs_per_6tile_entry": 1039
   }
 }
