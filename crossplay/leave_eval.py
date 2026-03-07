@@ -14,6 +14,7 @@ V21.2: Env-var-controlled leave mode (CROSSPLAY_LEAVES):
   formula     -- hand-tuned per-tile formula (V21 default)
   blend       -- alpha * formula + (1-alpha) * superleaves
   quackle     -- Quackle-derived per-tile values with bag decay
+  research    -- MAGPIE/Quackle 2025 values adapted for Crossplay differences
 
   CROSSPLAY_BLEND_ALPHA -- blend weight (0.0=pure SL, 1.0=pure formula,
   default 0.5). Only used when CROSSPLAY_LEAVES=blend.
@@ -59,6 +60,125 @@ QUACKLE_TILE_VALUES = {
     'F': -2.21, 'O': -2.50, 'G': -1.80, 'W': -4.50, 'U': -4.00,
     'V': -6.50, 'Q': -6.79,
 }
+
+# Research-derived per-tile leave values for Crossplay.
+# Base: MAGPIE/Quackle single-tile values (state of the art, 2025).
+# Adjustments for Crossplay game differences:
+#   - 3 blanks (vs 2): blank ~25% less scarce, marginal value drops
+#   - Sweep=40 (vs bingo=50): 20% less bonus for 7-tile plays
+#   - 5 S tiles (vs 4): S ~20% less scarce
+#   - No endgame tile penalty: Q/V/U slightly less punishing
+#   - Different tile face values: K=6(+1), L=2(+1), G=4(+2), B=4(+1),
+#     V=6(+2), W=5(+1), J=10(+2), H=3(-1), U=2(+1)
+#   - 5 N tiles (vs 6): N slightly more scarce
+#   - 8 I tiles (vs 9): I slightly more scarce
+RESEARCH_TILE_VALUES = {
+    '?': 19.0,    # 25.57 * scarcity(3vs2)^0.5 * sweep_adj = ~19
+    'S':  7.0,    # 8.04 * scarcity(5vs4)^0.5 * sweep_adj
+    'Z':  5.0,    # 5.12 (same face=10, great scoring: ZA, ZO)
+    'X':  3.3,    # 3.31 (same face=8, AX/EX/OX/XI premium plays)
+    'R':  1.1,    # 1.10 (same face=1, bingo-friendly, unchanged)
+    'C':  0.85,   # 0.85 (same face=3, flexible)
+    'H':  0.6,    # 1.09 adjusted: face 3 vs 4, -0.5 scoring penalty
+    'M':  0.58,   # 0.58 (same face=3)
+    'L':  0.5,    # -0.17 + 0.67: L=2 vs 1, +1 face = better scoring
+    'D':  0.45,   # 0.45 (same face=2)
+    'E':  0.3,    # 0.35 * sweep_adj (bingo tile, slight reduction)
+    'N':  0.3,    # 0.22 + 0.08: 5 tiles vs 6, slightly more scarce
+    'K':  0.3,    # -0.54 + 0.84: K=6 vs 5, much better scoring
+    'T': -0.1,    # -0.10 (same face=1, same count=6)
+    'P': -0.46,   # -0.46 (same face=3)
+    'J': -0.5,    # -1.47 + 0.97: J=10 vs 8, better scoring per play
+    'A': -0.6,    # -0.63 (same face=1, same count=9)
+    'Y': -0.6,    # -0.63 (same face=4)
+    'B': -1.4,    # -2.00 + 0.60: B=4 vs 3, slightly better scoring
+    'G': -1.3,    # -2.85 + 1.55: G=4 vs 2, +2 face = much better
+    'I': -1.8,    # -2.07 + 0.27: 8 tiles vs 9, slightly more scarce
+    'F': -2.2,    # -2.21 (same face=4)
+    'O': -2.5,    # -2.50 (same face=1, same count=8)
+    'W': -3.2,    # -3.82 + 0.62: W=5 vs 4, slightly better scoring
+    'U': -4.3,    # -5.10 + 0.80: U=2 vs 1, no endgame penalty
+    'V': -4.5,    # -5.55 + 1.05: V=6 vs 4, higher scoring per play
+    'Q': -6.0,    # -6.79 + 0.79: no endgame penalty makes Q less bad
+}
+
+
+def _research_evaluate(leave, bag_size=None):
+    """Research-derived Crossplay leave evaluation.
+
+    Based on MAGPIE/Quackle state-of-the-art values (2025) with systematic
+    adjustments for Crossplay game differences. Includes interaction terms
+    from Maven research: V:C balance, duplicate penalties, Q-without-U.
+
+    This is a 'smart formula' -- per-tile values + interaction adjustments,
+    not a flat sum. Captures the major non-additive effects that Maven's
+    15M-parameter model identified as most impactful.
+    """
+    if not leave:
+        return 0.0
+    leave = leave.upper()
+
+    # 1. Base per-tile sum
+    value = sum(RESEARCH_TILE_VALUES.get(t, -1.0) for t in leave)
+
+    # 2. Vowel/consonant balance (from Maven research)
+    vowels = sum(1 for t in leave if t in VOWELS)
+    consonants = sum(1 for t in leave if t.isalpha() and t not in VOWELS and t != '?')
+    blanks = sum(1 for t in leave if t == '?')
+    total = len(leave)
+
+    if total >= 2:
+        # Optimal ratios per leave size (Maven-style)
+        # 2 tiles: 1V:1C ideal
+        # 3 tiles: 1V:2C ideal
+        # 4 tiles: 2V:2C ideal
+        # 5 tiles: 2V:3C ideal
+        # 6 tiles: 2-3V:3-4C ideal
+        ideal_vowels = max(1, round(total * 0.38))  # ~38% vowels
+        vowel_excess = vowels - ideal_vowels
+        if vowels == 0 and total >= 3:
+            value -= 8.0  # No vowels is catastrophic
+        elif vowel_excess > 0:
+            value -= vowel_excess * 2.5  # Too many vowels
+        elif vowel_excess < -1 and total >= 4:
+            value -= abs(vowel_excess + 1) * 2.0  # Too few vowels
+        if consonants == 0 and total >= 3:
+            value -= 5.0  # No consonants
+
+    # 3. Duplicate penalties (non-linear, from Maven/MAGPIE research)
+    # Duplicates are worse than our flat -3.0: the 2nd copy is -3.5,
+    # the 3rd copy is -5.0 (increasingly severe)
+    from collections import Counter
+    counter = Counter(leave)
+    for tile, count in counter.items():
+        if count > 1 and tile != '?':
+            if count == 2:
+                value -= 3.5  # Pair penalty
+            elif count == 3:
+                value -= 8.5  # Triple penalty (3.5 + 5.0)
+            else:
+                value -= 8.5 + 6.0 * (count - 3)  # Quad+ (extreme)
+
+    # 4. Q-without-U penalty (from Maven's Q-U interaction model)
+    if 'Q' in counter and 'U' not in counter and '?' not in counter:
+        value -= 4.0  # Extra penalty for Q without U or blank
+
+    # 5. Bingo stem synergy bonus (scaled for sweep=40)
+    # From MAGPIE: ERS leave = +17.93, but most of that is in per-tile
+    # values already. The synergy bonus is the non-additive part.
+    if total >= 4:
+        leave_set = set(leave)
+        satine = sum(1 for c in 'SATINE' if c in leave_set)
+        if satine >= 5:
+            value += 3.0  # Strong bingo stem (sweep=40 adjusted)
+        elif satine >= 4:
+            value += 1.5  # Moderate bingo stem
+
+    # 6. Bag decay (Crossplay has no tile penalty, so leaves matter
+    # less as bag empties)
+    value *= _leave_decay(bag_size)
+
+    return value
 
 
 def _leave_decay(bag_size):
@@ -240,6 +360,12 @@ def evaluate_leave(leave: str, bag_empty: bool = False,
         if bag_size is None and bag_empty:
             bag_size = 0
         return _quackle_evaluate(leave, bag_size)
+
+    # Research mode: MAGPIE/Quackle-derived values adapted for Crossplay
+    if LEAVE_MODE == 'research':
+        if bag_size is None and bag_empty:
+            bag_size = 0
+        return _research_evaluate(leave, bag_size)
 
     # Formula mode (V21 default, proven best in tournament testing)
     if LEAVE_MODE == 'formula':

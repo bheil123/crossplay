@@ -55,6 +55,11 @@ crossplay/superleaves/gen2_*.pkl
 crossplay/superleaves/gen3_*.pkl
 crossplay/superleaves/gen4_*.pkl
 crossplay/superleaves/gen5_*.pkl
+crossplay/superleaves/gen6_*.pkl
+crossplay/superleaves/gen7_*.pkl
+crossplay/superleaves/gen8_*.pkl
+crossplay/superleaves/quackle_bootstrap.pkl
+crossplay/superleaves/research_bootstrap.pkl
 crossplay/superleaves/tile_cma_*.pkl
 crossplay/superleaves/denoised_*.pkl
 crossplay/superleaves/rebased_*.pkl

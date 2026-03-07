@@ -80,6 +80,78 @@ class LeaveTable:
 
         return total
 
+    def bootstrap_from_quackle(self):
+        """Initialize all valid leaves from Quackle-derived per-tile values.
+
+        Same enumeration as bootstrap_from_formula, but uses Quackle's
+        per-tile values (adapted for Crossplay) instead of our hand-tuned
+        formula. This provides an alternative starting point for training.
+        """
+        from ..leave_eval import QUACKLE_TILE_VALUES
+        from ..config import TILE_DISTRIBUTION
+
+        tiles = []
+        max_counts = {}
+        for letter, count in sorted(TILE_DISTRIBUTION.items()):
+            tiles.append(letter)
+            max_counts[letter] = count
+
+        total = 0
+        for size in range(1, 7):
+            for combo in combinations_with_replacement(tiles, size):
+                valid = True
+                seen = {}
+                for t in combo:
+                    seen[t] = seen.get(t, 0) + 1
+                    if seen[t] > max_counts[t]:
+                        valid = False
+                        break
+                if not valid:
+                    continue
+
+                leave_key = tuple(combo)
+                value = sum(QUACKLE_TILE_VALUES.get(t, -1.0) for t in combo)
+                self._table[leave_key] = value
+                total += 1
+
+        return total
+
+    def bootstrap_from_research(self):
+        """Initialize all valid leaves using research-derived Crossplay values.
+
+        Uses _research_evaluate() which applies MAGPIE/Quackle 2025 per-tile
+        values adapted for Crossplay differences, with interaction terms
+        (V:C balance, duplicate penalties, Q-without-U, bingo stems).
+        """
+        from ..leave_eval import _research_evaluate
+        from ..config import TILE_DISTRIBUTION
+
+        tiles = []
+        max_counts = {}
+        for letter, count in sorted(TILE_DISTRIBUTION.items()):
+            tiles.append(letter)
+            max_counts[letter] = count
+
+        total = 0
+        for size in range(1, 7):
+            for combo in combinations_with_replacement(tiles, size):
+                valid = True
+                seen = {}
+                for t in combo:
+                    seen[t] = seen.get(t, 0) + 1
+                    if seen[t] > max_counts[t]:
+                        valid = False
+                        break
+                if not valid:
+                    continue
+
+                leave_key = tuple(combo)
+                leave_str = ''.join(combo)
+                self._table[leave_key] = _research_evaluate(leave_str)
+                total += 1
+
+        return total
+
     def batch_update_ema(self, observations, alpha):
         """Apply EMA updates from a batch of observations.
 

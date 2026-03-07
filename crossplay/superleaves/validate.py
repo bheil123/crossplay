@@ -71,6 +71,20 @@ class QuackleLeaveAdapter:
         return sum(self._values.get(t, -1.0) for t in leave_key)
 
 
+class ResearchLeaveAdapter:
+    """Wraps research-derived Crossplay values behind LeaveTable interface."""
+
+    def __init__(self):
+        from ..leave_eval import _research_evaluate
+        self._eval = _research_evaluate
+
+    def get(self, leave_key, default=0.0):
+        if not leave_key:
+            return 0.0
+        leave_str = ''.join(leave_key)
+        return self._eval(leave_str)
+
+
 def play_validation_game(gaddag, move_finder_cls, table_a, table_b):
     """Play one game: table_a is P1, table_b is P2.
 
@@ -171,6 +185,9 @@ def _load_table(path_or_sentinel, label, pid):
     elif path_or_sentinel == '__quackle__':
         print(f"  [Worker {pid}] {label}: Quackle per-tile adapter", flush=True)
         return QuackleLeaveAdapter()
+    elif path_or_sentinel == '__research__':
+        print(f"  [Worker {pid}] {label}: Research-derived adapter", flush=True)
+        return ResearchLeaveAdapter()
     else:
         t = time.time()
         table = LeaveTable.load(path_or_sentinel)
@@ -259,6 +276,8 @@ def _label_for(path_or_sentinel):
         return 'Formula'
     elif path_or_sentinel == '__quackle__':
         return 'Quackle'
+    elif path_or_sentinel == '__research__':
+        return 'Research'
     else:
         return os.path.basename(path_or_sentinel).replace('.pkl', '')
 
@@ -385,12 +404,15 @@ def validate(table_path, num_games, workers=None, opponent_path=None):
 
 def _resolve_path(path_str):
     """Resolve a table path: sentinels pass through, files resolved."""
-    if path_str in ('__formula__', '__quackle__', 'formula', 'quackle'):
+    if path_str in ('__formula__', '__quackle__', '__research__',
+                     'formula', 'quackle', 'research'):
         # Normalize short names to sentinel format
         if path_str == 'formula':
             return '__formula__'
         if path_str == 'quackle':
             return '__quackle__'
+        if path_str == 'research':
+            return '__research__'
         return path_str
 
     # Try as-is, then relative to superleaves dir
