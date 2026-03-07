@@ -190,6 +190,16 @@ def check_recalibrate_request():
     return os.path.exists(_recalibrate_request_path())
 
 
+def _restart_request_path():
+    """Path to restart flag file (created by remote_train.py on remote signal)."""
+    return os.path.join(os.path.dirname(_superleaves_dir()), '.restart_request')
+
+
+def check_restart_request():
+    """Check if restart flag file exists. Returns True if it does."""
+    return os.path.exists(_restart_request_path())
+
+
 # ---------------------------------------------------------------------------
 # Find latest checkpoint for resume
 # ---------------------------------------------------------------------------
@@ -453,6 +463,30 @@ def train(num_games, workers, generation=1, resume_from=None,
                     print(f"  Status: paused_for_recalibration")
                     print(f"  To recalibrate: python -m crossplay.mc_calibrate calibrate --force")
                     print(f"  To resume: python -m crossplay.superleaves.trainer --resume --generation {generation}")
+                    try:
+                        os.unlink(worker_table_path)
+                    except OSError:
+                        pass
+                    return table
+
+                # Check for remote restart request
+                if check_restart_request():
+                    print(f"\n  [!] Remote restart requested. Saving checkpoint and exiting...", flush=True)
+                    _flush_async_save()
+                    cp_path = _checkpoint_path(generation, games_done)
+                    table.save(cp_path)
+                    elapsed = time.time() - start_time
+                    gps = (games_done - resume_games) / max(elapsed, 0.01)
+                    write_status(
+                        'restarting', generation, games_done, num_games,
+                        gps, cp_path, table_size, table.single_tile_values()
+                    )
+                    print(f"  Checkpoint saved: {cp_path}")
+                    print(f"  Status: restarting (remote_train.py will pick up new config)")
+                    try:
+                        os.unlink(_restart_request_path())
+                    except OSError:
+                        pass
                     try:
                         os.unlink(worker_table_path)
                     except OSError:

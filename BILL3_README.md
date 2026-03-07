@@ -1,4 +1,11 @@
-# Bill3 Training Instructions -- Gen5 SuperLeaves
+# Bill3 Training Instructions -- Gen6 SuperLeaves
+
+## STATUS: Gen5 training is being stopped remotely
+
+Gen5 had a training issue (bad seed values from gen4, alpha too low).
+The trainer will auto-stop at the next checkpoint via .recalibrate_request.
+
+**When you see the trainer exit, follow the Gen6 instructions below.**
 
 ## Your Benchmark Results
 
@@ -15,11 +22,6 @@ L3 Cache: 128MB (3D V-Cache)
 |      28 |        91.9 |           150.1 |
 |      29 |        93.8 |           154.4 |
 
-Best throughput: 93.8 g/s (total) at 29 workers
-Sustained game-only rate: ~154 g/s (init overhead amortized over long runs)
-
-For comparison: Dad's i7-8700 gets ~26.5 g/s -- your machine is 3.5x faster!
-
 ## Step 1: Pull Latest Code
 
 ```
@@ -28,64 +30,62 @@ git pull
 git lfs pull
 ```
 
-This gets the gen5 checkpoint at 1.49M games (21MB file via Git LFS).
-
-## Step 2: Start Training
+## Step 2: Start Gen6 Training (from formula -- clean start)
 
 Run from the repo root in a **native Windows terminal** (CMD or PowerShell, NOT Git Bash):
 
 **CMD:**
 ```
 python -m crossplay.superleaves.remote_train ^
-  --generation 5 --games 36000000 ^
-  --init-from crossplay\superleaves\gen5_1490000.pkl ^
-  --alpha-start 0.03 --alpha-end 0.0003 ^
-  --workers 28 --push-every 500000 --resume
+  --generation 6 --games 36000000 ^
+  --alpha-start 0.1 --alpha-end 0.001 ^
+  --workers 28 --push-every 500000
 ```
 
 **PowerShell:**
 ```powershell
 python -m crossplay.superleaves.remote_train `
-  --generation 5 --games 36000000 `
-  --init-from crossplay\superleaves\gen5_1490000.pkl `
-  --alpha-start 0.03 --alpha-end 0.0003 `
-  --workers 28 --push-every 500000 --resume
+  --generation 6 --games 36000000 `
+  --alpha-start 0.1 --alpha-end 0.001 `
+  --workers 28 --push-every 500000
 ```
 
-## What This Does
+**Note: NO --init-from and NO --resume.** This starts fresh from the hand-tuned
+formula, which is what gen3 (our best generation) did successfully.
 
-- Resumes gen5 training from the 1.49M game checkpoint
-- Trains to 36M total games using TD(0) temporal difference learning
-- Alpha (learning rate) decays exponentially from 0.03 to 0.0003
-- Checkpoints saved locally every 10,000 games
-- **Auto-pushes to GitHub every 500K games** so dad can monitor progress
-- Uses 28 workers (reserves 4 threads for OS)
+## What Changed from Gen5
+
+- **No init-from**: Gen5 was seeded from gen4 which had drifted tile values
+  (S inflated to +23, E to +18, Q positive when it should be negative).
+  Gen6 starts clean from the formula baseline.
+- **Higher alpha**: 0.1 -> 0.001 (proven schedule from gen3) instead of
+  gen5's too-conservative 0.03 -> 0.0003.
+- **remote_train.py now supports remote restart**: If dad pushes a
+  restart_config.json to git, the trainer will auto-stop and restart
+  with new parameters. No need to manually intervene.
 
 ## Estimated Time
 
-- Remaining games: 34,510,000
-- Estimated sustained rate: ~120-140 g/s
-- ETA: ~70-80 hours (~3 days)
+- Total games: 36,000,000
+- Estimated sustained rate: ~160 g/s
+- ETA: ~62 hours (~2.5 days)
 
 ## Important Notes
 
-1. Workers take 30-90 seconds to load the GADDAG before progress appears -- don't kill it
-2. GADDAG auto-builds on first run (~25 seconds on your machine) if not cached
+1. Workers take 30-90 seconds to load the GADDAG before progress appears
+2. GADDAG auto-builds on first run (~25s) if not cached
 3. Training runs fine in background -- you can use the computer normally
 4. If you need to stop: Ctrl+C (saves checkpoint before exiting)
-5. To resume after stopping: just run the same command again
-6. Git pushes happen automatically in the background -- you don't need to do anything
-7. If a git push fails (e.g. conflict), it retries next milestone -- no training interruption
+5. To resume after stopping: add `--resume` to the same command
+6. Git pushes happen automatically every 500K games
+7. If a git push fails, it retries next milestone -- no training interruption
 
-## What Gets Auto-Pushed
+## Remote Restart Feature (NEW)
 
-Every 500K games, the script automatically:
-- `git add -f` the latest gen5 checkpoint (.pkl file, ~21MB via LFS)
-- `git add` status.json (training progress)
-- Commits with a message like "Gen5 checkpoint at 2000000 games (Bill3 7950X3D)"
-- Pushes to GitHub
-
-Dad can monitor by running `git fetch && git log origin/main --oneline` on his end.
+Dad can now remotely retask the trainer by pushing a `restart_config.json`
+to git. When the monitor thread does its next `git pull` (at each push
+milestone), it detects the config and restarts the trainer automatically.
+You don't need to do anything -- it's fully automatic.
 
 ## Questions?
 
