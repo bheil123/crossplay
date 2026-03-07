@@ -226,20 +226,86 @@
       "engine_version": "21.4.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "EXECUTOR",
+      "row": 1,
+      "col": 5,
+      "dir": "V",
+      "player": "me",
+      "score": 61,
+      "bag": 43,
+      "blanks": [],
+      "cumulative": [
+        241,
+        151
+      ],
+      "rack": "UOREXT?",
+      "drawn": "OELSIIE",
+      "note": "bingo",
+      "timestamp": "2026-03-06T22:11:02.164743",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "DOZE",
+      "row": 7,
+      "col": 4,
+      "dir": "V",
+      "player": "opp",
+      "score": 35,
+      "bag": 39,
+      "blanks": [],
+      "cumulative": [
+        241,
+        186
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-03-07T01:55:57.674198",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "SEI",
+      "row": 11,
+      "col": 4,
+      "dir": "H",
+      "player": "me",
+      "score": 20,
+      "bag": 36,
+      "blanks": [],
+      "cumulative": [
+        252,
+        186
+      ],
+      "rack": "OELSIIE",
+      "drawn": "ABE",
+      "note": "",
+      "timestamp": "2026-03-07T02:04:16.767717",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [],
-  "your_score": 180,
-  "opp_score": 151,
-  "your_rack": "UOREXT?",
-  "is_your_turn": true,
+  "your_score": 252,
+  "opp_score": 186,
+  "your_rack": "OILAEBE",
+  "is_your_turn": false,
   "opponent_name": "joybells27",
   "created_at": "2026-03-05T21:43:24.091001",
-  "updated_at": "2026-03-06T22:08:42.018600",
+  "updated_at": "2026-03-07T02:04:16.767717",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "joybells27_009",
   "status": "active",
-  "spread": 29,
-  "move_count": 9
+  "spread": 66,
+  "move_count": 12
 }

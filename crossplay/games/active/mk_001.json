@@ -204,20 +204,64 @@
       "engine_version": "21.4.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "CLOG",
+      "row": 12,
+      "col": 1,
+      "dir": "V",
+      "player": "opp",
+      "score": 30,
+      "bag": 51,
+      "blanks": [],
+      "cumulative": [
+        215,
+        126
+      ],
+      "rack": null,
+      "drawn": null,
+      "note": "",
+      "timestamp": "2026-03-07T02:07:07.222470",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
+    },
+    {
+      "word": "BOG",
+      "row": 6,
+      "col": 5,
+      "dir": "V",
+      "player": "me",
+      "score": 26,
+      "bag": 48,
+      "blanks": [],
+      "cumulative": [
+        241,
+        126
+      ],
+      "rack": "GFOAEBE",
+      "drawn": "NQA",
+      "note": "",
+      "timestamp": "2026-03-07T02:09:56.383236",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [],
-  "your_score": 249,
-  "opp_score": 96,
-  "your_rack": "GFOAEBE",
+  "your_score": 241,
+  "opp_score": 126,
+  "your_rack": "NFQAEAE",
   "is_your_turn": false,
   "opponent_name": "mk",
   "created_at": "2026-03-04T19:12:42.411147",
-  "updated_at": "2026-03-06T22:06:35.530317",
+  "updated_at": "2026-03-07T02:09:56.383236",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "mk_001",
   "status": "active",
-  "spread": 153,
-  "move_count": 8
+  "spread": 115,
+  "move_count": 10
 }
