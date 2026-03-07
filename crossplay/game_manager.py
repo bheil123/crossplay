@@ -67,6 +67,16 @@ def get_resources():
     return GADDAG, DICTIONARY
 
 
+def invalidate_resources():
+    """Reset cached GADDAG and dictionary so next get_resources() reloads fresh.
+
+    Called by modify_dictionary() after updating the dictionary and GADDAG.
+    """
+    global GADDAG, DICTIONARY
+    GADDAG = None
+    DICTIONARY = None
+
+
 class Strategy(Enum):
     """AI strategy types."""
     HIGHEST_SCORE = "highest"      # Always play highest scoring move

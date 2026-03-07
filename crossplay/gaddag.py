@@ -218,6 +218,31 @@ def get_gaddag():
     return _gaddag
 
 
+def invalidate_cache():
+    """Delete GADDAG cache files and reset the global singleton.
+
+    After calling this, the next get_gaddag() will rebuild from dictionary.
+    """
+    global _gaddag
+    import os
+    base_dir = os.path.dirname(__file__)
+    for fname in ['gaddag_compact.bin', 'gaddag.pkl']:
+        path = os.path.join(base_dir, fname)
+        if os.path.exists(path):
+            os.unlink(path)
+            print(f"  Deleted {fname}")
+    _gaddag = None
+
+
+def rebuild():
+    """Invalidate GADDAG cache and rebuild from current dictionary.
+
+    Returns the new GADDAG instance.
+    """
+    invalidate_cache()
+    return get_gaddag()
+
+
 if __name__ == "__main__":
     import time
     import os

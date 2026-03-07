@@ -278,6 +278,96 @@ def is_valid_word(word: str) -> bool:
     return get_dictionary().is_valid(word)
 
 
+def modify_dictionary(add=None, remove=None, rebuild_gaddag=True):
+    """Add/remove words from the dictionary and optionally rebuild GADDAG.
+
+    This is the single entry point for dictionary changes. It:
+      1. Loads crossplay_dict.pkl
+      2. Adds/removes specified words
+      3. Saves updated crossplay_dict.pkl
+      4. Invalidates and rebuilds the GADDAG (~25-48s)
+      5. Resets module-level singleton caches
+
+    Args:
+        add: List of words to add (case-insensitive).
+        remove: List of words to remove (case-insensitive).
+        rebuild_gaddag: If True (default), rebuild GADDAG after changes.
+
+    Returns:
+        dict with 'added', 'removed', 'already_existed', 'not_found' lists.
+    """
+    import time
+    global _global_dict
+
+    add = [w.upper() for w in (add or [])]
+    remove = [w.upper() for w in (remove or [])]
+
+    # Load current dictionary
+    base_dir = os.path.dirname(__file__)
+    dict_path = os.path.join(base_dir, 'crossplay_dict.pkl')
+    dictionary = Dictionary.load(dict_path, use_pattern_index=False)
+
+    result = {
+        'added': [],
+        'removed': [],
+        'already_existed': [],
+        'not_found': [],
+    }
+
+    # Apply additions
+    for word in add:
+        if word in dictionary._words:
+            result['already_existed'].append(word)
+        else:
+            dictionary.add_word(word)
+            result['added'].append(word)
+
+    # Apply removals
+    for word in remove:
+        if word in dictionary._words:
+            dictionary.remove_word(word)
+            result['removed'].append(word)
+        else:
+            result['not_found'].append(word)
+
+    # Save if anything changed
+    if result['added'] or result['removed']:
+        dictionary.save(dict_path)
+        print(f"  Dictionary saved: {len(dictionary)} words")
+
+        # Reset dictionary singleton
+        _global_dict = None
+
+        if rebuild_gaddag:
+            from . import gaddag as gaddag_mod
+            from .game_manager import invalidate_resources
+
+            print("  Rebuilding GADDAG (this takes 25-48s)...")
+            t0 = time.perf_counter()
+            gaddag_mod.rebuild()
+            elapsed = time.perf_counter() - t0
+            print(f"  GADDAG rebuilt in {elapsed:.1f}s")
+
+            # Reset game_manager cached resources
+            invalidate_resources()
+
+        # Summary
+        parts = []
+        if result['added']:
+            parts.append(f"Added {len(result['added'])}: {', '.join(result['added'])}")
+        if result['removed']:
+            parts.append(f"Removed {len(result['removed'])}: {', '.join(result['removed'])}")
+        if result['already_existed']:
+            parts.append(f"Already existed: {', '.join(result['already_existed'])}")
+        if result['not_found']:
+            parts.append(f"Not found: {', '.join(result['not_found'])}")
+        print(f"  {'. '.join(parts)}.")
+    else:
+        print("  No changes to dictionary.")
+
+    return result
+
+
 if __name__ == "__main__":
     d = get_dictionary()
     print(f"Dictionary loaded with {len(d)} words")
