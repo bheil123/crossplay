@@ -182,20 +182,42 @@
       "engine_version": "21.4.0",
       "win_pct": null,
       "nyt": null
+    },
+    {
+      "word": "GHAZIES",
+      "row": 15,
+      "col": 1,
+      "dir": "H",
+      "player": "me",
+      "score": 138,
+      "bag": 54,
+      "blanks": [],
+      "cumulative": [
+        249,
+        96
+      ],
+      "rack": "EIGAH??",
+      "drawn": "GFOAEBE",
+      "note": "bingo",
+      "timestamp": "2026-03-06T22:06:35.530317",
+      "engine": null,
+      "engine_version": "21.4.0",
+      "win_pct": null,
+      "nyt": null
     }
   ],
   "blank_positions": [],
-  "your_score": 111,
+  "your_score": 249,
   "opp_score": 96,
-  "your_rack": "EIGAH??",
-  "is_your_turn": true,
+  "your_rack": "GFOAEBE",
+  "is_your_turn": false,
   "opponent_name": "mk",
   "created_at": "2026-03-04T19:12:42.411147",
-  "updated_at": "2026-03-06T22:02:48.175470",
+  "updated_at": "2026-03-06T22:06:35.530317",
   "notes": "",
   "final_turns_remaining": null,
   "game_id": "mk_001",
   "status": "active",
-  "spread": 15,
-  "move_count": 7
+  "spread": 153,
+  "move_count": 8
 }
