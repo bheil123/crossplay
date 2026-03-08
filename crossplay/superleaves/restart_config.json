@@ -1,13 +1,13 @@
 {
-  "action": "restart",
-  "generation": 6,
-  "games": 36000000,
+  "action": "resume",
+  "generation": 8,
+  "games": 100000000,
   "init_from": null,
   "alpha_start": 0.1,
   "alpha_end": 0.001,
   "td_gamma": 0.97,
   "workers": 28,
-  "push_every": 500000,
+  "push_every": 250000,
   "checkpoint_every": 10000,
-  "message": "Restart from formula -- gen5 had drift from bad gen4 seed (alpha too low, values diverged)"
+  "message": "Resume gen8 training (research bootstrap, 100M games)"
 }

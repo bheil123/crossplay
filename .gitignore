@@ -69,8 +69,9 @@ crossplay/superleaves/rebased_*.pkl
 !crossplay/superleaves/gen1_350000.pkl
 !crossplay/superleaves/gen4_3000000.pkl
 
-# Remote training artifacts (local only)
+# Remote training artifacts (local only, force-pushed by remote_train.py)
 crossplay/superleaves/remote_train.log
+crossplay/superleaves/remote_results.txt
 crossplay/superleaves/_benchmark_table.pkl
 
 # NYT screenshots (large binary files, keep locally)

@@ -1,11 +1,10 @@
-# Bill3 Training Instructions -- Gen6 SuperLeaves
+# Bill3 Training Instructions -- Gen8 SuperLeaves
 
-## STATUS: Gen5 training is being stopped remotely
+## STATUS: Ready to start Gen8 training
 
-Gen5 had a training issue (bad seed values from gen4, alpha too low).
-The trainer will auto-stop at the next checkpoint via .recalibrate_request.
-
-**When you see the trainer exit, follow the Gen6 instructions below.**
+Gen8 uses research-derived Crossplay leave values as its starting point
+(unlike gen3-6 which started from the hand-tuned formula). Training target
+is 100M games for deep convergence.
 
 ## Your Benchmark Results
 
@@ -30,62 +29,119 @@ git pull
 git lfs pull
 ```
 
-## Step 2: Start Gen6 Training (from formula -- clean start)
+## Step 2: Start Gen8 Training
 
 Run from the repo root in a **native Windows terminal** (CMD or PowerShell, NOT Git Bash):
 
 **CMD:**
 ```
 python -m crossplay.superleaves.remote_train ^
-  --generation 6 --games 36000000 ^
+  --generation 8 --games 100000000 ^
   --alpha-start 0.1 --alpha-end 0.001 ^
-  --workers 28 --push-every 500000
+  --workers 28 --push-every 250000 --resume
 ```
 
 **PowerShell:**
 ```powershell
 python -m crossplay.superleaves.remote_train `
-  --generation 6 --games 36000000 `
+  --generation 8 --games 100000000 `
   --alpha-start 0.1 --alpha-end 0.001 `
-  --workers 28 --push-every 500000
+  --workers 28 --push-every 250000 --resume
 ```
 
-**Note: NO --init-from and NO --resume.** This starts fresh from the hand-tuned
-formula, which is what gen3 (our best generation) did successfully.
+**Note:** Uses `--resume` to pick up from the checkpoint that was pushed to
+git. The `remote_train` wrapper handles auto-pushing checkpoints to GitHub
+every 250K games and accepts remote control signals via git.
 
-## What Changed from Gen5
+## What Gen8 Does Differently
 
-- **No init-from**: Gen5 was seeded from gen4 which had drifted tile values
-  (S inflated to +23, E to +18, Q positive when it should be negative).
-  Gen6 starts clean from the formula baseline.
-- **Higher alpha**: 0.1 -> 0.001 (proven schedule from gen3) instead of
-  gen5's too-conservative 0.03 -> 0.0003.
-- **remote_train.py now supports remote restart**: If dad pushes a
-  restart_config.json to git, the trainer will auto-stop and restart
-  with new parameters. No need to manually intervene.
+- **Research bootstrap**: Started from research-derived Crossplay leave
+  values instead of the hand-tuned formula. These values were calibrated
+  specifically for Crossplay's 3-blank, 40-point-sweep rules.
+- **100M games**: Much longer training run for deeper convergence.
+- **250K push interval**: Checkpoints pushed every ~25 minutes for
+  close monitoring (was 1M in gen6).
+
+## Remote Control (V2)
+
+Dad can now remotely control training by pushing `restart_config.json`
+to git. The monitor thread polls git every 60 seconds and detects signals
+automatically. **You don't need to do anything** -- it's fully automatic.
+
+### Available remote actions:
+
+| Action | What it does |
+|--------|-------------|
+| `pause` | Stop training, save checkpoint, push final state, exit |
+| `resume` | Resume from latest checkpoint (optionally with new params) |
+| `restart` | Fresh start with new parameters |
+| `validate` | Pause training, run validation test, push results, resume |
+| `tournament` | Pause training, run bot tournament, push results, resume |
+| `recalibrate` | Pause training, recalibrate MC speed, resume |
+| `update_code` | Pull latest code changes, optionally rebuild Cython, resume |
+| `status` | Force immediate status push (no training interruption) |
+
+### Example remote configs (dad pushes these via git):
+
+**Pause training:**
+```json
+{"action": "pause", "message": "Pausing for maintenance"}
+```
+
+**Run validation:**
+```json
+{
+  "action": "validate",
+  "table": "latest",
+  "opponent": "formula",
+  "validate_games": 5000,
+  "message": "Check gen8 progress vs formula"
+}
+```
+
+**Run tournament:**
+```json
+{
+  "action": "tournament",
+  "bot1": "dadbot_v6",
+  "bot2": "my_bot",
+  "tourney_games": 20,
+  "tier": "fast",
+  "message": "Quick bot check"
+}
+```
+
+After validate/tournament/recalibrate, training **automatically resumes**
+from the latest checkpoint. No manual intervention needed.
 
 ## Estimated Time
 
-- Total games: 36,000,000
-- Estimated sustained rate: ~160 g/s
-- ETA: ~62 hours (~2.5 days)
+- Total games: 100,000,000
+- Estimated sustained rate: ~90 g/s (28 workers)
+- ETA: ~309 hours (~12.9 days)
+- Checkpoints pushed every 250K games (~46 min intervals)
 
 ## Important Notes
 
 1. Workers take 30-90 seconds to load the GADDAG before progress appears
-2. GADDAG auto-builds on first run (~25s) if not cached
+2. GADDAG auto-builds on first run (~25s on your machine) if not cached
 3. Training runs fine in background -- you can use the computer normally
 4. If you need to stop: Ctrl+C (saves checkpoint before exiting)
-5. To resume after stopping: add `--resume` to the same command
-6. Git pushes happen automatically every 500K games
+5. To resume after manual stop: run the same command again (--resume)
+6. Git pushes happen automatically every 250K games
 7. If a git push fails, it retries next milestone -- no training interruption
+8. The monitor thread polls git every 60s for remote control signals
 
-## Remote Restart Feature (NEW)
+## If Something Goes Wrong
 
-Dad can now remotely retask the trainer by pushing a `restart_config.json`
-to git. When the monitor thread does its next `git pull` (at each push
-milestone), it detects the config and restarts the trainer automatically.
-You don't need to do anything -- it's fully automatic.
+- **Training crashes**: Just run the command again with `--resume`.
+  It will find the latest checkpoint and continue.
+- **Git push fails**: Check your internet connection. The push will
+  retry at the next 250K milestone automatically.
+- **"No checkpoint found"**: The gen8 checkpoint hasn't been pushed
+  to git yet. Tell dad to push one.
+- **Orphaned processes**: If you see extra Python processes after a
+  crash, the trainer cleans them up automatically on restart.
 
 ## Questions?
 
