@@ -32,7 +32,7 @@ def play_one_game(gaddag, move_finder_cls, leave_table, td_gamma=0.97):
 
     Returns:
         (observations, score1, score2)
-        observations: list of (leave_key, td_target, weight)
+        observations: list of (leave_key, td_target, weight, bag_size)
     """
     board = Board()
 
@@ -55,7 +55,7 @@ def play_one_game(gaddag, move_finder_cls, leave_table, td_gamma=0.97):
     score1, score2 = 0, 0
 
     # Per-player trajectories for TD backward pass
-    # Each entry: (leave_key, advantage, weight)
+    # Each entry: (leave_key, advantage, weight, bag_size)
     trajectory_p1 = []
     trajectory_p2 = []
 
@@ -109,7 +109,7 @@ def play_one_game(gaddag, move_finder_cls, leave_table, td_gamma=0.97):
             advantage = best_equity - top_score_equity
 
             traj = trajectory_p1 if is_p1 else trajectory_p2
-            traj.append((best_leave, advantage, weight))
+            traj.append((best_leave, advantage, weight, bag_size))
 
         # Place word on board
         board.place_word(word, row, col, horiz)
@@ -150,9 +150,9 @@ def play_one_game(gaddag, move_finder_cls, leave_table, td_gamma=0.97):
         # Backward pass: last move has V_next = 0
         v_next = 0.0
         for i in range(len(traj) - 1, -1, -1):
-            leave_key, advantage, weight = traj[i]
+            leave_key, advantage, weight, bag_size = traj[i]
             td_target = advantage + td_gamma * v_next
-            observations.append((leave_key, td_target, weight))
+            observations.append((leave_key, td_target, weight, bag_size))
             # V(this_leave) for the move before this one
             v_next = leave_table.get(leave_key, 0.0)
 

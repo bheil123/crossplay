@@ -139,7 +139,7 @@ def _play_batch(batch_size):
 
 def write_status(status, generation, games_completed, games_total,
                  games_per_sec, checkpoint_file, leave_table_size,
-                 single_tile_vals=None, batch_gps=None):
+                 single_tile_vals=None, batch_gps=None, count_stats=None):
     """Write training status to JSON file."""
     if games_per_sec > 0 and games_completed < games_total:
         eta_minutes = (games_total - games_completed) / games_per_sec / 60
@@ -165,6 +165,8 @@ def write_status(status, generation, games_completed, games_total,
                 single_tile_vals.items(), key=lambda x: -x[1]
             )
         }
+    if count_stats:
+        data['count_stats'] = count_stats
 
     path = _status_path()
     tmp = path + '.tmp'
@@ -252,9 +254,28 @@ def _async_save(table, paths):
     if _save_thread is not None:
         _save_thread.join()
 
-    # Snapshot the table dict under lock so main thread can continue
+    # Snapshot the table, counts, phase, and regression data under lock
     with _save_lock:
-        snapshot = dict(table._table)
+        phase_counts_list = [
+            (k, p, c) for (k, p), c in table._phase_counts.items() if c > 0
+        ]
+        phase_sums_list = [
+            (k, p, s) for (k, p), s in table._phase_sums.items() if s != 0.0
+        ]
+        reg_list = [
+            (k, table._reg_n[k], table._reg_sum_x[k], table._reg_sum_y[k],
+             table._reg_sum_xy[k], table._reg_sum_xx[k])
+            for k in table._reg_n if table._reg_n[k] > 0
+        ]
+        snapshot_data = {
+            '_format': 'v4',
+            'table': dict(table._table),
+            'counts': dict(table._counts),
+            'counts_start_games': table._counts_start_games,
+            'phase_counts': phase_counts_list,
+            'phase_sums': phase_sums_list,
+            'regression': reg_list,
+        }
 
     def _do_save():
         import pickle, tempfile
@@ -263,7 +284,7 @@ def _async_save(table, paths):
             fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
             try:
                 with os.fdopen(fd, 'wb') as f:
-                    pickle.dump(snapshot, f, protocol=pickle.HIGHEST_PROTOCOL)
+                    pickle.dump(snapshot_data, f, protocol=pickle.HIGHEST_PROTOCOL)
                 os.replace(tmp_path, path)
             except Exception:
                 try:
@@ -361,6 +382,13 @@ def train(num_games, workers, generation=1, resume_from=None,
         print(f"Resuming from checkpoint: {resume_from}")
         print(f"  Games already completed: {resume_games:,}")
         table = LeaveTable.load(resume_from)
+        # If counts tracking just started (no prior counts), record the start point
+        if table._counts_start_games == 0 and not any(table._counts.values()):
+            table._counts_start_games = resume_games
+            print(f"  Observation counting starts at game {resume_games:,}")
+        else:
+            obs_keys = sum(1 for v in table._counts.values() if v > 0)
+            print(f"  Observation counts: {obs_keys:,} keys observed since game {table._counts_start_games:,}")
     elif init_from:
         print(f"Initializing from previous generation: {init_from}")
         table = LeaveTable.load(init_from)
@@ -534,14 +562,31 @@ def train(num_games, workers, generation=1, resume_from=None,
                         top3 = sorted(stv.items(), key=lambda x: -x[1])[:3]
                         top3_str = ' '.join(f"{k}={v:+.1f}" for k, v in top3)
 
+                        # Get count stats for status
+                        cs = table.count_stats()
+                        obs_pct = cs['pct_observed']
+
                         print(
                             f"  [{pct:5.1f}%] {games_done:,}/{num_games:,}  "
                             f"{gps:.1f} g/s (batch {batch_gps:.1f})  "
                             f"alpha={alpha:.4f}  "
-                            f"obs={total_obs_count:,}  top: {top3_str}"
+                            f"obs={total_obs_count:,}  "
+                            f"coverage={obs_pct:.1f}%  top: {top3_str}"
                         )
                         last_report_games = games_done
                         last_report_time = now
+
+                        # Build per-size coverage for status
+                        by_size = cs.get('by_size', {})
+                        coverage_by_size = {}
+                        for sz in sorted(by_size):
+                            info = by_size[sz]
+                            coverage_by_size[f'{sz}_tile'] = {
+                                'total': info['total'],
+                                'observed': info['observed'],
+                                'pct': round(info['pct'], 1),
+                                'mean_obs': round(info['mean_count'], 1),
+                            }
 
                         # Update status file
                         write_status(
@@ -550,7 +595,14 @@ def train(num_games, workers, generation=1, resume_from=None,
                             _checkpoint_path(generation, games_done),
                             table_size,
                             stv,
-                            batch_gps=batch_gps
+                            batch_gps=batch_gps,
+                            count_stats={
+                                'keys_observed': cs['total_observed'],
+                                'pct_observed': round(obs_pct, 1),
+                                'total_observations': cs['total_observations'],
+                                'counts_start_games': cs['counts_start_games'],
+                                'by_size': coverage_by_size,
+                            }
                         )
 
                     # Checkpoint (async to avoid blocking the training loop)
