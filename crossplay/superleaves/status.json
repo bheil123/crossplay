@@ -1,13 +1,86 @@
 {
   "status": "running",
   "generation": 8,
-  "games_completed": 6610000,
+  "games_completed": 7338000,
   "games_total": 100000000,
-  "pct_complete": 6.6,
-  "games_per_sec": 0.0,
-  "batch_gps": null,
-  "eta_minutes": 0.0,
-  "checkpoint_file": "",
+  "pct_complete": 7.3,
+  "games_per_sec": 20.3,
+  "batch_gps": 18.8,
+  "eta_minutes": 76053.3,
+  "checkpoint_file": "C:\\Users\\billh\\crossplay\\crossplay\\superleaves\\gen8_7338000.pkl",
   "leave_table_size": 921298,
-  "timestamp": "2026-03-10 14:39:16"
+  "timestamp": "2026-03-11 03:26:40",
+  "single_tile_values": {
+    "?": -21.17,
+    "S": -29.42,
+    "X": -33.76,
+    "J": -41.29,
+    "Z": -41.92,
+    "K": -42.91,
+    "D": -43.97,
+    "B": -44.52,
+    "C": -44.59,
+    "R": -44.89,
+    "M": -46.04,
+    "Y": -46.96,
+    "L": -46.97,
+    "H": -47.16,
+    "N": -47.28,
+    "P": -47.67,
+    "W": -48.19,
+    "F": -49.95,
+    "V": -50.68,
+    "T": -52.28,
+    "U": -53.5,
+    "E": -54.11,
+    "G": -54.68,
+    "A": -54.73,
+    "O": -56.72,
+    "I": -59.58,
+    "Q": -77.62
+  },
+  "count_stats": {
+    "keys_observed": 424929,
+    "pct_observed": 46.1,
+    "total_observations": 17142145,
+    "counts_start_games": 6200000,
+    "by_size": {
+      "1_tile": {
+        "total": 27,
+        "observed": 27,
+        "pct": 100.0,
+        "mean_obs": 9677.4
+      },
+      "2_tile": {
+        "total": 373,
+        "observed": 373,
+        "pct": 100.0,
+        "mean_obs": 4109.2
+      },
+      "3_tile": {
+        "total": 3511,
+        "observed": 3511,
+        "pct": 100.0,
+        "mean_obs": 838.2
+      },
+      "4_tile": {
+        "total": 25305,
+        "observed": 25110,
+        "pct": 99.2,
+        "mean_obs": 204.8
+      },
+      "5_tile": {
+        "total": 148817,
+        "observed": 131710,
+        "pct": 88.5,
+        "mean_obs": 43.4
+      },
+      "6_tile": {
+        "total": 743265,
+        "observed": 264198,
+        "pct": 35.5,
+        "mean_obs": 5.8
+      }
+    }
+  }
 }
