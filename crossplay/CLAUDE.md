@@ -989,6 +989,18 @@ ls superleaves/gen3_*.pkl | grep -v gen3_FINAL | xargs rm
 and the deployed leave table. The engine is immediately playable. The GADDAG
 (gaddag_compact.bin) auto-builds on first run (~48 seconds).
 
+## Post-gen8 TODO (after 100M games complete)
+
+1. **Analyze regression slopes** -- identify tiles/leaves with significant
+   phase dependence from collected regression accumulators
+2. **Build phase-dependent leave lookup** from regression data (intercept +
+   slope * bag_size). No retraining needed -- "80% solution"
+3. **A/B test phase-dependent vs flat leaves** in tournament
+4. **If significant, design gen9** with 3 phase tables (early/mid/late) and
+   run on Bill3's 7950X3D machine (~147 g/s)
+5. **Confidence-weighted blending** -- trust trained values for high-count
+   keys, fade to formula for low-count (especially 6-tile with <17 obs)
+
 ## Common tasks
 
 **Start a new game:** `new N opponent` (e.g., `new 1 canjam`) -- creates
