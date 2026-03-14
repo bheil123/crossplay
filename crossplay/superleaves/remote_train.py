@@ -30,6 +30,12 @@ import subprocess
 import argparse
 import threading
 import signal
+import platform
+
+
+def _machine_name():
+    """Return a short machine identifier for commit messages."""
+    return platform.node() or 'unknown'
 
 
 def _superleaves_dir():
@@ -89,7 +95,7 @@ def _git_push_checkpoint(checkpoint_path, generation, games, repo_root, log_file
         return False
 
     # Commit
-    msg = f"Gen{generation} training progress from Bill3 7950X3D ({games:,} games)"
+    msg = f"Gen{generation} training progress from {_machine_name()} ({games:,} games)"
     ok, out, err = _git_cmd(['commit', '-m', msg], repo_root)
     if not ok:
         if 'nothing to commit' in err or 'nothing to commit' in out:
@@ -450,7 +456,7 @@ def _push_remote_results(action, output, repo_root, log_file):
 
     header = (f"{'='*60}\n"
               f"Remote {action} results -- {ts}\n"
-              f"Machine: Bill3 7950X3D\n"
+              f"Machine: {_machine_name()}\n"
               f"{'='*60}\n\n")
 
     try:
@@ -652,6 +658,16 @@ def main():
 
     _log_config(args, log_file)
     _log(f"Trainer command: {' '.join(trainer_cmd)}", log_file)
+
+    # Clear any stale signal files from previous runs to prevent
+    # the monitor thread from immediately triggering a restart
+    for stale_path in [_restart_config_path(), _restart_request_path()]:
+        if os.path.exists(stale_path):
+            _log(f"  Clearing stale signal file: {os.path.basename(stale_path)}", log_file)
+            try:
+                os.unlink(stale_path)
+            except OSError:
+                pass
 
     # Main training loop (supports remote control via restart_config.json)
     while True:
