@@ -76,13 +76,41 @@ def _git_cmd(args, cwd):
         return False, '', str(e)
 
 
+def _has_unpushed_commits(repo_root):
+    """Check if there are local commits not yet pushed to origin."""
+    ok, out, _ = _git_cmd(['rev-list', '--count', 'origin/main..HEAD'], repo_root)
+    if ok and out.strip().isdigit():
+        return int(out.strip()) > 0
+    return False
+
+
+def _squash_unpushed(repo_root, log_file):
+    """Squash all unpushed commits into one to prevent pileup."""
+    ok, out, _ = _git_cmd(['rev-list', '--count', 'origin/main..HEAD'], repo_root)
+    if ok and out.strip().isdigit():
+        count = int(out.strip())
+        if count > 1:
+            _log(f"  Squashing {count} unpushed commits into 1...", log_file)
+            _git_cmd(['reset', '--soft', 'origin/main'], repo_root)
+            return True
+    return False
+
+
 def _git_push_checkpoint(checkpoint_path, generation, games, repo_root, log_file):
-    """Push a checkpoint file to GitHub with conflict handling."""
+    """Push a checkpoint file to GitHub with conflict handling.
+
+    Prevents commit pileup: if previous push failed, squashes all unpushed
+    commits into one before adding the new checkpoint. Only one unpushed
+    commit exists at any time.
+    """
     rel_path = os.path.relpath(checkpoint_path, repo_root)
     status_path = os.path.join(_superleaves_dir(), 'status.json')
     rel_status = os.path.relpath(status_path, repo_root)
 
     _log(f"Pushing checkpoint: gen{generation}_{games:,} games", log_file)
+
+    # Squash any piled-up unpushed commits before adding more
+    _squash_unpushed(repo_root, log_file)
 
     # Stage the checkpoint and status file
     files_to_add = [rel_path]
@@ -94,7 +122,7 @@ def _git_push_checkpoint(checkpoint_path, generation, games, repo_root, log_file
         _log(f"  [!] git add failed: {err}", log_file)
         return False
 
-    # Commit
+    # Commit (single commit replaces any squashed ones)
     msg = f"Gen{generation} training progress from {_machine_name()} ({games:,} games)"
     ok, out, err = _git_cmd(['commit', '-m', msg], repo_root)
     if not ok:
