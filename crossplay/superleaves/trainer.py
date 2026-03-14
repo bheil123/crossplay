@@ -25,6 +25,7 @@ import glob
 import argparse
 import logging
 import threading
+import platform
 from pathlib import Path
 from datetime import datetime
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -50,12 +51,24 @@ def _superleaves_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _host_dir():
+    """Return host-specific checkpoint directory, creating if needed.
+
+    Each machine stores checkpoints and status in its own subdir
+    (superleaves/{hostname}/) to prevent conflicts when multiple
+    machines train independently and share via git.
+    """
+    d = os.path.join(_superleaves_dir(), platform.node())
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 def _status_path():
-    return os.path.join(_superleaves_dir(), 'status.json')
+    return os.path.join(_host_dir(), 'status.json')
 
 
 def _checkpoint_path(generation, games):
-    return os.path.join(_superleaves_dir(), f'gen{generation}_{games}.pkl')
+    return os.path.join(_host_dir(), f'gen{generation}_{games}.pkl')
 
 
 def _recalibrate_request_path():
@@ -206,35 +219,47 @@ def check_restart_request():
 # Find latest checkpoint for resume
 # ---------------------------------------------------------------------------
 
-def find_latest_checkpoint(generation=None):
+def find_latest_checkpoint(generation=None, host=None):
     """Find the most recent checkpoint file.
+
+    Searches in host-specific dir first, falls back to flat superleaves/
+    for backward compatibility with pre-host-dir checkpoints.
+
+    Args:
+        generation: filter to this generation number (or None for any)
+        host: search in superleaves/{host}/ instead of local host dir.
+              Use this to resume from another machine's checkpoint.
 
     Returns:
         (path, generation, games) or (None, None, None)
     """
-    pattern = os.path.join(_superleaves_dir(), 'gen*_*.pkl')
-    files = glob.glob(pattern)
-    if not files:
-        return None, None, None
+    # Determine search directories: host dir first, then flat dir fallback
+    if host:
+        search_dirs = [os.path.join(_superleaves_dir(), host)]
+    else:
+        search_dirs = [_host_dir(), _superleaves_dir()]
 
     best = None
     best_gen = 0
     best_games = 0
-    for f in files:
-        base = os.path.basename(f)
-        # Parse gen{N}_{games}.pkl
-        try:
-            parts = base.replace('.pkl', '').split('_')
-            gen = int(parts[0].replace('gen', ''))
-            games = int(parts[1])
-        except (ValueError, IndexError):
-            continue
-        if generation is not None and gen != generation:
-            continue
-        if gen > best_gen or (gen == best_gen and games > best_games):
-            best = f
-            best_gen = gen
-            best_games = games
+
+    for search_dir in search_dirs:
+        pattern = os.path.join(search_dir, 'gen*_*.pkl')
+        for f in glob.glob(pattern):
+            base = os.path.basename(f)
+            # Parse gen{N}_{games}.pkl
+            try:
+                parts = base.replace('.pkl', '').split('_')
+                gen = int(parts[0].replace('gen', ''))
+                games = int(parts[1])
+            except (ValueError, IndexError):
+                continue
+            if generation is not None and gen != generation:
+                continue
+            if gen > best_gen or (gen == best_gen and games > best_games):
+                best = f
+                best_gen = gen
+                best_games = games
 
     return best, best_gen, best_games
 
@@ -310,7 +335,7 @@ def _cleanup_old_checkpoints(generation, current_games, checkpoint_every, keep=3
     Always keeps checkpoints at multiples of checkpoint_every.
     Removes non-multiple checkpoints (e.g. from interrupts) older than keep.
     """
-    pattern = os.path.join(_superleaves_dir(), f'gen{generation}_*.pkl')
+    pattern = os.path.join(_host_dir(), f'gen{generation}_*.pkl')
     files = glob.glob(pattern)
     if not files:
         return
@@ -402,7 +427,7 @@ def train(num_games, workers, generation=1, resume_from=None,
     table_size = len(table)
 
     # Save initial table for workers to load
-    worker_table_path = os.path.join(_superleaves_dir(), '_worker_table.pkl')
+    worker_table_path = os.path.join(_host_dir(), '_worker_table.pkl')
     table.save(worker_table_path)
 
     # Alpha schedule: exponential decay
@@ -774,6 +799,10 @@ def main():
                         help='Quick 100K game smoke test')
     parser.add_argument('--resume', action='store_true',
                         help='Resume from latest checkpoint')
+    parser.add_argument('--resume-from-host', type=str, default=None,
+                        help='Resume from another host\'s checkpoint '
+                             '(e.g., --resume-from-host BILL3-PC). '
+                             'Implies --resume.')
     parser.add_argument('--init-from', type=str, default=None,
                         help='Initialize from a previous generation checkpoint '
                              '(e.g., gen1_350000.pkl for gen2 training)')
@@ -820,15 +849,25 @@ def main():
     resume_games = 0
     gen = args.generation
 
+    if args.resume_from_host:
+        args.resume = True  # --resume-from-host implies --resume
+
     if args.resume:
-        cp_path, cp_gen, cp_games = find_latest_checkpoint(args.generation)
+        host = args.resume_from_host
+        cp_path, cp_gen, cp_games = find_latest_checkpoint(args.generation, host=host)
         if cp_path:
             resume_from = cp_path
             resume_games = cp_games
             gen = cp_gen
-            print(f"Found checkpoint: gen{cp_gen} at {cp_games:,} games")
+            if host:
+                print(f"Found checkpoint from host '{host}': gen{cp_gen} at {cp_games:,} games")
+            else:
+                print(f"Found checkpoint: gen{cp_gen} at {cp_games:,} games")
         else:
-            print("No checkpoint found, starting fresh.")
+            if host:
+                print(f"No checkpoint found for host '{host}', starting fresh.")
+            else:
+                print("No checkpoint found, starting fresh.")
 
     # Resolve --init-from path (support bare filenames in superleaves dir)
     init_from = args.init_from

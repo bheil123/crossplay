@@ -415,9 +415,14 @@ def _resolve_path(path_str):
             return '__research__'
         return path_str
 
-    # Try as-is, then relative to superleaves dir
+    # Try as-is, then host dir, then flat superleaves dir
     if os.path.isabs(path_str) and os.path.exists(path_str):
         return path_str
+    # Check host-specific directory first
+    candidate = os.path.join(_host_dir(), path_str)
+    if os.path.exists(candidate):
+        return candidate
+    # Fallback to flat superleaves dir (backward compat)
     candidate = os.path.join(_superleaves_dir(), path_str)
     if os.path.exists(candidate):
         return candidate
@@ -459,6 +464,14 @@ def main():
 
 def _superleaves_dir():
     return os.path.dirname(os.path.abspath(__file__))
+
+
+def _host_dir():
+    """Return host-specific checkpoint directory."""
+    import platform
+    d = os.path.join(_superleaves_dir(), platform.node())
+    os.makedirs(d, exist_ok=True)
+    return d
 
 
 if __name__ == '__main__':

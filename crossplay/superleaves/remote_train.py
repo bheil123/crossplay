@@ -42,6 +42,13 @@ def _superleaves_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _host_dir():
+    """Return host-specific checkpoint directory, creating if needed."""
+    d = os.path.join(_superleaves_dir(), platform.node())
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
 def _repo_root():
     """Find the git repo root."""
     sl_dir = _superleaves_dir()
@@ -104,7 +111,7 @@ def _git_push_checkpoint(checkpoint_path, generation, games, repo_root, log_file
     commit exists at any time.
     """
     rel_path = os.path.relpath(checkpoint_path, repo_root)
-    status_path = os.path.join(_superleaves_dir(), 'status.json')
+    status_path = os.path.join(_host_dir(), 'status.json')
     rel_status = os.path.relpath(status_path, repo_root)
 
     _log(f"Pushing checkpoint: gen{generation}_{games:,} games", log_file)
@@ -268,7 +275,7 @@ def _cleanup_signal_files(log_file=None):
 def _handle_status_signal(config, repo_root, log_file):
     """Handle 'status' action: force push status.json immediately."""
     _log("  Forcing status push (remote request)...", log_file)
-    status_path = os.path.join(_superleaves_dir(), 'status.json')
+    status_path = os.path.join(_host_dir(), 'status.json')
     if os.path.exists(status_path):
         _git_push_files([status_path], 'Forced status push (remote request)',
                         repo_root, log_file)
@@ -294,7 +301,7 @@ def _run_validation(config, repo_root, log_file):
 
     # Resolve 'latest' table from status.json
     if table == 'latest':
-        status_path = os.path.join(_superleaves_dir(), 'status.json')
+        status_path = os.path.join(_host_dir(), 'status.json')
         if os.path.exists(status_path):
             try:
                 with open(status_path) as f:
@@ -557,7 +564,7 @@ def _monitor_and_push(generation, push_every, stop_event, restart_event,
     signal_holder is a mutable list for passing (action, config) back to main.
     """
     repo_root = _repo_root()
-    sl_dir = _superleaves_dir()
+    host_d = _host_dir()
     pushed = set()
     last_git_poll = 0
 
@@ -566,7 +573,7 @@ def _monitor_and_push(generation, push_every, stop_event, restart_event,
         did_git_pull = False
 
         # Check for new milestone checkpoints
-        status_path = os.path.join(sl_dir, 'status.json')
+        status_path = os.path.join(host_d, 'status.json')
         if os.path.exists(status_path):
             try:
                 with open(status_path) as f:
@@ -579,7 +586,7 @@ def _monitor_and_push(generation, push_every, stop_event, restart_event,
             milestone = (games_done // push_every) * push_every
             if milestone > 0 and milestone not in pushed:
                 cp_path = os.path.join(
-                    sl_dir, f'gen{generation}_{milestone}.pkl'
+                    host_d, f'gen{generation}_{milestone}.pkl'
                 )
                 if os.path.exists(cp_path):
                     success = _git_push_checkpoint(
@@ -619,7 +626,7 @@ def _monitor_and_push(generation, push_every, stop_event, restart_event,
 
     # Final push on exit: push whatever the latest checkpoint is
     _log("Monitor thread stopping, doing final push...", log_file)
-    status_path = os.path.join(sl_dir, 'status.json')
+    status_path = os.path.join(host_d, 'status.json')
     if os.path.exists(status_path):
         try:
             with open(status_path) as f:
