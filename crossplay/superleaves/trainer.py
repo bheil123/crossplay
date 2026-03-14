@@ -808,8 +808,8 @@ def main():
                              '(e.g., gen1_350000.pkl for gen2 training)')
     parser.add_argument('--batch-size', type=int, default=100,
                         help='Games per worker batch (default: 100)')
-    parser.add_argument('--checkpoint-every', type=int, default=10000,
-                        help='Checkpoint interval (default: 10K)')
+    parser.add_argument('--checkpoint-every', type=int, default=250000,
+                        help='Checkpoint interval (default: 250K)')
     parser.add_argument('--report-every', type=int, default=1000,
                         help='Progress report interval (default: 1K)')
     parser.add_argument('--td-gamma', type=float, default=0.97,

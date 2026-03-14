@@ -519,7 +519,7 @@ def _build_trainer_cmd(config, log_file=None):
         '--td-gamma', str(config.get('td_gamma', 0.97)),
         '--alpha-start', str(config.get('alpha_start', 0.1)),
         '--alpha-end', str(config.get('alpha_end', 0.001)),
-        '--checkpoint-every', str(config.get('checkpoint_every', 10000)),
+        '--checkpoint-every', str(config.get('checkpoint_every', 250000)),
     ]
     if config.get('workers'):
         cmd += ['--workers', str(config['workers'])]
@@ -676,8 +676,8 @@ def main():
                         help='Initial learning rate (default: 0.1)')
     parser.add_argument('--alpha-end', type=float, default=0.001,
                         help='Final learning rate (default: 0.001)')
-    parser.add_argument('--checkpoint-every', type=int, default=10000,
-                        help='Checkpoint interval (default: 10K)')
+    parser.add_argument('--checkpoint-every', type=int, default=250000,
+                        help='Checkpoint interval (default: 250K)')
     args = parser.parse_args()
 
     log_file = os.path.join(_superleaves_dir(), 'remote_train.log')
