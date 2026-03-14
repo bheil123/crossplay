@@ -1,0 +1,86 @@
+{
+  "status": "running",
+  "generation": 8,
+  "games_completed": 12393000,
+  "games_total": 100000000,
+  "pct_complete": 12.4,
+  "games_per_sec": 11.7,
+  "batch_gps": 11.8,
+  "eta_minutes": 125223.9,
+  "checkpoint_file": "C:\\Users\\billh\\crossplay\\crossplay\\superleaves\\Vipersden-ESJ\\gen8_12393000.pkl",
+  "leave_table_size": 921298,
+  "timestamp": "2026-03-14 12:06:33",
+  "single_tile_values": {
+    "R": -75.95,
+    "J": -87.2,
+    "I": -88.93,
+    "M": -102.74,
+    "X": -103.68,
+    "F": -104.77,
+    "V": -106.0,
+    "T": -115.78,
+    "Y": -120.79,
+    "Z": -121.72,
+    "G": -131.18,
+    "W": -138.26,
+    "K": -167.64,
+    "H": -168.14,
+    "C": -173.49,
+    "N": -181.92,
+    "Q": -183.61,
+    "S": -185.89,
+    "?": -186.6,
+    "L": -189.03,
+    "O": -194.34,
+    "B": -202.57,
+    "A": -204.25,
+    "P": -211.45,
+    "U": -215.68,
+    "D": -218.12,
+    "E": -236.76
+  },
+  "count_stats": {
+    "keys_observed": 794062,
+    "pct_observed": 86.2,
+    "total_observations": 109368287,
+    "counts_start_games": 6200000,
+    "by_size": {
+      "1_tile": {
+        "total": 27,
+        "observed": 27,
+        "pct": 100.0,
+        "mean_obs": 49875.9
+      },
+      "2_tile": {
+        "total": 373,
+        "observed": 373,
+        "pct": 100.0,
+        "mean_obs": 19557.7
+      },
+      "3_tile": {
+        "total": 3511,
+        "observed": 3511,
+        "pct": 100.0,
+        "mean_obs": 4315.8
+      },
+      "4_tile": {
+        "total": 25305,
+        "observed": 25303,
+        "pct": 100.0,
+        "mean_obs": 1132.4
+      },
+      "5_tile": {
+        "total": 148817,
+        "observed": 148111,
+        "pct": 99.5,
+        "mean_obs": 270.3
+      },
+      "6_tile": {
+        "total": 743265,
+        "observed": 616737,
+        "pct": 83.0,
+        "mean_obs": 27.4
+      }
+    }
+  }
+}
