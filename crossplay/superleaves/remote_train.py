@@ -525,6 +525,8 @@ def _build_trainer_cmd(config, log_file=None):
         cmd += ['--workers', str(config['workers'])]
     if config.get('resume'):
         cmd += ['--resume']
+    if config.get('resume_from_host'):
+        cmd += ['--resume-from-host', config['resume_from_host']]
     if config.get('init_from'):
         cmd += ['--init-from', config['init_from']]
     return cmd
@@ -543,7 +545,10 @@ def _build_trainer_cmd_from_args(args):
     ]
     if args.workers:
         cmd += ['--workers', str(args.workers)]
-    if args.resume:
+    if getattr(args, 'resume_from_host', None):
+        # --resume-from-host implies --resume; pass both
+        cmd += ['--resume', '--resume-from-host', args.resume_from_host]
+    elif args.resume:
         cmd += ['--resume']
     if args.init_from:
         cmd += ['--init-from', args.init_from]
@@ -659,6 +664,10 @@ def main():
                         help='Push checkpoint every N games (default: 250K)')
     parser.add_argument('--resume', action='store_true',
                         help='Resume from latest checkpoint')
+    parser.add_argument('--resume-from-host', type=str, default=None,
+                        help='Resume from another host\'s checkpoint '
+                             '(e.g., --resume-from-host Vipersden-ESJ). '
+                             'Implies --resume.')
     parser.add_argument('--init-from', type=str, default=None,
                         help='Initialize from a previous generation checkpoint')
     parser.add_argument('--td-gamma', type=float, default=0.97,
@@ -678,6 +687,11 @@ def main():
     trainer_cmd = _build_trainer_cmd_from_args(args)
     generation = args.generation
     push_every = args.push_every
+
+    # --resume-from-host implies --resume (only needed on first launch;
+    # subsequent auto-resumes use own host dir via plain --resume)
+    if args.resume_from_host:
+        args.resume = True
 
     # Track current training config for auto-resume after actions
     current_config = {
