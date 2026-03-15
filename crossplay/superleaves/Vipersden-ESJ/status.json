@@ -1,85 +1,85 @@
 {
   "status": "running",
   "generation": 8,
-  "games_completed": 12750000,
+  "games_completed": 13000000,
   "games_total": 100000000,
-  "pct_complete": 12.8,
-  "games_per_sec": 17.1,
-  "batch_gps": 18.8,
-  "eta_minutes": 85182.7,
-  "checkpoint_file": "C:\\Users\\billh\\crossplay\\crossplay\\superleaves\\Vipersden-ESJ\\gen8_12750000.pkl",
+  "pct_complete": 13.0,
+  "games_per_sec": 17.4,
+  "batch_gps": 16.4,
+  "eta_minutes": 83177.2,
+  "checkpoint_file": "C:\\Users\\billh\\crossplay\\crossplay\\superleaves\\Vipersden-ESJ\\gen8_13000000.pkl",
   "leave_table_size": 921298,
-  "timestamp": "2026-03-14 18:50:35",
+  "timestamp": "2026-03-14 22:46:58",
   "single_tile_values": {
-    "X": -142.81,
-    "Y": -148.36,
-    "J": -152.04,
-    "E": -157.42,
-    "Q": -161.34,
-    "R": -178.64,
-    "F": -188.11,
-    "Z": -191.02,
-    "T": -194.05,
-    "M": -197.16,
-    "D": -197.84,
-    "L": -199.56,
-    "V": -204.39,
-    "U": -205.66,
-    "I": -207.29,
-    "S": -207.95,
-    "G": -208.87,
-    "N": -210.6,
-    "W": -218.0,
-    "C": -219.17,
-    "?": -220.45,
-    "H": -226.9,
-    "K": -232.7,
-    "B": -234.67,
-    "O": -249.14,
-    "P": -264.76,
-    "A": -289.11
+    "Q": -107.22,
+    "X": -139.38,
+    "Y": -147.67,
+    "J": -152.39,
+    "R": -177.91,
+    "D": -179.22,
+    "E": -187.25,
+    "F": -188.5,
+    "N": -188.57,
+    "Z": -192.57,
+    "T": -196.35,
+    "V": -196.46,
+    "M": -199.32,
+    "U": -202.37,
+    "I": -204.7,
+    "C": -208.39,
+    "S": -211.29,
+    "G": -211.71,
+    "W": -216.61,
+    "P": -227.02,
+    "L": -227.93,
+    "?": -236.71,
+    "B": -240.33,
+    "H": -240.93,
+    "O": -247.8,
+    "K": -261.12,
+    "A": -272.45
   },
   "count_stats": {
-    "keys_observed": 816528,
-    "pct_observed": 88.6,
-    "total_observations": 115934097,
+    "keys_observed": 823786,
+    "pct_observed": 89.4,
+    "total_observations": 118972725,
     "counts_start_games": 6200000,
     "by_size": {
       "1_tile": {
         "total": 27,
         "observed": 27,
         "pct": 100.0,
-        "mean_obs": 51185.2
+        "mean_obs": 52506.7
       },
       "2_tile": {
         "total": 373,
         "observed": 373,
         "pct": 100.0,
-        "mean_obs": 20163.1
+        "mean_obs": 20649.9
       },
       "3_tile": {
         "total": 3511,
         "observed": 3511,
         "pct": 100.0,
-        "mean_obs": 4555.8
+        "mean_obs": 4684.3
       },
       "4_tile": {
         "total": 25305,
         "observed": 25303,
         "pct": 100.0,
-        "mean_obs": 1208.2
+        "mean_obs": 1237.5
       },
       "5_tile": {
         "total": 148817,
-        "observed": 148279,
-        "pct": 99.6,
-        "mean_obs": 283.8
+        "observed": 148331,
+        "pct": 99.7,
+        "mean_obs": 289.6
       },
       "6_tile": {
         "total": 743265,
-        "observed": 639035,
-        "pct": 86.0,
-        "mean_obs": 28.8
+        "observed": 646241,
+        "pct": 86.9,
+        "mean_obs": 29.6
       }
     }
   }
